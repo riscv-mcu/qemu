@@ -10,5 +10,8 @@ riscv_ss.add(when: 'CONFIG_SIFIVE_U', if_true: files('sifive_u.c'))
 riscv_ss.add(when: 'CONFIG_SPIKE', if_true: files('spike.c'))
 riscv_ss.add(when: 'CONFIG_MICROCHIP_PFSOC', if_true: files('microchip_pfsoc.c'))
 riscv_ss.add(when: 'CONFIG_PLCT_STONE', if_true: files('plct_stone.c'))
+riscv_ss.add(when: 'CONFIG_NUCLEI', if_true: files('nuclei_gd32vf103.c'))
+riscv_ss.add(when: 'CONFIG_NUCLEI', if_true: files('nuclei_hbird.c'))
+riscv_ss.add(when: 'CONFIG_NUCLEI_U', if_true: files('nuclei_u.c'))
 
 hw_arch += {'riscv': riscv_ss}
