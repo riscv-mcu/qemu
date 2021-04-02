@@ -990,8 +990,8 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
  */
 void riscv_cpu_do_interrupt(CPUState *cs)
 {
-#if !defined(CONFIG_USER_ONLY)
 
+#if !defined(CONFIG_USER_ONLY)
     RISCVCPU *cpu = RISCV_CPU(cs);
     CPURISCVState *env = &cpu->env;
     bool force_hs_execp = riscv_cpu_force_hs_excep_enabled(env);
@@ -1072,7 +1072,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         cause = set_field(cause, MCAUSE_MPP, PRV_M);
         cause = set_field(cause, MCAUSE_INTERRUPT, 1);
 
-        env->mintstatus = set_field(env->mintstatus, MINTSTATUS_MIL, level);  
+        env->mintstatus = set_field(env->mintstatus, MINTSTATUS_MIL, level);
     }else{
         cause = set_field(cause, MCAUSE_INTERRUPT, 0);
     }
