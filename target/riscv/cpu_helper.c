@@ -1150,10 +1150,16 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     } else {
         /* handle the trap in M-mode */
         if(eclic_flag ) {
+            uint32_t riscv_addr_size = 4; 
+            if (!riscv_cpu_is_32bit(env))
+            {
+                riscv_addr_size = 8;
+            }
+
             if(mode)
             {
-                uint64_t vec_addr = (cause & 0x3FF) *4 + env->mtvt;
-                cpu_physical_memory_rw(vec_addr, &newpc,  4, 0);
+                uint64_t vec_addr = (cause & 0x3FF) *riscv_addr_size + env->mtvt;
+                cpu_physical_memory_rw(vec_addr, &newpc,  riscv_addr_size, 0);
             }else{
                 if ((env->mtvt2 & 0x1) == 0) {
                     newpc = env->mtvec & 0xfffffffc;

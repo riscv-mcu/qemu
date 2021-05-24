@@ -1036,10 +1036,16 @@ static int write_msavedcause2(CPURISCVState *env, int csrno, target_ulong val)
 static int rmw_pushmsubm(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
+    uint64_t notify_addr = 0;
+    uint32_t riscv_addr_size = 4; 
+    if (!riscv_cpu_is_32bit(env))
+    {
+        riscv_addr_size = 8;
+    }
 
-    uint64_t notify_addr = new_value * 4 + env->gpr[2];
+    notify_addr = new_value * riscv_addr_size + env->gpr[2];
 
-    cpu_physical_memory_rw(notify_addr, &env->msubm,  4, 1);
+    cpu_physical_memory_rw(notify_addr, &env->msubm,  riscv_addr_size, 1);
 
     return RISCV_EXCP_NONE;
 }
@@ -1061,25 +1067,39 @@ static int rmw_jalmnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
 {
     target_ulong addr;
 
+    uint32_t riscv_addr_size = 4; 
+    if (!riscv_cpu_is_32bit(env))
+    {
+        riscv_addr_size = 8;
+    }
+
     if (env->irq_pending) {
-    	uint64_t vec_addr = (env->mcause & 0x3FF) *4 + env->mtvt;
-    	cpu_physical_memory_rw(vec_addr, &addr,  4, 0);
-    	env->gpr[1] = env->pc + 4;  //ret use
-    	env->gpr[5] = env->pc + 4;  //link reg
-    	*ret_value = addr;
-    	env->mstatus = set_field(env->mstatus, MSTATUS_MIE, 1);
-    	riscv_cpu_eclic_int_handler_start(env->eclic, env->mcause & 0x3ff);
+        uint64_t vec_addr = (env->mcause & 0x3FF) *riscv_addr_size + env->mtvt;
+        cpu_physical_memory_rw(vec_addr, &addr,  riscv_addr_size, 0);
+        env->gpr[1] = env->pc + riscv_addr_size;  //ret use
+        env->gpr[5] = env->pc + riscv_addr_size;  //link reg
+        *ret_value = addr;
+        env->mstatus = set_field(env->mstatus, MSTATUS_MIE, 1);
+        riscv_cpu_eclic_int_handler_start(env->eclic, env->mcause & 0x3ff);
     } else
-    	*ret_value = env->pc + 4;
+        *ret_value = env->pc + riscv_addr_size;
+    
     return RISCV_EXCP_NONE;
 }
 
 static int rmw_pushmcause(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
-    uint64_t notify_addr = new_value * 4 + env->gpr[2];
+    uint64_t notify_addr = 0;
+    uint32_t riscv_addr_size = 4; 
+    if (!riscv_cpu_is_32bit(env))
+    {
+        riscv_addr_size = 8;
+    }
+    
+    notify_addr = new_value * riscv_addr_size + env->gpr[2];
 
-    cpu_physical_memory_rw(notify_addr, &env->mcause,  4, 1);
+    cpu_physical_memory_rw(notify_addr, &env->mcause,  riscv_addr_size, 1);
 
     return RISCV_EXCP_NONE;
 }
@@ -1087,8 +1107,15 @@ static int rmw_pushmcause(CPURISCVState *env, int csrno, target_ulong *ret_value
 static int rmw_pushmepc(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
-    uint64_t notify_addr = new_value * 4 + env->gpr[2];
-    cpu_physical_memory_rw(notify_addr, &env->mepc, 4, 1);
+    uint64_t notify_addr = 0;
+    uint32_t riscv_addr_size = 4; 
+    if (!riscv_cpu_is_32bit(env))
+    {
+        riscv_addr_size = 8;
+    }
+
+    notify_addr = new_value * riscv_addr_size + env->gpr[2];
+    cpu_physical_memory_rw(notify_addr, &env->mepc, riscv_addr_size, 1);
     return RISCV_EXCP_NONE;
 }
 
