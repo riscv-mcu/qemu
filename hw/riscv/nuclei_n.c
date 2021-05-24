@@ -46,44 +46,29 @@ static const struct MemmapEntry
 {
     hwaddr base;
     hwaddr size;
-} nuclei_memmap[] = {
-    [HBIRD_DEBUG] = {0x0, 0x1000},
-    [HBIRD_ROM] = {0x1000, 0x1000},
-    [HBIRD_TIMER] = {0x2000000, 0x1000},
-    [HBIRD_ECLIC] = {0xc000000, 0x10000},
-    [HBIRD_GPIO] = {0x10012000, 0x1000},
-    [HBIRD_UART0] = {0x10013000, 0x1000},
-    [HBIRD_QSPI0] = {0x10014000, 0x1000},
-    [HBIRD_PWM0] = {0x10015000, 0x1000},
-    [HBIRD_UART1] = {0x10023000, 0x1000},
-    [HBIRD_QSPI1] = {0x10024000, 0x1000},
-    [HBIRD_PWM1] = {0x10025000, 0x1000},
-    [HBIRD_QSPI2] = {0x10034000, 0x1000},
-    [HBIRD_PWM2] = {0x10035000, 0x1000},
-    [HBIRD_XIP] = {0x20000000, 0x10000000}, //flashxip
-    [HBIRD_DRAM] = {0xa0000000, 0x0},       //ddr
-    [HBIRD_ILM] = {0x80000000, 0x20000},    //ilm
-    [HBIRD_DLM] = {0x90000000, 0x20000},
+} nuclei_n_memmap[] = {
+    [NUCLEI_N_DEV_DEBUG] = {        0x0,     0x1000 },
+    [NUCLEI_N_DEV_ROM]   = {     0x1000,     0x1000 },
+    [NUCLEI_N_DEV_TIMER] = {  0x2000000,     0x1000 },
+    [NUCLEI_N_DEV_ECLIC] = {  0xc000000,    0x10000 },
+    [NUCLEI_N_DEV_GPIO]  = { 0x10012000,     0x1000 },
+    [NUCLEI_N_DEV_UART0] = { 0x10013000,     0x1000 },
+    [NUCLEI_N_DEV_QSPI0] = { 0x10014000,     0x1000 },
+    [NUCLEI_N_DEV_PWM0]  = { 0x10015000,     0x1000 },
+    [NUCLEI_N_DEV_UART1] = { 0x10023000,     0x1000 },
+    [NUCLEI_N_DEV_QSPI1] = { 0x10024000,     0x1000 },
+    [NUCLEI_N_DEV_PWM1]  = { 0x10025000,     0x1000 },
+    [NUCLEI_N_DEV_QSPI2] = { 0x10034000,     0x1000 },
+    [NUCLEI_N_DEV_PWM2]  = { 0x10035000,     0x1000 },
+    [NUCLEI_N_DEV_XIP]   = { 0x20000000, 0x10000000 },
+    [NUCLEI_N_DEV_ILM]   = { 0x80000000,    0x20000 },
+    [NUCLEI_N_DEV_DLM]   = { 0x90000000,    0x20000 },
 };
 
-static void nuclei_machine_get_uint32_prop(Object *obj, Visitor *v,
-                                           const char *name, void *opaque,
-                                           Error **errp)
+static void riscv_nuclei_n_machine_init(MachineState *machine)
 {
-    visit_type_uint32(v, name, (uint32_t *)opaque, errp);
-}
-
-static void nuclei_machine_set_uint32_prop(Object *obj, Visitor *v,
-                                           const char *name, void *opaque,
-                                           Error **errp)
-{
-    visit_type_uint32(v, name, (uint32_t *)opaque, errp);
-}
-
-static void nuclei_board_init(MachineState *machine)
-{
-    const struct MemmapEntry *memmap = nuclei_memmap;
-    NucleiHBState *s = HBIRD_FPGA_MACHINE(machine);
+    const struct MemmapEntry *memmap = nuclei_n_memmap;
+    NucleiNState *s = RISCV_NUCLEI_N_MACHINE(machine);
     MemoryRegion *system_memory = get_system_memory();
     MemoryRegion *main_mem = g_new(MemoryRegion, 1);
     MemoryRegion *flash = g_new(MemoryRegion, 1);
@@ -92,30 +77,18 @@ static void nuclei_board_init(MachineState *machine)
 
     /* TODO: Add qtest support */
     /* Initialize SOC */
-    object_initialize_child(OBJECT(machine), "soc", &s->soc, TYPE_NUCLEI_HBIRD_SOC);
+    object_initialize_child(OBJECT(machine), "soc", &s->soc, TYPE_NUCLEI_N_SOC);
     qdev_realize(DEVICE(&s->soc), NULL, &error_abort);
 
-    memory_region_init_ram(&s->soc.ilm, NULL, "riscv.nuclei.ram.ilm",
-                           memmap[HBIRD_ILM].size, &error_fatal);
-    memory_region_add_subregion(system_memory,
-                                memmap[HBIRD_ILM].base, &s->soc.ilm);
+    memory_region_init_ram(&s->soc.ilm, NULL, "riscv.nuclei.n.ram.ilm",
+        memmap[NUCLEI_N_DEV_ILM].size, &error_fatal);
+    memory_region_add_subregion(system_memory, 
+        memmap[NUCLEI_N_DEV_ILM].base, &s->soc.ilm);
 
-    memory_region_init_ram(&s->soc.dlm, NULL, "riscv.nuclei.ram.dlm",
-                           memmap[HBIRD_DLM].size, &error_fatal);
-    memory_region_add_subregion(system_memory,
-                                memmap[HBIRD_DLM].base, &s->soc.dlm);
-
-    /* register DRAM */
-    memory_region_init_ram(main_mem, NULL, "riscv.nuclei.dram",
-                           machine->ram_size, &error_fatal);
-    memory_region_add_subregion(system_memory, memmap[HBIRD_DRAM].base,
-                                main_mem);
-
-    /* Flash memory */
-    memory_region_init_ram(flash, NULL, "riscv.nuclei.xip",
-                           memmap[HBIRD_XIP].size, &error_fatal);
-    memory_region_add_subregion(system_memory, memmap[HBIRD_XIP].base,
-                                flash);
+    memory_region_init_ram(&s->soc.dlm, NULL, "riscv.nuclei.n.ram.dlm",
+        memmap[NUCLEI_N_DEV_DLM].size, &error_fatal);
+    memory_region_add_subregion(system_memory, 
+        memmap[NUCLEI_N_DEV_DLM].base, &s->soc.dlm);
 
     switch (s->msel)
     {
@@ -158,8 +131,7 @@ static void nuclei_board_init(MachineState *machine)
         reset_vec[i] = cpu_to_le32(reset_vec[i]);
     }
     rom_add_blob_fixed_as("mrom.reset", reset_vec, sizeof(reset_vec),
-                          memmap[HBIRD_ROM].base, &address_space_memory);
-
+        memmap[NUCLEI_N_DEV_ROM].base, &address_space_memory);
     /* boot rom */
     if (machine->kernel_filename)
     {
@@ -179,9 +151,9 @@ static void nuclei_soc_init(Object *obj)
 
 static void nuclei_soc_realize(DeviceState *dev, Error **errp)
 {
-    const struct MemmapEntry *memmap = nuclei_memmap;
+    const struct MemmapEntry *memmap = nuclei_n_memmap;
     MachineState *ms = MACHINE(qdev_get_machine());
-    NucleiHBSoCState *s = RISCV_NUCLEI_HBIRD_SOC(dev);
+    NucleiNSoCState *s = RISCV_NUCLEI_N_SOC(dev);
     MemoryRegion *sys_mem = get_system_memory();
     Error *err = NULL;
 
@@ -190,19 +162,19 @@ static void nuclei_soc_realize(DeviceState *dev, Error **errp)
     sysbus_realize(SYS_BUS_DEVICE(&s->cpus), &error_abort);
 
     /* Mask ROM */
-    memory_region_init_rom(&s->internal_rom, OBJECT(dev), "riscv.nuclei.irom",
-                           memmap[HBIRD_ROM].size, &error_fatal);
+    memory_region_init_rom(&s->internal_rom, OBJECT(dev), "riscv.nuclei.n.irom",
+                           memmap[NUCLEI_N_DEV_ROM].size, &error_fatal);
     memory_region_add_subregion(sys_mem,
-                                memmap[HBIRD_ROM].base, &s->internal_rom);
+        memmap[NUCLEI_N_DEV_ROM].base, &s->internal_rom);
 
     /* MMIO */
-    s->eclic = nuclei_eclic_create(memmap[HBIRD_ECLIC].base,
-                                   memmap[HBIRD_ECLIC].size, HBIRD_SOC_INT_MAX);
+    s->eclic = nuclei_eclic_create(memmap[NUCLEI_N_DEV_ECLIC].base,
+        memmap[NUCLEI_N_DEV_ECLIC].size, NUCLEI_N_INT_MAX);
 
-    s->timer = nuclei_systimer_create(memmap[HBIRD_TIMER].base,
-                                      memmap[HBIRD_TIMER].size,
-                                      s->eclic,
-                                      NUCLEI_HBIRD_TIMEBASE_FREQ);
+    s->timer = nuclei_systimer_create(memmap[NUCLEI_N_DEV_TIMER].base,
+                memmap[NUCLEI_N_DEV_TIMER].size,
+                 s->eclic,
+                NUCLEI_N_TIMEBASE_FREQ);
 
     /* GPIO */
     sysbus_realize(SYS_BUS_DEVICE(&s->gpio), &err);
@@ -213,73 +185,72 @@ static void nuclei_soc_realize(DeviceState *dev, Error **errp)
     }
 
     /* Map GPIO registers */
-    sysbus_mmio_map(SYS_BUS_DEVICE(&s->gpio), 0, memmap[HBIRD_GPIO].base);
+    sysbus_mmio_map(SYS_BUS_DEVICE(&s->gpio), 0, memmap[NUCLEI_N_DEV_GPIO].base);
     /* Pass all GPIOs to the SOC layer so they are available to the board */
 
     /* Create and connect UART interrupts to the ECLIC */
     nuclei_uart_create(sys_mem,
-                       memmap[HBIRD_UART0].base,
-                       memmap[HBIRD_UART0].size,
-                       serial_hd(0),
-                       nuclei_eclic_get_irq(DEVICE(s->eclic),
-                                            HBIRD_SOC_INT22_IRQn));
+                    memmap[NUCLEI_N_DEV_UART0].base,
+                    memmap[NUCLEI_N_DEV_UART0].size,
+                    serial_hd(0),
+                    nuclei_eclic_get_irq(DEVICE(s->eclic),
+                    NUCLEI_N_INT22_IRQn));
+
+    /* Flash memory */
+    memory_region_init_rom(&s->xip_mem, OBJECT(dev), "riscv.nuclei.n.xip",
+                        memmap[NUCLEI_N_DEV_XIP].size, &error_fatal);
+    memory_region_add_subregion(sys_mem,
+                        memmap[NUCLEI_N_DEV_XIP].base, &s->xip_mem);
 }
 
-static void nuclei_machine_instance_init(Object *obj)
-{
-    NucleiHBState *s = HBIRD_FPGA_MACHINE(obj);
-
-    s->msel = 0;
-    object_property_add(obj, "msel", "uint32",
-                        nuclei_machine_get_uint32_prop,
-                        nuclei_machine_set_uint32_prop, NULL, &s->msel);
-    object_property_set_description(obj, "msel",
-                                    "Mode Select Startup");
-}
-
-static void nuclei_machine_class_init(ObjectClass *oc, void *data)
+static void riscv_nuclei_n_machine_class_init(ObjectClass *oc, void *data)
 {
     MachineClass *mc = MACHINE_CLASS(oc);
 
-    mc->desc = "Nuclei HummingBird Evaluation Kit";
-    mc->init = nuclei_board_init;
+    mc->desc = "Nuclei RISC-V demosoc on Kit(MCU200T/DDR200T), support Nuclei N/NX class processor";
+    mc->init = riscv_nuclei_n_machine_init;
     mc->max_cpus = 1;
     mc->default_cpu_type = NUCLEI_N_CPU;
 }
 
-static const TypeInfo nuclei_machine_typeinfo = {
-    .name = MACHINE_TYPE_NAME("hbird_fpga"),
-    .parent = TYPE_MACHINE,
-    .class_init = nuclei_machine_class_init,
-    .instance_init = nuclei_machine_instance_init,
-    .instance_size = sizeof(NucleiHBState),
-};
-
-static void nuclei_machine_init_register_types(void)
+static void riscv_nuclei_n_machine_instance_init(Object *obj)
 {
-    type_register_static(&nuclei_machine_typeinfo);
+    //todo
 }
 
-type_init(nuclei_machine_init_register_types)
+static const TypeInfo riscv_nuclei_n_machine_typeinfo = {
+    .name       = MACHINE_TYPE_NAME("nuclei_n"),
+    .parent     = TYPE_MACHINE,
+    .class_init = riscv_nuclei_n_machine_class_init,
+    .instance_init = riscv_nuclei_n_machine_instance_init,
+    .instance_size = sizeof(NucleiNState),
+};
 
-    static void nuclei_soc_class_init(ObjectClass *oc, void *data)
+static void riscv_nuclei_n_machine_init_register_types(void)
+{
+    type_register_static(&riscv_nuclei_n_machine_typeinfo);
+}
+
+type_init(riscv_nuclei_n_machine_init_register_types)
+
+static void riscv_nuclei_n_soc_class_init(ObjectClass *oc, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(oc);
-    dc->realize = nuclei_soc_realize;
+    dc->realize = riscv_nuclei_n_soc_realize;
     dc->user_creatable = false;
 }
 
-static const TypeInfo nuclei_soc_type_info = {
-    .name = TYPE_NUCLEI_HBIRD_SOC,
+static const TypeInfo riscv_nuclei_n_soc_type_info = {
+    .name = TYPE_NUCLEI_N_SOC,
     .parent = TYPE_DEVICE,
-    .instance_size = sizeof(NucleiHBSoCState),
-    .instance_init = nuclei_soc_init,
-    .class_init = nuclei_soc_class_init,
+    .instance_size = sizeof(NucleiNSoCState),
+    .instance_init = riscv_nuclei_n_soc_init,
+    .class_init = riscv_nuclei_n_soc_class_init,
 };
 
-static void nuclei_soc_register_types(void)
+static void riscv_nuclei_n_soc_register_types(void)
 {
-    type_register_static(&nuclei_soc_type_info);
+    type_register_static(&riscv_nuclei_n_soc_type_info);
 }
 
-type_init(nuclei_soc_register_types)
+type_init(riscv_nuclei_n_soc_register_types)
