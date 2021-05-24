@@ -298,7 +298,7 @@ static void create_fdt(NucLeiUState *s, const struct MemmapEntry *memmap,
     g_free(nodename);
 
     nodename = g_strdup_printf("/spi@%lx",
-                               memmap[NUCLEI_U_SPI0].base);
+        (long)memmap[NUCLEI_U_SPI0].base);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,spi0");
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
@@ -594,7 +594,7 @@ static void nuclei_u_machine_class_init(ObjectClass *oc, void *data)
 {
     MachineClass *mc = MACHINE_CLASS(oc);
 
-    mc->desc = "RISC-V NUCLEI U Board";
+    mc->desc = "Nuclei RISC-V demosoc on Kit(MCU200T/DDR200T), support Nuclei UX class processor with MMU";
     mc->init = nuclei_u_machine_init;
     mc->max_cpus = NUCLEI_U_MANAGEMENT_CPU_COUNT + NUCLEI_U_COMPUTE_CPU_COUNT;
     mc->min_cpus = NUCLEI_U_MANAGEMENT_CPU_COUNT + 1;
@@ -733,7 +733,7 @@ static void nuclei_u_soc_realize(DeviceState *dev, Error **errp)
         return;
     }
     sysbus_mmio_map(SYS_BUS_DEVICE(&s->timer), 0, memmap[NUCLEI_U_DEV_TIMER].base);
-    s->timer.timebase_freq = NUCLEI_HBIRD_TIMEBASE_FREQ;
+    s->timer.timebase_freq = NUCLEI_U_TIMEBASE_FREQ;
 
     qdev_prop_set_uint32(DEVICE(&s->gpio), "ngpio", 16);
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->gpio), errp))

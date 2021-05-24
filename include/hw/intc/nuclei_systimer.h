@@ -63,8 +63,9 @@ typedef struct NucLeiSYSTIMERState
 
 } NucLeiSYSTIMERState;
 
-#define NUCLEI_GD32_TIMEBASE_FREQ (108000000 * 2)
-#define NUCLEI_HBIRD_TIMEBASE_FREQ (10000000)
+#define  NUCLEI_GD32_TIMEBASE_FREQ  (108000000)
+#define  NUCLEI_N_TIMEBASE_FREQ     (100000/2)
+#define  NUCLEI_U_TIMEBASE_FREQ     (100000/2)
 
 DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size,
                                     DeviceState *eclic, uint32_t timebase_freq);
