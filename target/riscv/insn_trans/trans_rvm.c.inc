@@ -126,3 +126,23 @@ static bool trans_remuw(DisasContext *ctx, arg_remuw *a)
 
     return gen_arith_div_uw(ctx, a, &gen_remu);
 }
+
+
+static bool trans_lbuf(DisasContext *ctx, arg_lbuf *a)
+{
+    gen_helper_lbuf(cpu_gpr[a->rs1]);
+    return true;
+}
+
+static bool trans_sbuf(DisasContext *ctx, arg_sbuf *a)
+{
+    gen_helper_sbuf(cpu_gpr[a->rs1]);
+    return true;
+}
+
+static bool trans_rowsum(DisasContext *ctx, arg_rowsum *a)
+{
+    gen_helper_rowsum(cpu_gpr[a->rd],cpu_gpr[a->rs1]);
+    return true;
+}
+
