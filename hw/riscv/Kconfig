@@ -33,6 +33,7 @@ config RISCV_VIRT
     select SIFIVE_PLIC
     select SIFIVE_TEST
     select VIRTIO_MMIO
+    select FW_CFG_DMA
 
 config SIFIVE_E
     bool
@@ -66,3 +67,39 @@ config SPIKE
     select MSI_NONBROKEN
     select SIFIVE_CLINT
     select SIFIVE_PLIC
+
+config GD32VF103
+    bool
+    select MSI_NONBROKEN
+    select NUCLEI_RCU
+    select NUCLEI_SYSTIMER
+    select NUCLEI_ECLIC
+    select GD32VF103_GPIO
+    select GD32VF103_ADC
+    select GD32VF103_I2C
+    select GD32VF103_RTC
+    select GD32VF103_SPI
+    select GD32VF103_TIMER
+    select WDT_GD32VF103
+    select GD32VF103_USART
+    select UNIMP
+
+config NUCLEI_N
+    bool
+    select MSI_NONBROKEN
+    select NUCLEI_RCU
+    select NUCLEI_SYSTIMER
+    select NUCLEI_ECLIC
+    select SIFIVE_GPIO
+    select NUCLEI_UART
+    select UNIMP
+
+config NUCLEI_U
+    bool
+    select MSI_NONBROKEN
+    select NUCLEI_SYSTIMER
+    select SIFIVE_GPIO
+    select SIFIVE_PLIC
+    select SIFIVE_UART
+    select SIFIVE_SPI
+    select SSI_M25P80
