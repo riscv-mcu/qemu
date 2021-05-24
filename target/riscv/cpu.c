@@ -244,6 +244,15 @@ static void rv64imacu_nuclei_u_cpu_init(Object *obj)
     set_feature(env, RISCV_FEATURE_PMP);
 }
 
+static void rv64imafcu_nuclei_u_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    set_misa(env, RV64 | RVI | RVM | RVA | RVF | RVC | RVU);
+    set_priv_version(env, PRIV_VERSION_1_10_0);
+    set_resetvec(env, DEFAULT_RSTVEC);
+    set_feature(env, RISCV_FEATURE_PMP);
+}
+
 static void rv64imafdcu_nuclei_u_cpu_init(Object *obj)
 {
     CPURISCVState *env = &RISCV_CPU(obj)->env;
@@ -348,7 +357,7 @@ static void rv32emacu_nuclei_cpu_init(Object *obj)
 static void rv32imafcu_nuclei_cpu_init(Object *obj)
 {
     CPURISCVState *env = &RISCV_CPU(obj)->env;
-    set_misa(env, RV32 | RVI | RVM | RVA | RVF |RVC | RVU);
+    set_misa(env, RV32 | RVI | RVM | RVA | RVF | RVC | RVU);
     set_priv_version(env, PRIV_VERSION_1_10_0);
     qdev_prop_set_bit(DEVICE(obj), "mmu", false);
     set_resetvec(env, DEFAULT_RSTVEC);
@@ -986,6 +995,7 @@ static const TypeInfo riscv_cpu_type_infos[] = {
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_NX900F,    rv64imafcu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_NX900FD,   rv64imafdcu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX600,     rv64imacu_nuclei_u_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX600F,    rv64imafcu_nuclei_u_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX600FD,   rv64imafdcu_nuclei_u_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX900,     rv64imacu_nuclei_u_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX900FD,   rv64imafdcu_nuclei_u_cpu_init),
