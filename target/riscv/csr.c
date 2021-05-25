@@ -325,7 +325,18 @@ static int read_instret(CPURISCVState *env, int csrno, target_ulong *val)
     if (icount_enabled()) {
         *val = icount_get();
     } else {
-        *val = cpu_get_host_ticks();
+        if( env->scounteren != 0)
+        {
+            *val = 0;
+        }
+        else
+        {
+            //*val = cpu_get_host_ticks();
+            static int prev_instret = 0;
+            static int cnt = 0;
+            prev_instret = prev_instret + (cnt++);
+            *val = prev_instret;
+        }
     }
 #else
     *val = cpu_get_host_ticks();
@@ -339,7 +350,8 @@ static int read_instreth(CPURISCVState *env, int csrno, target_ulong *val)
     if (icount_enabled()) {
         *val = icount_get() >> 32;
     } else {
-        *val = cpu_get_host_ticks() >> 32;
+        //*val = cpu_get_host_ticks() >> 32;
+        *val = 0;
     }
 #else
     *val = cpu_get_host_ticks() >> 32;
@@ -627,11 +639,13 @@ static int write_mtvec(CPURISCVState *env, int csrno, target_ulong val)
     /* bits [1:0] encode mode; 0 = direct, 1 = vectored, 2 >= reserved */
    if (mode1 < 2) {
         env->mtvec = val;
+        env->mnvec = val;
     } else {
          /* bits [5:0] encode extended modes currently used by the ECLIC */
         switch (mode2) {
         case 0b000011: /* ECLIC  mode */
             env->mtvec = val;
+            env->mnvec = val;
             break;
         default:
                 qemu_log_mask(LOG_UNIMP, "CSR_MTVEC: reserved mode not supported\n");
@@ -917,7 +931,12 @@ static int rmw_pushmsubm(CPURISCVState *env, int csrno, target_ulong *ret_value,
 
 static int read_mtvt2(CPURISCVState *env, int csrno, target_ulong *val)
 {
-    *val = env->mtvt2;
+    int low_bit = 0;
+    if(env->mtvt2 & 0x01)
+    {
+        low_bit = 1;
+    }
+    *val = ((env->mtvt2 & (target_ulong)(~0x3)) | low_bit);    
     return 0;
 }
 
@@ -1004,6 +1023,7 @@ static int read_sleepvalue(CPURISCVState *env, int csrno, target_ulong *val)
 static int write_sleepvalue(CPURISCVState *env, int csrno, target_ulong val)
 {
     env->sleepvalue = val;
+    riscv_cpu_eclic_int_handler_start(env->eclic, env->mcause & val);
     return 0;
 }
 

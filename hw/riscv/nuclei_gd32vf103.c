@@ -72,6 +72,8 @@ static const struct MemmapEntry
     [GD32VF103_GPIOE] = {0x40011800, 0x400},
 };
 
+NucleiGDBoardType board_type;
+
 static void nuclei_board_init(MachineState *machine)
 {
     const struct MemmapEntry *memmap = gd32vf103_memmap;
@@ -245,18 +247,43 @@ static void riscv_nuclei_soc_realize(DeviceState *dev, Error **errp)
     /* Pass all GPIOs to the SOC layer so they are available to the board */
 
     /* Create and connect USART interrupts to the ECLIC */
-    gd32vf103_usart_create(sys_mem,
-                           memmap[GD32VF103_UART4].base,
-                           memmap[GD32VF103_UART4].size,
-                           serial_hd(0),
-                           nuclei_eclic_get_irq(DEVICE(s->eclic),
-                                                GD32VF103_UART4_IRQn));
+    if(board_type == GD32VF103V_RVSTAR_TYPE)
+    {
+        gd32vf103_usart_create(sys_mem,
+            memmap[GD32VF103_UART4].base,
+            memmap[GD32VF103_UART4].size,
+            serial_hd(0),
+            nuclei_eclic_get_irq(DEVICE(s->eclic),
+            GD32VF103_UART4_IRQn));
+
+    }
+    else
+    {
+        gd32vf103_usart_create(sys_mem,
+            memmap[GD32VF103_USART0].base,
+            memmap[GD32VF103_USART0].size,
+            serial_hd(0),
+            nuclei_eclic_get_irq(DEVICE(s->eclic),
+            GD32VF103_USART0_IRQn));
+    }
+}
+
+static void nuclei_eval_board_init(MachineState *machine)
+{
+    board_type = GD32VF103V_EVAL_TYPE;
+    nuclei_board_init(machine);
+}
+
+static void nuclei_rvstar_board_init(MachineState *machine)
+{
+    board_type = GD32VF103V_RVSTAR_TYPE;
+    nuclei_board_init(machine);
 }
 
 static void nuclei_eval_machine_init(MachineClass *mc)
 {
     mc->desc = "RISC-V Nuclei GD32VF103 Eval Board";
-    mc->init = nuclei_board_init;
+    mc->init = nuclei_eval_board_init;
     mc->max_cpus = 1;
     mc->is_default = false;
     mc->default_cpu_type = NUCLEI_CPU;
@@ -265,7 +292,7 @@ static void nuclei_eval_machine_init(MachineClass *mc)
 static void nuclei_rvstar_machine_init(MachineClass *mc)
 {
     mc->desc = "RISC-V Nuclei GD32VF103 Rvstar Board";
-    mc->init = nuclei_board_init;
+    mc->init = nuclei_rvstar_board_init;
     mc->max_cpus = 1;
     mc->is_default = false;
     mc->default_cpu_type = NUCLEI_CPU;

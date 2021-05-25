@@ -46,21 +46,32 @@
 #define TYPE_RISCV_CPU_NUCLEI_N201      RISCV_CPU_TYPE_NAME("nuclei-n201")
 #define TYPE_RISCV_CPU_NUCLEI_N201E     RISCV_CPU_TYPE_NAME("nuclei-n201e")
 #define TYPE_RISCV_CPU_NUCLEI_N203      RISCV_CPU_TYPE_NAME("nuclei-n203")
+#define TYPE_RISCV_CPU_NUCLEI_N203P     RISCV_CPU_TYPE_NAME("nuclei-n203p")
 #define TYPE_RISCV_CPU_NUCLEI_N203E     RISCV_CPU_TYPE_NAME("nuclei-n203e")
 #define TYPE_RISCV_CPU_NUCLEI_N205      RISCV_CPU_TYPE_NAME("nuclei-n205")
+#define TYPE_RISCV_CPU_NUCLEI_N205P     RISCV_CPU_TYPE_NAME("nuclei-n205p")
 #define TYPE_RISCV_CPU_NUCLEI_N205E     RISCV_CPU_TYPE_NAME("nuclei-n205e")
 #define TYPE_RISCV_CPU_NUCLEI_N305      RISCV_CPU_TYPE_NAME("nuclei-n305")
+#define TYPE_RISCV_CPU_NUCLEI_N305P     RISCV_CPU_TYPE_NAME("nuclei-n305p")
 #define TYPE_RISCV_CPU_NUCLEI_N307      RISCV_CPU_TYPE_NAME("nuclei-n307")
+#define TYPE_RISCV_CPU_NUCLEI_N307P     RISCV_CPU_TYPE_NAME("nuclei-n307p")
 #define TYPE_RISCV_CPU_NUCLEI_N307FD    RISCV_CPU_TYPE_NAME("nuclei-n307fd")
+#define TYPE_RISCV_CPU_NUCLEI_N307FDP   RISCV_CPU_TYPE_NAME("nuclei-n307fdp")
 #define TYPE_RISCV_CPU_NUCLEI_N600      RISCV_CPU_TYPE_NAME("nuclei-n600")
 #define TYPE_RISCV_CPU_NUCLEI_N600F     RISCV_CPU_TYPE_NAME("nuclei-n600f")
 #define TYPE_RISCV_CPU_NUCLEI_N600FD    RISCV_CPU_TYPE_NAME("nuclei-n600fd")
 #define TYPE_RISCV_CPU_NUCLEI_NX600     RISCV_CPU_TYPE_NAME("nuclei-nx600")
+#define TYPE_RISCV_CPU_NUCLEI_NX600P    RISCV_CPU_TYPE_NAME("nuclei-nx600p")
 #define TYPE_RISCV_CPU_NUCLEI_NX600F    RISCV_CPU_TYPE_NAME("nuclei-nx600f")
+#define TYPE_RISCV_CPU_NUCLEI_NX600FP   RISCV_CPU_TYPE_NAME("nuclei-nx600fp")
 #define TYPE_RISCV_CPU_NUCLEI_NX600FD   RISCV_CPU_TYPE_NAME("nuclei-nx600fd")
+#define TYPE_RISCV_CPU_NUCLEI_NX600FDP  RISCV_CPU_TYPE_NAME("nuclei-nx600fdp")
 #define TYPE_RISCV_CPU_NUCLEI_UX600     RISCV_CPU_TYPE_NAME("nuclei-ux600")
+#define TYPE_RISCV_CPU_NUCLEI_UX600P    RISCV_CPU_TYPE_NAME("nuclei-ux600p")
 #define TYPE_RISCV_CPU_NUCLEI_UX600F    RISCV_CPU_TYPE_NAME("nuclei-ux600f")
+#define TYPE_RISCV_CPU_NUCLEI_UX600FP   RISCV_CPU_TYPE_NAME("nuclei-ux600fp")
 #define TYPE_RISCV_CPU_NUCLEI_UX600FD   RISCV_CPU_TYPE_NAME("nuclei-ux600fd")
+#define TYPE_RISCV_CPU_NUCLEI_UX600FDP  RISCV_CPU_TYPE_NAME("nuclei-ux600fdp")
 #define TYPE_RISCV_CPU_NUCLEI_N900      RISCV_CPU_TYPE_NAME("nuclei-n900")
 #define TYPE_RISCV_CPU_NUCLEI_N900F     RISCV_CPU_TYPE_NAME("nuclei-n900f")
 #define TYPE_RISCV_CPU_NUCLEI_N900FD    RISCV_CPU_TYPE_NAME("nuclei-n900fd")
@@ -94,6 +105,7 @@
 #define RVF RV('F')
 #define RVD RV('D')
 #define RVV RV('V')
+#define RVP RV('P')
 #define RVC RV('C')
 #define RVS RV('S')
 #define RVU RV('U')
@@ -114,6 +126,7 @@ enum {
 #define PRIV_VERSION_1_11_0 0x00011100
 
 #define VEXT_VERSION_0_07_1 0x00000701
+#define PEXT_VERSION_0_09_2 0x00000902
 
 enum {
     TRANSLATE_SUCCESS,
@@ -163,6 +176,7 @@ struct CPURISCVState {
 
     target_ulong priv_ver;
     target_ulong vext_ver;
+    target_ulong pext_ver;
     target_ulong misa;
     target_ulong misa_mask;
 
@@ -360,13 +374,16 @@ struct RISCVCPU {
         bool ext_u;
         bool ext_h;
         bool ext_v;
+        bool ext_p;
         bool ext_counters;
         bool ext_ifencei;
         bool ext_icsr;
+        bool ext_p64;
 
         char *priv_spec;
         char *user_spec;
         char *vext_spec;
+        char *pext_spec;
         uint16_t vlen;
         uint16_t elen;
         bool mmu;

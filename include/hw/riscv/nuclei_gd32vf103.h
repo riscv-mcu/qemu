@@ -33,6 +33,11 @@
 #define RISCV_NUCLEI_GD32VF103_SOC(obj) \
     OBJECT_CHECK(NucleiGDSoCState, (obj), TYPE_NUCLEI_GD32VF103_SOC)
 
+typedef enum NucleiGDBoardType {
+    GD32VF103V_EVAL_TYPE = 0,
+    GD32VF103V_RVSTAR_TYPE,
+} NucleiGDBoardType;
+
 typedef struct NucleiGDSoCState {
     /*< private >*/
     SysBusDevice parent_obj;
