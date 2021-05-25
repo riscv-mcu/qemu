@@ -298,7 +298,7 @@ static void create_fdt(NucLeiUState *s, const struct MemmapEntry *memmap,
     g_free(nodename);
 
     nodename = g_strdup_printf("/spi@%lx",
-        (long)memmap[NUCLEI_U_SPI0].base);
+                               memmap[NUCLEI_U_SPI0].base);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,spi0");
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
