@@ -87,7 +87,7 @@ uint32_t simd_desc(uint32_t oprsz, uint32_t maxsz, int32_t data)
 {
     uint32_t desc = 0;
 
-    check_size_align(oprsz, maxsz, 0);
+    //check_size_align(oprsz, maxsz, 0);
     tcg_debug_assert(data == sextract32(data, 0, SIMD_DATA_BITS));
 
     oprsz = (oprsz / 8) - 1;
