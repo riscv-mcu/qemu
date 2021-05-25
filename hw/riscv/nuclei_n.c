@@ -60,13 +60,15 @@ static const struct MemmapEntry
     [NUCLEI_N_DEV_PWM1]  = { 0x10025000,     0x1000 },
     [NUCLEI_N_DEV_QSPI2] = { 0x10034000,     0x1000 },
     [NUCLEI_N_DEV_PWM2]  = { 0x10035000,     0x1000 },
-    [NUCLEI_N_DEV_XIP]   = { 0x20000000, 0x10000000 },
-    [NUCLEI_N_DEV_ILM]   = { 0x80000000,    0x20000 },
-    [NUCLEI_N_DEV_DLM]   = { 0x90000000,    0x20000 },
+    [NUCLEI_N_DEV_XIP]   = { 0x20000000,  0x10000000},
+    [NUCLEI_N_DEV_ILM]   = { 0x80000000,  0x2000000 },
+    [NUCLEI_N_DEV_DLM]   = { 0x90000000,  0x2000000 },
+    [NUCLEI_N_DEV_DDR]   = { 0xA0000000,  0x4000000 },
 };
 
 static void riscv_nuclei_n_machine_init(MachineState *machine)
 {
+    uint32_t start_addr = 0;
     const struct MemmapEntry *memmap = nuclei_n_memmap;
     NucleiNState *s = RISCV_NUCLEI_N_MACHINE(machine);
     MemoryRegion *system_memory = get_system_memory();
@@ -89,6 +91,22 @@ static void riscv_nuclei_n_machine_init(MachineState *machine)
         memmap[NUCLEI_N_DEV_DLM].size, &error_fatal);
     memory_region_add_subregion(system_memory, 
         memmap[NUCLEI_N_DEV_DLM].base, &s->soc.dlm);
+
+    start_addr = memmap[NUCLEI_N_DEV_ILM].base;
+
+    if(s->download == NULL)
+    {
+
+    }else if(!strcmp(s->download, "flash"))
+    {
+        start_addr = memmap[NUCLEI_N_DEV_XIP].base;
+    }else if(!strcmp(s->download, "flashxip"))
+    {
+        start_addr = memmap[NUCLEI_N_DEV_XIP].base;
+    }else if(!strcmp(s->download, "ddr"))
+    {
+        start_addr = memmap[NUCLEI_N_DEV_DDR].base;
+    }
 
     switch (s->msel)
     {
@@ -133,23 +151,28 @@ static void riscv_nuclei_n_machine_init(MachineState *machine)
     rom_add_blob_fixed_as("mrom.reset", reset_vec, sizeof(reset_vec),
         memmap[NUCLEI_N_DEV_ROM].base, &address_space_memory);
     /* boot rom */
-    if (machine->kernel_filename)
-    {
-        riscv_load_kernel(machine->kernel_filename, start_addr, NULL);
+    if (machine->kernel_filename) {
+       riscv_load_kernel(machine->kernel_filename, 
+            start_addr, NULL);
     }
 }
 
-static void nuclei_soc_init(Object *obj)
+static void riscv_nuclei_n_soc_init(Object *obj)
 {
-    NucleiHBSoCState *s = RISCV_NUCLEI_HBIRD_SOC(obj);
+    MachineState *ms = MACHINE(qdev_get_machine());
+    NucleiNSoCState *s = RISCV_NUCLEI_N_SOC(obj);
+    object_initialize_child(obj, "cpus", &s->cpus,TYPE_RISCV_HART_ARRAY);
+    object_property_set_int(OBJECT(&s->cpus), "num-harts", ms->smp.cpus,
+                            &error_abort);
 
-    object_initialize_child(obj, "cpus", &s->cpus, TYPE_RISCV_HART_ARRAY);
+    // object_initialize_child(obj, "timer",
+    //                       &s->timer, TYPE_NUCLEI_SYSTIMER);
 
     object_initialize_child(obj, "riscv.nuclei.gpio",
                             &s->gpio, TYPE_SIFIVE_GPIO);
 }
 
-static void nuclei_soc_realize(DeviceState *dev, Error **errp)
+static void riscv_nuclei_n_soc_realize(DeviceState *dev, Error **errp)
 {
     const struct MemmapEntry *memmap = nuclei_n_memmap;
     MachineState *ms = MACHINE(qdev_get_machine());
@@ -201,6 +224,23 @@ static void nuclei_soc_realize(DeviceState *dev, Error **errp)
                         memmap[NUCLEI_N_DEV_XIP].size, &error_fatal);
     memory_region_add_subregion(sys_mem,
                         memmap[NUCLEI_N_DEV_XIP].base, &s->xip_mem);
+    /* DDR */
+    memory_region_init_ram(&s->ddr, OBJECT(dev), "riscv.nuclei.n.ddr",
+                        memmap[NUCLEI_N_DEV_DDR].size, &error_fatal);
+    memory_region_add_subregion(sys_mem,
+                        memmap[NUCLEI_N_DEV_DDR].base, &s->ddr);
+}
+
+static char* nuclei_n_machine_get_download(Object *obj, Error **errp)
+{
+    NucleiNState *s = RISCV_NUCLEI_N_MACHINE(obj);
+    return g_strdup(s->download);
+}
+
+static void nuclei_n_machine_set_download(Object *obj, const char *value, Error **errp)
+{
+    NucleiNState *s = RISCV_NUCLEI_N_MACHINE(obj);
+    s->download = g_strdup(value);
 }
 
 static void riscv_nuclei_n_machine_class_init(ObjectClass *oc, void *data)
@@ -211,6 +251,32 @@ static void riscv_nuclei_n_machine_class_init(ObjectClass *oc, void *data)
     mc->init = riscv_nuclei_n_machine_init;
     mc->max_cpus = 1;
     mc->default_cpu_type = NUCLEI_N_CPU;
+
+    object_class_property_add_str(oc, "download",
+                                   nuclei_n_machine_get_download,
+                                   nuclei_n_machine_set_download);
+    object_class_property_set_description(oc, "download",
+                                          "Set on to tell QEMU's ROM to jump to "
+                                          "download modes. Otherwise QEMU will jump to DRAM "
+                                          "nuclei support three download modes(flashxip,flash,ilm,ddr)");
+}
+
+static void riscv_nuclei_n_machine_instance_init(Object *obj)
+{
+    //todo
+}
+
+static const TypeInfo riscv_nuclei_n_machine_typeinfo = {
+    .name       = MACHINE_TYPE_NAME("nuclei_n"),
+    .parent     = TYPE_MACHINE,
+    .class_init = riscv_nuclei_n_machine_class_init,
+    .instance_init = riscv_nuclei_n_machine_instance_init,
+    .instance_size = sizeof(NucleiNState),
+};
+
+static void riscv_nuclei_n_machine_init_register_types(void)
+{
+    type_register_static(&riscv_nuclei_n_machine_typeinfo);
 }
 
 static void riscv_nuclei_n_machine_instance_init(Object *obj)

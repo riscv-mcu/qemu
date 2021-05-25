@@ -43,6 +43,7 @@ typedef struct NucleiNSoCState {
     MemoryRegion dlm;
     MemoryRegion internal_rom;
     MemoryRegion xip_mem;
+    MemoryRegion ddr;
 
     DeviceState *timer;
     // NucLeiSYSTIMERState *timer;
@@ -51,15 +52,12 @@ typedef struct NucleiNSoCState {
 
 } NucleiNSoCState;
 
-#define TYPE_HBIRD_FPGA_MACHINE MACHINE_TYPE_NAME("hbird_fpga")
-#define HBIRD_FPGA_MACHINE(obj) \
-    OBJECT_CHECK(NucleiHBState, (obj), TYPE_HBIRD_FPGA_MACHINE)
-
 typedef struct
 {
     /*< private >*/
     SysBusDevice parent_obj;
 
+    const char *download;
     /*< public >*/
     NucleiNSoCState soc;
 } NucleiNState;
@@ -84,7 +82,8 @@ enum {
     NUCLEI_N_DEV_PWM2,
     NUCLEI_N_DEV_XIP,
     NUCLEI_N_DEV_ILM,
-    NUCLEI_N_DEV_DLM
+    NUCLEI_N_DEV_DLM,
+    NUCLEI_N_DEV_DDR
 };
 
 enum {
