@@ -91,13 +91,27 @@ static uint64_t nuclei_timer_read(void *opaque, hwaddr offset,
 
     switch (offset) {
     case NUCLEI_SYSTIMER_REG_MTIMELO:
-        value = cpu_riscv_read_rtc(s->timebase_freq);
-        s->mtime_lo =  value & 0xffffffff;
-        s->mtime_hi = (value >> 32) & 0xffffffff;
-        value = s->mtime_lo;
+        if(s->mstop)
+        {
+            value = 0;
+        }
+        else
+        {
+            value = cpu_riscv_read_rtc(s->timebase_freq);
+            s->mtime_lo =  value & 0xffffffff;
+            s->mtime_hi = (value >> 32) & 0xffffffff;
+            value = s->mtime_lo;
+        }
         break;
     case NUCLEI_SYSTIMER_REG_MTIMEHI:
-        value =  s->mtime_hi;
+        if(s->mstop)
+        {
+            value = 0;
+        }
+        else
+        {
+            value =  s->mtime_hi;
+        }
         break;
     case NUCLEI_SYSTIMER_REG_MTIMECMPLO:
         s->mtimecmp_lo = (env->mtimecmp) & 0xFFFFFFFF;
@@ -140,15 +154,15 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
         env->mtimer->expire_time |= ((value << 32)&0xFFFFFFFF);
         break;
     case NUCLEI_SYSTIMER_REG_MTIMECMPLO:
-        s->mtimecmp_lo = value;
-        s->mtimecmp_hi = 0xFFFFFFFF;
-        env->mtimecmp  |= (value &0xFFFFFFFF);
-        nuclei_timer_update_compare(s);
+            s->mtimecmp_lo = value;
+            s->mtimecmp_hi = 0xFFFFFFFF;
+            env->mtimecmp  |= (value &0xFFFFFFFF);
+            nuclei_timer_update_compare(s);
         break;
     case NUCLEI_SYSTIMER_REG_MTIMECMPHI:
-        s->mtimecmp_hi = value;
-        env->mtimecmp  |= ((value << 32)&0xFFFFFFFF);
-        nuclei_timer_update_compare(s);
+            s->mtimecmp_hi = value;
+            env->mtimecmp  |= ((value << 32)&0xFFFFFFFF);
+            nuclei_timer_update_compare(s);
         break;
     case NUCLEI_SYSTIMER_REG_MSFTRST:
 	if (!(value & 0x80000000) == 0)
