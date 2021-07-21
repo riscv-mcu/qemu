@@ -298,8 +298,8 @@ static void nuclei_rvstar_machine_init(MachineClass *mc)
     mc->default_cpu_type = NUCLEI_CPU;
 }
 
-DEFINE_MACHINE("gd32vf103_eval", nuclei_eval_machine_init)
-DEFINE_MACHINE("gd32vf103_rvstar", nuclei_rvstar_machine_init)
+DEFINE_MACHINE("gd32vf103v_eval", nuclei_eval_machine_init)
+DEFINE_MACHINE("gd32vf103v_rvstar", nuclei_rvstar_machine_init)
 
 static void riscv_nuclei_soc_class_init(ObjectClass *oc, void *data)
 {
