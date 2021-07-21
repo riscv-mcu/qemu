@@ -13,7 +13,8 @@ build_windows_qemu:
   script:
     # install software
     # - dnf install updates
-    - dnf install -y git mingw64-pixman mingw64-glib2 mingw64-gmp mingw64-SDL2 mingw64-pkg-config mingw64-bzip2 bzip2 make diffutils
+    - dnf install -y git mingw64-pixman mingw64-gmp mingw64-SDL2 mingw64-pkg-config mingw64-bzip2 bzip2 make diffutils
+    - dnf install -y http://ftp.pbone.net/mirror/archive.fedoraproject.org/fedora-secondary/releases/28/Everything/ppc64/os/Packages/m/mingw64-glib2-2.54.1-1.fc28.noarch.rpm
     - dnf install -y meson ninja-build
     - dnf install -y meson gcc
     - git submodule sync --recursive
