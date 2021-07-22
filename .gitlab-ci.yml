@@ -20,6 +20,7 @@ build_windows_qemu:
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git submodule update --remote
+    #- git submodule update --remote
     - sync
     # build
     - mkdir $CI_PROJECT_DIR/build -p
@@ -39,51 +40,82 @@ build_linux_qemu:
   image: ubuntu:16.04
   script:
     #install software
-    - mv /etc/apt/sources.list /etc/apt/sources.list.bak
+    # - mv /etc/apt/sources.list /etc/apt/sources.list.bak
     #echo "deb-src http://archive.ubuntu.com/ubuntu xenial main restricted" >/etc/apt/sources.list && \
-    - echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial main restricted" >>/etc/apt/sources.list
-    - echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-updates main restricted" >>/etc/apt/sources.list
-    - echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial universe" >>/etc/apt/sources.list
-    - echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-updates universe" >>/etc/apt/sources.list
-    - echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial multiverse" >>/etc/apt/sources.list
-    - echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-updates multiverse" >>/etc/apt/sources.list
-    - echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-backports main restricted universe multiverse" >>/etc/apt/sources.list
-    - echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-security main restricted" >>/etc/apt/sources.list
-    - echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-security universe" >>/etc/apt/sources.list
-    - echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-security multiverse" >>/etc/apt/sources.list
+    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial main restricted" >>/etc/apt/sources.list
+    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-updates main restricted" >>/etc/apt/sources.list
+    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial universe" >>/etc/apt/sources.list
+    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-updates universe" >>/etc/apt/sources.list
+    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial multiverse" >>/etc/apt/sources.list
+    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-updates multiverse" >>/etc/apt/sources.list
+    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-backports main restricted universe multiverse" >>/etc/apt/sources.list
+    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-security main restricted" >>/etc/apt/sources.list
+    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-security universe" >>/etc/apt/sources.list
+    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-security multiverse" >>/etc/apt/sources.list
     #echo "deb http://archive.canonical.com/ubuntu xenial partner" >>/etc/apt/sources.list && \
     #echo "deb-src http://archive.canonical.com/ubuntu xenial partner" >>/etc/apt/sources.list && \
-    - apt-get update --fix-missing
-    - apt-get install -y git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libsdl1.2-dev libpixman-1-dev libfdt-dev autoconf automake libtool librbd-dev libaio-dev flex bison make 
-    # ninja-build
+    - apt-get -y update --fix-missing 
+    - apt-get install -y --fix-missing git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libsdl1.2-dev libpixman-1-dev libfdt-dev autoconf automake libtool librbd-dev libaio-dev flex bison make
+    # gcc 7.5
     - apt-get install -y software-properties-common
-    - add-apt-repository ppa:deadsnakes/ppa
-    - apt-get update --fix-missing
-    - apt-get install -y python3.6
-    - update-alternatives --install /usr/bin/python python /usr/bin/python2.7 1
-    - update-alternatives --install /usr/bin/python python /usr/bin/python3.6 2
-    - rm /usr/bin/python && ln -s /usr/bin/python3.6 /usr/bin/python && rm /usr/bin/python3 && ln -s /usr/bin/python3.6 /usr/bin/python3
-    - apt-get install -y python3-pip
-    - pip3 install pip
-    - pip3 install --upgrade pip
-    - rm /usr/bin/pip3 && ln -s -f /usr/local/bin/pip3 /usr/bin/pip3 && ln -s -f /usr/local/bin/pip3 /usr/bin/pip
+    - apt-get install wget openssl libssl-dev -y
+    #- apt-get install -y ppa-purge
+    - apt-get install --reinstall ca-certificates
+    #- add-apt-repository ppa:ubuntu-toolchain-r/test -y
+    #- apt-get update
+    #- apt-get install gcc-9 -y
+    #- apt-get install g++-9 -y
+    - wget http://www.python.org/ftp/python/3.6.4/Python-3.6.4.tgz
+    - tar -xvzf Python-3.6.4.tgz
+    - cd Python-3.6.4
+    - ./configure --with-ssl
+    - make -j8 && make install
+    - which python3
+    - rm /usr/bin/python && ln -s /usr/local/bin/python3 /usr/bin/python
+    - ln -s -f /usr/local/python3/bin/pip3  /usr/bin/pip3  && ln -s -f /usr/local/bin/pip3 /usr/bin/pip
     - pip3 install ninja
     - pip3 install meson==0.57.2
+    - wget http://ftp.gnu.org/gnu/gcc/gcc-9.2.0/gcc-9.2.0.tar.gz
+    - tar -zxvf gcc-9.2.0.tar.gz
+    - cd gcc-9.2.0
+    - ./contrib/download_prerequisites
+    - mkdir build && cd build
+    - ../configure -enable-checking=release -enable-languages=c,c++ -disable-multilib
+    - make -j8 && make install
+    #- update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 
+    #- update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 60
+    #- update-alternatives --config gcc
+    # ninja-build
+    #- add-apt-repository ppa:deadsnakes/ppa -y
+    #- apt-get update --fix-missing
+    #- apt-get install -y python3.6
+    #- update-alternatives --install /usr/bin/python python /usr/bin/python2.7 1
+    #- update-alternatives --install /usr/bin/python python /usr/bin/python3.6 2
+    #- rm /usr/bin/python && ln -s /usr/bin/python3.6 /usr/bin/python && rm /usr/bin/python3 && ln -s /usr/bin/python3.6 /usr/bin/python3
+    # git submodule
+    - cd $CI_PROJECT_DIR
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git submodule update --remote
     - sync
+    # glib
+    - apt install xsltproc -y
+    - apt-get install docbook-xsl -y
+    - wget ftp://ftp.acc.umu.se/pub/gnome/sources/glib/2.68/glib-2.68.3.tar.xz
+    - tar xvf glib-2.68.3.tar.xz && cd glib-2.68.3
+    - mkdir build && cd    build && meson --prefix=/usr          --buildtype=release       -Dman=true                -Dselinux=disabled        ..                  && ninja
+    - ninja install && mkdir -p /usr/share/doc/glib-2.68.3 && cp -r ../docs/reference/{NEWS,gio,glib,gobject} /usr/share/doc/glib-2.68.3
     #build
+    - cd $CI_PROJECT_DIR
     - mkdir $CI_PROJECT_DIR/build -p
     - mkdir $CI_PROJECT_DIR/linux_qemu -p
     - cd build
-    - ../configure --prefix=$CI_PROJECT_DIR/linux_qemu --target-list=riscv32-softmmu,riscv64-softmmu && make -j8 && make install
+    - ../configure --disable-werror --prefix=$CI_PROJECT_DIR/linux_qemu --target-list=riscv32-softmmu,riscv64-softmmu && make -j8 && make install
     - ls $CI_PROJECT_DIR/linux_qemu/bin -al
     - find / -name "libpng12.so.0"
   artifacts:
     paths:
     - $CI_PROJECT_DIR/linux_qemu
-
 
 test_sdk:
   stage: test

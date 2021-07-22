@@ -1,66 +1,66 @@
 [submodule "roms/seabios"]
 	path = roms/seabios
-	url = git@gito.corp.nucleisys.com:software/tools/seabios.git
+	url = http://gito.corp.nucleisys.com/software/qemu/seabios.git
 [submodule "roms/SLOF"]
 	path = roms/SLOF
-	url = git@gito.corp.nucleisys.com:software/tools/SLOF.git
+	url = http://gito.corp.nucleisys.com/software/qemu/SLOF.git
 [submodule "roms/ipxe"]
 	path = roms/ipxe
-	url = git@gito.corp.nucleisys.com:software/tools/ipxe.git
+	url = http://gito.corp.nucleisys.com/software/qemu/ipxe.git
 [submodule "roms/openbios"]
 	path = roms/openbios
-	url = git@gito.corp.nucleisys.com:software/tools/openbios.git
+	url = http://gito.corp.nucleisys.com/software/qemu/openbios.git
 [submodule "roms/qemu-palcode"]
 	path = roms/qemu-palcode
-	url = git@gito.corp.nucleisys.com:software/tools/qemu-palcode.git
+	url = http://gito.corp.nucleisys.com/software/qemu/qemu-palcode.git
 [submodule "roms/sgabios"]
 	path = roms/sgabios
-	url = git@gito.corp.nucleisys.com:software/tools/sgabios.git
+	url = http://gito.corp.nucleisys.com/software/qemu/sgabios.git
 [submodule "dtc"]
 	path = dtc
-	url = git@gito.corp.nucleisys.com:software/tools/dtc.git
+	url = http://gito.corp.nucleisys.com/software/qemu/dtc.git
 [submodule "roms/u-boot"]
 	path = roms/u-boot
-	url = git@gito.corp.nucleisys.com:software/tools/u-boot.git
+	url = http://gito.corp.nucleisys.com/software/qemu/u-boot.git
 [submodule "roms/skiboot"]
 	path = roms/skiboot
-	url = git@gito.corp.nucleisys.com:software/tools/skiboot.git
+	url = http://gito.corp.nucleisys.com/software/qemu/skiboot.git
 [submodule "roms/QemuMacDrivers"]
 	path = roms/QemuMacDrivers
-	url = git@gito.corp.nucleisys.com:software/tools/QemuMacDrivers.git
+	url = http://gito.corp.nucleisys.com/software/qemu/QemuMacDrivers.git
 [submodule "ui/keycodemapdb"]
 	path = ui/keycodemapdb
-	url = git@gito.corp.nucleisys.com:software/tools/keycodemapdb.git
+	url = http://gito.corp.nucleisys.com/software/qemu/keycodemapdb.git
 [submodule "capstone"]
 	path = capstone
-	url = git@gito.corp.nucleisys.com:software/tools/capstone.git
+	url = http://gito.corp.nucleisys.com/software/qemu/capstone.git
 [submodule "roms/seabios-hppa"]
 	path = roms/seabios-hppa
-	url = git@gito.corp.nucleisys.com:software/tools/seabios-hppa.git
+	url = http://gito.corp.nucleisys.com/software/qemu/seabios-hppa.git
 [submodule "roms/u-boot-sam460ex"]
 	path = roms/u-boot-sam460ex
-	url = git@gito.corp.nucleisys.com:software/tools/u-boot-sam460ex.git
+	url = http://gito.corp.nucleisys.com/software/qemu/u-boot-sam460ex.git
 [submodule "tests/fp/berkeley-testfloat-3"]
 	path = tests/fp/berkeley-testfloat-3
-	url = git@gito.corp.nucleisys.com:software/tools/berkeley-testfloat-3.git
+	url = http://gito.corp.nucleisys.com/software/qemu/berkeley-testfloat-3.git
 [submodule "tests/fp/berkeley-softfloat-3"]
 	path = tests/fp/berkeley-softfloat-3
-	url = git@gito.corp.nucleisys.com:software/tools/berkeley-softfloat-3.git
+	url = http://gito.corp.nucleisys.com/software/qemu/berkeley-softfloat-3.git
 [submodule "roms/edk2"]
 	path = roms/edk2
-	url = git@gito.corp.nucleisys.com:software/tools/edk2.git
+	url = http://gito.corp.nucleisys.com/software/qemu/edk2.git
 [submodule "slirp"]
 	path = slirp
-	url = git@gito.corp.nucleisys.com:software/tools/libslirp.git
+	url = http://gito.corp.nucleisys.com/software/qemu/libslirp.git
 [submodule "roms/opensbi"]
 	path = roms/opensbi
-	url = 	git@gito.corp.nucleisys.com:software/tools/opensbi.git
+	url = 	http://gito.corp.nucleisys.com/software/qemu/opensbi.git
 [submodule "roms/qboot"]
 	path = roms/qboot
-	url = git@gito.corp.nucleisys.com:software/tools/qboot.git
+	url = http://gito.corp.nucleisys.com/software/qemu/qboot.git
 [submodule "meson"]
 	path = meson
-	url = git@gito.corp.nucleisys.com:software/tools/meson.git
+	url = http://gito.corp.nucleisys.com/software/qemu/meson.git
 [submodule "roms/vbootrom"]
 	path = roms/vbootrom
-	url = git@gito.corp.nucleisys.com:software/tools/vbootrom.git
+	url = http://gito.corp.nucleisys.com/software/qemu/vbootrom.git
