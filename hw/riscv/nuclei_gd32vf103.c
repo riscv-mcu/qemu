@@ -280,27 +280,6 @@ static void nuclei_rvstar_board_init(MachineState *machine)
     nuclei_board_init(machine);
 }
 
-static void nuclei_eval_machine_init(MachineClass *mc)
-{
-    mc->desc = "RISC-V Nuclei GD32VF103 Eval Board";
-    mc->init = nuclei_eval_board_init;
-    mc->max_cpus = 1;
-    mc->is_default = false;
-    mc->default_cpu_type = NUCLEI_CPU;
-}
-
-static void nuclei_rvstar_machine_init(MachineClass *mc)
-{
-    mc->desc = "RISC-V Nuclei GD32VF103 Rvstar Board";
-    mc->init = nuclei_rvstar_board_init;
-    mc->max_cpus = 1;
-    mc->is_default = false;
-    mc->default_cpu_type = NUCLEI_CPU;
-}
-
-DEFINE_MACHINE("gd32vf103v_eval", nuclei_eval_machine_init)
-DEFINE_MACHINE("gd32vf103v_rvstar", nuclei_rvstar_machine_init)
-
 static char* gd32vf103_machine_get_download(Object *obj, Error **errp)
 {
     return NULL;
@@ -311,19 +290,50 @@ static void gd32vf103_machine_set_download(Object *obj, const char *value, Error
 
 }
 
+
+static void nuclei_eval_machine_init(MachineClass *mc)
+{
+    mc->desc = "RISC-V Nuclei GD32VF103 Eval Board";
+    mc->init = nuclei_eval_board_init;
+    mc->max_cpus = 1;
+    mc->is_default = false;
+    mc->default_cpu_type = NUCLEI_CPU;
+
+    object_class_property_add_str(mc, "download",
+                                   gd32vf103_machine_get_download,
+                                   gd32vf103_machine_set_download);
+    object_class_property_set_description(mc, "download",
+                                          "Set on to tell QEMU's ROM to jump to "
+                                          "download modes. Otherwise QEMU will jump to DRAM "
+                                          "nuclei support three download modes(flashxip,flash,ilm,ddr)");
+}
+
+static void nuclei_rvstar_machine_init(MachineClass *mc)
+{
+    mc->desc = "RISC-V Nuclei GD32VF103 Rvstar Board";
+    mc->init = nuclei_rvstar_board_init;
+    mc->max_cpus = 1;
+    mc->is_default = false;
+    mc->default_cpu_type = NUCLEI_CPU;
+
+    object_class_property_add_str(mc, "download",
+                                   gd32vf103_machine_get_download,
+                                   gd32vf103_machine_set_download);
+    object_class_property_set_description(mc, "download",
+                                          "Set on to tell QEMU's ROM to jump to "
+                                          "download modes. Otherwise QEMU will jump to DRAM "
+                                          "nuclei support three download modes(flashxip,flash,ilm,ddr)");
+}
+
+DEFINE_MACHINE("gd32vf103v_eval", nuclei_eval_machine_init)
+DEFINE_MACHINE("gd32vf103v_rvstar", nuclei_rvstar_machine_init)
+
+
 static void riscv_nuclei_soc_class_init(ObjectClass *oc, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(oc);
     dc->realize = riscv_nuclei_soc_realize;
     dc->user_creatable = false;
-
-    object_class_property_add_str(oc, "download",
-                                   gd32vf103_machine_get_download,
-                                   gd32vf103_machine_set_download);
-    object_class_property_set_description(oc, "download",
-                                          "Set on to tell QEMU's ROM to jump to "
-                                          "download modes. Otherwise QEMU will jump to DRAM "
-                                          "nuclei support three download modes(flashxip,flash,ilm,ddr)");
 }
 
 static const TypeInfo nuclei_gd_soc_type_info = {
