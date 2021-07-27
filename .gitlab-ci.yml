@@ -182,8 +182,8 @@ test_cmsis_5:
     - pip3 install -r CMSIS/nuclei-sdk/tools/scripts/requirements.txt
     - python3 CMSIS/nuclei-sdk/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg CMSIS/nuclei_cmsis_5_ci_qemu.json --parallel=-j --logdir logs/dsp --run --run_target "qemu"
     # test vector=on dsp=on
-    - git clone git@gito.corp.nucleisys.com:snippets/4.git
-    - cp 4/Makefile.soc.demosoc CMSIS/nuclei-sdk/Build/Makefile.soc.demosoc
+    - git clone git@gito.corp.nucleisys.com:snippets/6.git
+    - cp 6/build.mk CMSIS/nuclei-sdk/SoC/demosoc/build.mk
     - cp CMSIS/3/nuclei_cmsis_5_ci_qemu_vector.json CMSIS/
     - python3 CMSIS/nuclei-sdk/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg CMSIS/nuclei_cmsis_5_ci_qemu_vector.json --parallel=-j --logdir logs/vector_on_dsp_on --run --run_target "qemu"
     # test vector=on dsp=off
