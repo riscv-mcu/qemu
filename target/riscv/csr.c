@@ -375,11 +375,7 @@ static int read_instret(CPURISCVState *env, int csrno, target_ulong *val)
         }
         else
         {
-            //*val = cpu_get_host_ticks();
-            static int prev_instret = 0;
-            static int cnt = 0;
-            prev_instret = prev_instret + (cnt++);
-            *val = prev_instret;
+            *val = muldiv64(qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL), 32768, NANOSECONDS_PER_SECOND);
         }
     }
 #else
