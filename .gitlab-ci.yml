@@ -15,8 +15,9 @@ build_windows_qemu:
     # - dnf install updates
     - dnf install -y git mingw64-pixman mingw64-gmp mingw64-SDL2 mingw64-pkg-config mingw64-bzip2 bzip2 make diffutils
     - dnf install -y http://ftp.pbone.net/mirror/archive.fedoraproject.org/fedora-secondary/releases/28/Everything/ppc64/os/Packages/m/mingw64-glib2-2.54.1-1.fc28.noarch.rpm
-    - dnf install -y meson ninja-build
-    - dnf install -y meson gcc
+    - dnf install -y ninja-build
+    - dnf install -y gcc
+    - dnf install -y https://download-ib01.fedoraproject.org/pub/fedora/linux/releases/34/Everything/aarch64/os/Packages/m/meson-0.56.2-2.fc34.noarch.rpm
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git submodule update --remote
@@ -24,10 +25,10 @@ build_windows_qemu:
     - sync
     # build
     - mkdir $CI_PROJECT_DIR/build -p
-    - mkdir $CI_PROJECT_DIR/windows_qemu -p
+    - mkdir $CI_PROJECT_DIR/windows_qemu/bin -p
     - cd build
-    - ../configure --disable-werror --cross-prefix=x86_64-w64-mingw32- --target-list=riscv32-softmmu,riscv64-softmmu --prefix=$CI_PROJECT_DIR/windows_qemu && make -j8 && make install 
-    - cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/* $CI_PROJECT_DIR/windows_qemu
+    - ../configure --disable-werror --cross-prefix=x86_64-w64-mingw32- --target-list=riscv32-softmmu,riscv64-softmmu --prefix=$CI_PROJECT_DIR/windows_qemu/bin && make -j8 && make install 
+    - cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/* $CI_PROJECT_DIR/windows_qemu/bin
   artifacts:
     paths:
     - $CI_PROJECT_DIR/windows_qemu
@@ -55,16 +56,10 @@ build_linux_qemu:
     #echo "deb http://archive.canonical.com/ubuntu xenial partner" >>/etc/apt/sources.list && \
     #echo "deb-src http://archive.canonical.com/ubuntu xenial partner" >>/etc/apt/sources.list && \
     - apt-get -y update --fix-missing 
-    - apt-get install -y --fix-missing git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libsdl1.2-dev libpixman-1-dev libfdt-dev autoconf automake libtool librbd-dev libaio-dev flex bison make
+    - apt-get install -y --fix-missing git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libpixman-1-dev autoconf automake libtool flex bison make
     # gcc 7.5
     - apt-get install -y software-properties-common
     - apt-get install wget openssl libssl-dev -y
-    #- apt-get install -y ppa-purge
-    - apt-get install --reinstall ca-certificates
-    #- add-apt-repository ppa:ubuntu-toolchain-r/test -y
-    #- apt-get update
-    #- apt-get install gcc-9 -y
-    #- apt-get install g++-9 -y
     - wget http://www.python.org/ftp/python/3.6.4/Python-3.6.4.tgz
     - tar -xvzf Python-3.6.4.tgz
     - cd Python-3.6.4
@@ -75,23 +70,6 @@ build_linux_qemu:
     - ln -s -f /usr/local/python3/bin/pip3  /usr/bin/pip3  && ln -s -f /usr/local/bin/pip3 /usr/bin/pip
     - pip3 install ninja
     - pip3 install meson==0.57.2
-    - wget http://ftp.gnu.org/gnu/gcc/gcc-9.2.0/gcc-9.2.0.tar.gz
-    - tar -zxvf gcc-9.2.0.tar.gz
-    - cd gcc-9.2.0
-    - ./contrib/download_prerequisites
-    - mkdir build && cd build
-    - ../configure -enable-checking=release -enable-languages=c,c++ -disable-multilib
-    - make -j8 && make install
-    #- update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 
-    #- update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 60
-    #- update-alternatives --config gcc
-    # ninja-build
-    #- add-apt-repository ppa:deadsnakes/ppa -y
-    #- apt-get update --fix-missing
-    #- apt-get install -y python3.6
-    #- update-alternatives --install /usr/bin/python python /usr/bin/python2.7 1
-    #- update-alternatives --install /usr/bin/python python /usr/bin/python3.6 2
-    #- rm /usr/bin/python && ln -s /usr/bin/python3.6 /usr/bin/python && rm /usr/bin/python3 && ln -s /usr/bin/python3.6 /usr/bin/python3
     # git submodule
     - cd $CI_PROJECT_DIR
     - git submodule sync --recursive
@@ -99,20 +77,12 @@ build_linux_qemu:
     - git submodule update --remote
     - sync
     # glib
-    - apt install xsltproc -y
-    - apt-get install docbook-xsl -y
-    - wget ftp://ftp.acc.umu.se/pub/gnome/sources/glib/2.68/glib-2.68.3.tar.xz
-    - tar xvf glib-2.68.3.tar.xz && cd glib-2.68.3
-    - mkdir build && cd    build && meson --prefix=/usr          --buildtype=release       -Dman=true                -Dselinux=disabled        ..                  && ninja
-    - ninja install && mkdir -p /usr/share/doc/glib-2.68.3 && cp -r ../docs/reference/{NEWS,gio,glib,gobject} /usr/share/doc/glib-2.68.3
     #build
     - cd $CI_PROJECT_DIR
     - mkdir $CI_PROJECT_DIR/build -p
     - mkdir $CI_PROJECT_DIR/linux_qemu -p
     - cd build
-    - ../configure --disable-werror --prefix=$CI_PROJECT_DIR/linux_qemu --target-list=riscv32-softmmu,riscv64-softmmu && make -j8 && make install
-    - ls $CI_PROJECT_DIR/linux_qemu/bin -al
-    - find / -name "libpng12.so.0"
+    - ../configure --disable-werror --prefix=$CI_PROJECT_DIR/linux_qemu --disable-vnc --disable-sdl --disable-sdl-image --target-list=riscv32-softmmu,riscv64-softmmu && make -j8 && make install
   artifacts:
     paths:
     - $CI_PROJECT_DIR/linux_qemu
@@ -126,7 +96,7 @@ test_sdk:
     #- source .ci/build_sdk.sh
     #- source .ci/build_applications.sh
     - cd $CI_PROJECT_DIR
-    - git clone git@gito.corp.nucleisys.com:zhaofujin/ci_test.git
+    #- git clone git@gito.corp.nucleisys.com:zhaofujin/ci_test.git
     #- cp $CI_PROJECT_DIR/ci_test/tools/nuclei_riscv_newlibc_prebuilt_linux64_2020.08.tar.bz2 $CI_PROJECT_DIR/nuclei_riscv_newlibc_prebuilt_linux64_2020.08.tar.bz2
     #- tar xvf nuclei_riscv_newlibc_prebuilt_linux64_2020.08.tar.bz2
     # gcc
@@ -206,7 +176,8 @@ test_nmsis:
   script:
     - export QEMU_PATH_LINUX=$(readlink -f linux_qemu/bin)
     - export PATH=$QEMU_PATH_LINUX:$PATH
-    - module load nucleisys/riscv-nuclei-elf-gcc
+    #- module load nucleisys/riscv-nuclei-elf-gcc
+    - export PATH=/home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.07-eng1/gcc/bin:$PATH
     #- source .ci/build_sdk.sh
     #- source .ci/build_applications.sh
     - cd $CI_PROJECT_DIR
