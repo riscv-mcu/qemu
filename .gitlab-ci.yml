@@ -122,17 +122,18 @@ test_sdk:
 
 test_cmsis_5:
   stage: test
+  timeout: 2h 30m
   script:
     # - module load nucleisys/riscv-nuclei-elf-gcc
     - export QEMU_PATH_LINUX=$(readlink -f linux_qemu/bin)
     - export PATH=$QEMU_PATH_LINUX:$PATH
     - cd $CI_PROJECT_DIR
-    - export PATH=/home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.02-rvvp/gcc/bin/:$PATH
+    - export PATH=/home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.07-eng1/gcc/bin:$PATH
     ################################################
     # start build nuclei-sdk
     - git clone git@gito.corp.nucleisys.com:software/library/cmsis-5-riscv.git
     - cd cmsis-5-riscv
-    - git checkout dev_nuclei_vector
+    - git checkout dev_nuclei
     # build lib
     - cd CMSIS
     - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
@@ -235,9 +236,15 @@ deploy-qemu:
     - tar -zcvf linux_qemu.tar.gz   linux_qemu
     # save log
     - mkdir $CI_PROJECT_DIR/test_logs
+    - mkdir $CI_PROJECT_DIR/Documents
     - cp $CI_PROJECT_DIR/logs/ $CI_PROJECT_DIR/test_logs/ -r
     - cp $CI_PROJECT_DIR/cmsis-5-riscv/logs/ $CI_PROJECT_DIR/test_logs/ -r
     - cp $CI_PROJECT_DIR/nuclei-sdk/logs/ $CI_PROJECT_DIR/test_logs/ -r
+
+    # docs
+    - git clone git@gito.corp.nucleisys.com:software/riscv-gnu-toolchain/qemu.wiki.git
+    - cp qemu.wiki/*pdf $CI_PROJECT_DIR/Documents -r
+    - cp qemu.wiki/nuclei-qemu-版本发布说明.md $CI_PROJECT_DIR/Documents -r
   tags:
     - env::native
     - host::xls01
@@ -247,3 +254,4 @@ deploy-qemu:
     - $CI_PROJECT_DIR/windows_qemu.tar.gz
     - $CI_PROJECT_DIR/linux_qemu.tar.gz
     - $CI_PROJECT_DIR/test_logs/
+    - $CI_PROJECT_DIR/Documents
