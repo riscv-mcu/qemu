@@ -362,6 +362,38 @@ static int write_vcsr(CPURISCVState *env, int csrno, target_ulong val)
     return 0;
 }
 
+static int read_mcycle(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    #if !defined(CONFIG_USER_ONLY)
+    if (icount_enabled()) {
+        *val = icount_get();
+    } else {
+        if( env->scounteren != 0)
+        {
+            *val = 0;
+        }
+        else
+        {
+            static int cur_val = 0;
+            static int last_val = 0;
+            //enable
+            if(cur_val == muldiv64(qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL), 32768, NANOSECONDS_PER_SECOND))
+            {
+                last_val = last_val + 1;
+            }
+            else
+            {
+                last_val = cur_val;
+            }
+            cur_val = muldiv64(qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL), 32768, NANOSECONDS_PER_SECOND);
+            *val = last_val;
+        }    
+    }
+#else
+    *val = cpu_get_host_ticks();
+#endif
+    return 0;
+}
 /* User Timers and Counters */
 static int read_instret(CPURISCVState *env, int csrno, target_ulong *val)
 {
@@ -375,8 +407,11 @@ static int read_instret(CPURISCVState *env, int csrno, target_ulong *val)
         }
         else
         {
-            *val = muldiv64(qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL), 32768, NANOSECONDS_PER_SECOND);
-        }
+            static int prev_instret = 0;
+            static int cnt = 1;
+            prev_instret = prev_instret + (cnt++) + (cnt++);
+            *val = prev_instret;
+        }    
     }
 #else
     *val = cpu_get_host_ticks();
@@ -1848,7 +1883,7 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
 
 #if !defined(CONFIG_USER_ONLY)
     /* Machine Timers and Counters */
-    [CSR_MCYCLE]    = { "mcycle",    any,   read_instret  },
+    [CSR_MCYCLE]    = { "mcycle",    any,   read_mcycle  },
     [CSR_MINSTRET]  = { "minstret",  any,   read_instret  },
     [CSR_MCYCLEH]   = { "mcycleh",   any32, read_instreth },
     [CSR_MINSTRETH] = { "minstreth", any32, read_instreth },
