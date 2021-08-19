@@ -843,7 +843,7 @@ static int machine_help_func(QemuOpts *opts, MachineState *machine)
     return 1;
 }
 
-#define NUCLEI_VERSION "nuclei-v1.0.3"
+#define NUCLEI_VERSION "nuclei-v1.0.4"
 static void version(void)
 {
     printf("QEMU emulator version " QEMU_FULL_VERSION "\n"
