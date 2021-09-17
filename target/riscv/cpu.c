@@ -262,6 +262,7 @@ static void rv64imafdcu_nuclei_u_cpu_init(Object *obj)
     qdev_prop_set_bit(DEVICE(obj), "mmu", true);
     set_feature(env, RISCV_FEATURE_PMP);
 }
+
 #else
 static void rv32_base_cpu_init(Object *obj)
 {
@@ -844,6 +845,33 @@ static const struct TCGCPUOps riscv_tcg_ops = {
 #endif /* !CONFIG_USER_ONLY */
 };
 
+static char* cpu_get_ext_state(Object *obj, Error **errp)
+{
+    RISCVCPU *cpu = RISCV_CPU(obj);
+    return riscv_isa_string(cpu);
+}
+
+static void cpu_set_ext_state(Object *obj, const char *value, Error **errp)
+{
+    int ii = 0;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+    const size_t slen = strlen(value);
+    char *isa_str = g_new(char, slen);
+    memcpy(isa_str, value, slen);
+    for (ii = 0; ii < slen; ii++) 
+    {
+        if(isa_str[ii] == 'p')
+        {
+            cpu->env.misa |= RVP;
+        }
+
+        if(isa_str[ii] == 'v')
+        {
+            cpu->env.misa |= RVV;
+        }
+    }
+}
+
 static void riscv_cpu_class_init(ObjectClass *c, void *data)
 {
     RISCVCPUClass *mcc = RISCV_CPU_CLASS(c);
@@ -875,6 +903,12 @@ static void riscv_cpu_class_init(ObjectClass *c, void *data)
     cc->gdb_arch_name = riscv_gdb_arch_name;
     cc->gdb_get_dynamic_xml = riscv_gdb_get_dynamic_xml;
     cc->tcg_ops = &riscv_tcg_ops;
+
+    object_class_property_add_str(c, "ext",
+                                   cpu_get_ext_state,
+                                   cpu_set_ext_state);
+    object_class_property_set_description(c, "ext",
+                                          "nuclei ext");
 
     device_class_set_props(dc, riscv_cpu_properties);
 }
@@ -967,24 +1001,15 @@ static const TypeInfo riscv_cpu_type_infos[] = {
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N300,      rv32imacu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N300F,     rv32imafcu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N300FD,    rv32imafdcu_nuclei_cpu_init),
-    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N300P,     rv32imacup_nuclei_cpu_init),
-    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N300FP,    rv32imafcup_nuclei_cpu_init),
-    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N300FDP,   rv32imafdcup_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N305,      rv32imacu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N307,      rv32imafcu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N307FD,    rv32imafdcu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N600,      rv32imacu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N600F,     rv32imafcu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N600FD,    rv32imafdcu_nuclei_cpu_init),
-    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N600P,     rv32imacup_nuclei_cpu_init),
-    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N600FP,    rv32imafcup_nuclei_cpu_init),
-    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N600FDP,   rv32imafdcup_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N900,      rv32imacu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N900F,     rv32imafcu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N900FD,    rv32imafdcu_nuclei_cpu_init),
-    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N900P,     rv32imacup_nuclei_cpu_init),
-    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N900FP,    rv32imafcup_nuclei_cpu_init),
-    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N900FDP,   rv32imafdcup_nuclei_cpu_init),
 #elif defined(TARGET_RISCV64)
     DEFINE_CPU(TYPE_RISCV_CPU_BASE64,           rv64_base_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_SIFIVE_E51,       rv64_sifive_e_cpu_init),
@@ -1006,18 +1031,12 @@ static const TypeInfo riscv_cpu_type_infos[] = {
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_NX900,     rv64imacu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_NX900F,    rv64imafcu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_NX900FD,   rv64imafdcu_nuclei_cpu_init),
-    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_NX900P,    rv64imacup_nuclei_cpu_init),
-    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_NX900FP,   rv64imafcup_nuclei_cpu_init),
-    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_NX900FDP,  rv64imafdcup_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX600,     rv64imacu_nuclei_u_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX600F,    rv64imafcu_nuclei_u_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX600FD,   rv64imafdcu_nuclei_u_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX900,     rv64imacu_nuclei_u_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX900F,    rv64imafcu_nuclei_u_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX900FD,   rv64imafdcu_nuclei_u_cpu_init),
-    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX900P,    rv64imacup_nuclei_u_cpu_init),
-    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX900FP,   rv64imafcup_nuclei_u_cpu_init),
-    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX900FDP,  rv64imafdcup_nuclei_u_cpu_init),
 #endif
 };
 
