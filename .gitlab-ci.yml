@@ -2,36 +2,82 @@ before_script:
   - uname -a
   - cat /etc/issue
 
-build_windows_qemu:
+prepare_tools:
   stage: build
-  tags:
-    - os::linux
-    - env::docker
-  image: 
-    name: fedora
-    entrypoint: ["/bin/sh", "-c"]
+  timeout: 2h 30m
   script:
-    # install software
-    # - dnf install updates
-    - dnf install -y git mingw64-pixman mingw64-gmp mingw64-SDL2 mingw64-pkg-config mingw64-bzip2 bzip2 make diffutils
-    - dnf install -y http://ftp.pbone.net/mirror/archive.fedoraproject.org/fedora-secondary/releases/28/Everything/ppc64/os/Packages/m/mingw64-glib2-2.54.1-1.fc28.noarch.rpm
-    - dnf install -y ninja-build
-    - dnf install -y gcc
-    - dnf install -y https://download-ib01.fedoraproject.org/pub/fedora/linux/releases/34/Everything/aarch64/os/Packages/m/meson-0.56.2-2.fc34.noarch.rpm
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git submodule update --remote
-    #- git submodule update --remote
-    - sync
-    # build
-    - mkdir $CI_PROJECT_DIR/build -p
-    - mkdir $CI_PROJECT_DIR/windows_qemu/bin -p
-    - cd build
-    - ../configure --disable-werror --cross-prefix=x86_64-w64-mingw32- --target-list=riscv32-softmmu,riscv64-softmmu --prefix=$CI_PROJECT_DIR/windows_qemu/bin && make -j8 && make install 
-    - cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/* $CI_PROJECT_DIR/windows_qemu/bin
+    - echo "hello world"
+    - mkdir -p $CI_PROJECT_DIR/tools/
+    - cd $CI_PROJECT_DIR/tools/
+    # docs
+    - git clone git@gito.corp.nucleisys.com:software/riscv-gnu-toolchain/qemu.wiki.git
+    # gcc
+    - mkdir -p $CI_PROJECT_DIR/tools/gcc
+    - cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.07-eng1/gcc/ gcc/ -r
+    #- cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.09-rvp-eng2-linux/gcc/ gcc/ -r
+    - export PATH=$CI_PROJECT_DIR/tools/gcc/gcc/bin:$PATH
+    # test sdk
+    - mkdir -p $CI_PROJECT_DIR/tools/sdk
+    - cd $CI_PROJECT_DIR/tools/sdk
+    - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
+    - cd nuclei-sdk
+    - git checkout fix_qemu_test
+    # nuclei-sdk
+    - cd $CI_PROJECT_DIR/tools/
+    - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
+    - cd nuclei-sdk
+    - git checkout fix_qemu_test
+    # cmsis-5
+    - cd  $CI_PROJECT_DIR/tools
+    - git clone git@gito.corp.nucleisys.com:software/library/cmsis-5-riscv.git
+    - cd  $CI_PROJECT_DIR/tools/cmsis-5-riscv/CMSIS
+    - git checkout dev_nuclei
+    - git clone git@gito.corp.nucleisys.com:snippets/3.git
+    - git clone git@gito.corp.nucleisys.com:snippets/6.git
+    - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
+    - cd nuclei-sdk
+    - git checkout fix_qemu_test
+    - cd $CI_PROJECT_DIR/tools/cmsis-5-riscv/CMSIS
+    - export NUCLEI_SDK_ROOT=$(readlink -f nuclei-sdk)
+    - make PARELLEL=1 gen
+    - make PARELLEL=1 release_code
+    - make PARELLEL=1 build_release
+    - export NUCLEI_SDK_NMSIS=$(readlink -f nmsis_release/NMSIS)
+    - sed -i 's/LENGTH = 64K/LENGTH = 4M/g' nuclei-sdk/SoC/demosoc/Board/nuclei_fpga_eval/Source/GCC/gcc_demosoc_ilm.ld
+    - cp 3/nuclei_cmsis_5_ci_qemu.json .
+    - cd nmsis_release/NMSIS/NN/NN_Lib_Tests
+    - make gen
+    # nmsis
+    - cd  $CI_PROJECT_DIR/tools/
+    - git clone git@gito.corp.nucleisys.com:software/library/NMSIS.git
+    - git clone git@gito.corp.nucleisys.com:snippets/1.git
+    - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS/
+    # build dsp lib
+    - make gen_dsp_lib
+    - make strip_dsp_lib
+    # build nn lib
+    - make gen_nn_lib
+    - make strip_nn_lib
+    - cd $CI_PROJECT_DIR/tools/nuclei-sdk
+    - pip3 install -r tools/scripts/requirements.txt
+    - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS/
+    - export NUCLEI_SDK_ROOT=$CI_PROJECT_DIR/tools/nuclei-sdk
+    - export NUCLEI_SDK_NMSIS=$CI_PROJECT_DIR/tools/NMSIS/NMSIS/
+    - export SOC=demosoc
+    - sed -i 's/LENGTH = 64K/LENGTH = 4M/g' $CI_PROJECT_DIR/tools/nuclei-sdk/SoC/demosoc/Board/nuclei_fpga_eval/Source/GCC/gcc_demosoc_ilm.ld
+    - cd $CI_PROJECT_DIR/tools/nuclei-sdk
+    - cp $CI_PROJECT_DIR/tools/1/application.json $CI_PROJECT_DIR/tools/nuclei-sdk/tools/scripts/nsdk_cli/configs/
+    - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS/NN/NN_Lib_Tests/
+    - make gen
+  tags:
+    - env::native
+    - host::xls01
+  allow_failure: true
   artifacts:
+    when: always
     paths:
-    - $CI_PROJECT_DIR/windows_qemu
+    - $CI_PROJECT_DIR/tools/
+
 
 build_linux_qemu:
   stage: build
@@ -40,21 +86,6 @@ build_linux_qemu:
     - env::docker
   image: ubuntu:16.04
   script:
-    #install software
-    # - mv /etc/apt/sources.list /etc/apt/sources.list.bak
-    #echo "deb-src http://archive.ubuntu.com/ubuntu xenial main restricted" >/etc/apt/sources.list && \
-    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial main restricted" >>/etc/apt/sources.list
-    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-updates main restricted" >>/etc/apt/sources.list
-    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial universe" >>/etc/apt/sources.list
-    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-updates universe" >>/etc/apt/sources.list
-    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial multiverse" >>/etc/apt/sources.list
-    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-updates multiverse" >>/etc/apt/sources.list
-    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-backports main restricted universe multiverse" >>/etc/apt/sources.list
-    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-security main restricted" >>/etc/apt/sources.list
-    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-security universe" >>/etc/apt/sources.list
-    #- echo "deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ xenial-security multiverse" >>/etc/apt/sources.list
-    #echo "deb http://archive.canonical.com/ubuntu xenial partner" >>/etc/apt/sources.list && \
-    #echo "deb-src http://archive.canonical.com/ubuntu xenial partner" >>/etc/apt/sources.list && \
     - apt-get -y update --fix-missing 
     - apt-get install -y --fix-missing git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libpixman-1-dev autoconf automake libtool flex bison make
     # gcc 7.5
@@ -86,75 +117,114 @@ build_linux_qemu:
   artifacts:
     paths:
     - $CI_PROJECT_DIR/linux_qemu
+    - $CI_PROJECT_DIR/tools
+
+build_windows_qemu:
+  stage: build
+  tags:
+    - os::linux
+    - env::docker
+  image: 
+    name: fedora
+    entrypoint: ["/bin/sh", "-c"]
+  script:
+    # install software
+    # - dnf install updates
+    - dnf install -y git mingw64-pixman mingw64-gmp mingw64-SDL2 mingw64-pkg-config mingw64-bzip2 bzip2 make diffutils
+    - dnf install -y http://ftp.pbone.net/mirror/archive.fedoraproject.org/fedora-secondary/releases/28/Everything/ppc64/os/Packages/m/mingw64-glib2-2.54.1-1.fc28.noarch.rpm
+    - dnf install -y ninja-build
+    - dnf install -y gcc
+    - dnf install -y https://download-ib01.fedoraproject.org/pub/fedora/linux/releases/34/Everything/aarch64/os/Packages/m/meson-0.56.2-2.fc34.noarch.rpm
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
+    - git submodule update --remote
+    #- git submodule update --remote
+    - sync
+    # build
+    - mkdir $CI_PROJECT_DIR/build -p
+    - mkdir $CI_PROJECT_DIR/windows_qemu/bin -p
+    - cd build
+    - ../configure --disable-werror --cross-prefix=x86_64-w64-mingw32- --target-list=riscv32-softmmu,riscv64-softmmu --prefix=$CI_PROJECT_DIR/windows_qemu/bin && make -j8 && make install 
+    - cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/* $CI_PROJECT_DIR/windows_qemu/bin
+  artifacts:
+    paths:
+    - $CI_PROJECT_DIR/windows_qemu
 
 test_sdk:
   stage: test
+  timeout: 2h 30m
   script:
+    - apt-get -y update --fix-missing 
+    - apt-get install -y --fix-missing git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libpixman-1-dev autoconf automake libtool flex bison make
+    #- apt-get install -y python3-pip
+    - apt-get install -y software-properties-common
+    - apt-get install wget openssl libssl-dev -y
+    - wget http://www.python.org/ftp/python/3.6.4/Python-3.6.4.tgz
+    - tar -xvzf Python-3.6.4.tgz
+    - cd Python-3.6.4
+    - ./configure --with-ssl
+    - make -j8 && make install
+    - which python3
+    - rm /usr/bin/python && ln -s /usr/local/bin/python3 /usr/bin/python
+    - ln -s -f /usr/local/python3/bin/pip3  /usr/bin/pip3  && ln -s -f /usr/local/bin/pip3 /usr/bin/pip
+    # find qemu and gcc
+    - cd $CI_PROJECT_DIR
     - export QEMU_PATH_LINUX=$(readlink -f linux_qemu/bin)
     - export PATH=$QEMU_PATH_LINUX:$PATH
-    - module load nucleisys/riscv-nuclei-elf-gcc
-    #- source .ci/build_sdk.sh
-    #- source .ci/build_applications.sh
-    - cd $CI_PROJECT_DIR
-    #- git clone git@gito.corp.nucleisys.com:zhaofujin/ci_test.git
-    #- cp $CI_PROJECT_DIR/ci_test/tools/nuclei_riscv_newlibc_prebuilt_linux64_2020.08.tar.bz2 $CI_PROJECT_DIR/nuclei_riscv_newlibc_prebuilt_linux64_2020.08.tar.bz2
-    #- tar xvf nuclei_riscv_newlibc_prebuilt_linux64_2020.08.tar.bz2
-    # gcc
-    #- export PATH=/home/xl_ci/gitlab-runner/builds/5YSmsSSK/0/software/riscv-gnu-toolchain/qemu/gcc/bin/:$PATH
-    # qemu
+    - export PATH=$CI_PROJECT_DIR/tools/gcc/gcc/bin:$PATH
+    - qemu-system-riscv32 -M ?
+    - riscv-nuclei-elf-gcc -v
     ################################################
-    # start build nuclei-sdk
-    - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
-    - cd nuclei-sdk
-    #- echo "NUCLEI_TOOL_ROOT=/home/xl_ci/gitlab-runner/builds/5YSmsSSK/0/software/riscv-gnu-toolchain/qemu/" > setup_config.sh
-    #- source setup.sh
-    #- echo $PATH
+    - cd $CI_PROJECT_DIR/tools/sdk/nuclei-sdk
     - pip3 install -r tools/scripts/requirements.txt
     - python3 tools/scripts/nsdk_cli/nsdk_bench.py --appcfg tools/scripts/nsdk_cli/configs/application.json --hwcfg tools/scripts/nsdk_cli/configs/nuclei_fpga_eval_ci_qemu.json --parallel=-j --logdir logs/nuclei_fpga_eval_qemu_ci --run --run_target "qemu"
   tags:
-    - env::native
-    - host::xls01
+    - os::linux
+    - env::docker
+  image: ubuntu:16.04
   allow_failure: true
   artifacts:
     when: always
     paths:
-    - $CI_PROJECT_DIR/nuclei-sdk/logs/
+    - $CI_PROJECT_DIR/tools/sdk/nuclei-sdk/logs/
 
 test_cmsis_5:
   stage: test
   timeout: 2h 30m
   script:
-    # - module load nucleisys/riscv-nuclei-elf-gcc
+    - apt-get -y update --fix-missing 
+    - apt-get install -y --fix-missing cmake git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libpixman-1-dev autoconf automake libtool flex bison make
+    #- apt-get install -y python3-pip
+    - apt-get install -y software-properties-common
+    - apt-get install wget openssl libssl-dev -y
+    - wget http://www.python.org/ftp/python/3.6.4/Python-3.6.4.tgz
+    - tar -xvzf Python-3.6.4.tgz
+    - cd Python-3.6.4
+    - ./configure --with-ssl
+    - make -j8 && make install
+    - which python3
+    - rm /usr/bin/python && ln -s /usr/local/bin/python3 /usr/bin/python
+    - ln -s -f /usr/local/python3/bin/pip3  /usr/bin/pip3  && ln -s -f /usr/local/bin/pip3 /usr/bin/pip
+    # find qemu and gcc
+    - cd $CI_PROJECT_DIR
     - export QEMU_PATH_LINUX=$(readlink -f linux_qemu/bin)
     - export PATH=$QEMU_PATH_LINUX:$PATH
-    - cd $CI_PROJECT_DIR
-    - export PATH=/home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.07-eng1/gcc/bin:$PATH
+    - export PATH=$CI_PROJECT_DIR/tools/gcc/gcc/bin:$PATH
+    - qemu-system-riscv32 -M ?
+    - riscv-nuclei-elf-gcc -v
     ################################################
-    # start build nuclei-sdk
-    - git clone git@gito.corp.nucleisys.com:software/library/cmsis-5-riscv.git
-    - cd cmsis-5-riscv
-    - git checkout dev_nuclei
-    # build lib
+    # start build cmsis5
+    - cd $CI_PROJECT_DIR/tools/cmsis-5-riscv
     - cd CMSIS
-    - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
     - export NUCLEI_SDK_ROOT=$(readlink -f nuclei-sdk)
-    #- make VEVTOR_SUPPORTED_CORES="" release
-    - make PARELLEL=1 gen
-    - make PARELLEL=1 release_code
-    - make PARELLEL=1 build_release
-    #- make strip
     - export NUCLEI_SDK_NMSIS=$(readlink -f nmsis_release/NMSIS)
-    - sed -i 's/LENGTH = 64K/LENGTH = 4M/g' nuclei-sdk/SoC/demosoc/Board/nuclei_fpga_eval/Source/GCC/gcc_demosoc_ilm.ld
-    - git clone git@gito.corp.nucleisys.com:snippets/3.git
-    - cp 3/nuclei_cmsis_5_ci_qemu.json .
-    - cd nmsis_release/NMSIS/NN/NN_Lib_Tests
-    - make gen
-    - cd $CI_PROJECT_DIR/cmsis-5-riscv
+    - ls -al
+    #- make strip
+    - cd $CI_PROJECT_DIR/tools/cmsis-5-riscv
     - pip3 install -r CMSIS/nuclei-sdk/tools/scripts/requirements.txt
     - python3 CMSIS/nuclei-sdk/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg CMSIS/nuclei_cmsis_5_ci_qemu.json --parallel=-j --logdir logs/dsp --run --run_target "qemu"
     # test vector=on dsp=on
-    - git clone git@gito.corp.nucleisys.com:snippets/6.git
-    - cp 6/build.mk CMSIS/nuclei-sdk/SoC/demosoc/build.mk
+    - cp CMSIS/6/build.mk CMSIS/nuclei-sdk/SoC/demosoc/build.mk
     - cp CMSIS/3/nuclei_cmsis_5_ci_qemu_vector.json CMSIS/
     - python3 CMSIS/nuclei-sdk/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg CMSIS/nuclei_cmsis_5_ci_qemu_vector.json --parallel=-j --logdir logs/vector_on_dsp_on --run --run_target "qemu"
     # test vector=on dsp=off
@@ -164,68 +234,57 @@ test_cmsis_5:
     - cp CMSIS/3/nuclei_cmsis_5_ci_qemu_vector_off_dsp_off.json CMSIS/
     - python3 CMSIS/nuclei-sdk/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg CMSIS/nuclei_cmsis_5_ci_qemu_vector_off_dsp_off.json --parallel=-j --logdir logs/vector_off_dsp_off --run --run_target "qemu"
   tags:
-    - env::native
-    - host::xls01
+    - os::linux
+    - env::docker
+  image: ubuntu:16.04
   allow_failure: true
   artifacts:
     when: always
     paths:
-    - $CI_PROJECT_DIR/cmsis-5-riscv/logs/
+    - $CI_PROJECT_DIR/tools/cmsis-5-riscv/logs/
 
 test_nmsis:
   stage: test
+  timeout: 2h 30m
   script:
+    - apt-get -y update --fix-missing 
+    - apt-get install -y --fix-missing cmake git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libpixman-1-dev autoconf automake libtool flex bison make
+    #- apt-get install -y python3-pip
+    - apt-get install -y software-properties-common
+    - apt-get install wget openssl libssl-dev -y
+    - wget http://www.python.org/ftp/python/3.6.4/Python-3.6.4.tgz
+    - tar -xvzf Python-3.6.4.tgz
+    - cd Python-3.6.4
+    - ./configure --with-ssl
+    - make -j8 && make install
+    - which python3
+    - rm /usr/bin/python && ln -s /usr/local/bin/python3 /usr/bin/python
+    - ln -s -f /usr/local/python3/bin/pip3  /usr/bin/pip3  && ln -s -f /usr/local/bin/pip3 /usr/bin/pip
+    # find qemu and gcc
+    - cd $CI_PROJECT_DIR
     - export QEMU_PATH_LINUX=$(readlink -f linux_qemu/bin)
     - export PATH=$QEMU_PATH_LINUX:$PATH
-    #- module load nucleisys/riscv-nuclei-elf-gcc
-    - export PATH=/home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.07-eng1/gcc/bin:$PATH
-    #- source .ci/build_sdk.sh
-    #- source .ci/build_applications.sh
-    - cd $CI_PROJECT_DIR
-    - git clone git@gito.corp.nucleisys.com:zhaofujin/ci_test.git
-    #- cp $CI_PROJECT_DIR/ci_test/tools/nuclei_riscv_newlibc_prebuilt_linux64_2020.08.tar.bz2 $CI_PROJECT_DIR/nuclei_riscv_newlibc_prebuilt_linux64_2020.08.tar.bz2
-    #- tar xvf nuclei_riscv_newlibc_prebuilt_linux64_2020.08.tar.bz2
-    # gcc
-    #- export PATH=/home/xl_ci/gitlab-runner/builds/5YSmsSSK/0/software/riscv-gnu-toolchain/qemu/gcc/bin/:$PATH
-    ################################################
-    # start build nuclei-sdk
-    - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
-    - cd nuclei-sdk
-    #- echo "NUCLEI_TOOL_ROOT=/home/xl_ci/gitlab-runner/builds/5YSmsSSK/0/software/riscv-gnu-toolchain/qemu/" > setup_config.sh
-    #- source setup.sh
-    #- echo $PATH
+    - export PATH=$CI_PROJECT_DIR/tools/gcc/gcc/bin:$PATH
+    - qemu-system-riscv32 -M ?
+    - riscv-nuclei-elf-gcc -v
+    ############################################################
+    - cd $CI_PROJECT_DIR/tools/nuclei-sdk
     - pip3 install -r tools/scripts/requirements.txt
-    #- python3 tools/scripts/nsdk_cli/nsdk_bench.py --appcfg tools/scripts/nsdk_cli/configs/application.json --hwcfg tools/scripts/nsdk_cli/configs/nuclei_fpga_eval_ci_qemu.json --parallel=-j --logdir logs/nuclei_fpga_eval_qemu_ci --run --run_target "qemu"
-    ################################################
-    # start build NMSIS
-    - cd $CI_PROJECT_DIR
-    - git clone git@gito.corp.nucleisys.com:snippets/1.git
-    - git clone git@gito.corp.nucleisys.com:software/library/NMSIS.git
-    - cd NMSIS/NMSIS/
-    # build dsp lib
-    - make gen_dsp_lib
-    - make strip_dsp_lib
-    # build nn lib
-    - make gen_nn_lib
-    - make strip_nn_lib
-    - export NUCLEI_SDK_ROOT=$CI_PROJECT_DIR/nuclei-sdk
-    - export NUCLEI_SDK_NMSIS=$CI_PROJECT_DIR/NMSIS/NMSIS/
+    - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS/
+    - export NUCLEI_SDK_ROOT=$CI_PROJECT_DIR/tools/nuclei-sdk
+    - export NUCLEI_SDK_NMSIS=$CI_PROJECT_DIR/tools/NMSIS/NMSIS/
     - export SOC=demosoc
-    - sed -i 's/LENGTH = 64K/LENGTH = 4M/g' $CI_PROJECT_DIR/nuclei-sdk/SoC/demosoc/Board/nuclei_fpga_eval/Source/GCC/gcc_demosoc_ilm.ld
-    - cd $CI_PROJECT_DIR/nuclei-sdk
-    - cp $CI_PROJECT_DIR/1/application.json $CI_PROJECT_DIR/nuclei-sdk/tools/scripts/nsdk_cli/configs/
-    - cd $CI_PROJECT_DIR/NMSIS/NMSIS/NN/NN_Lib_Tests/
-    - make gen
-    - cd $CI_PROJECT_DIR/
+    - cd $CI_PROJECT_DIR/tools
     - python3 nuclei-sdk/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg nuclei-sdk/tools/scripts/nsdk_cli/configs/application.json --parallel=-j --logdir logs/nuclei_fpga_ci_nmsis_qemu --run --run_target "qemu"
   tags:
-    - env::native
-    - host::xls01
+    - os::linux
+    - env::docker
+  image: ubuntu:16.04
   allow_failure: true
   artifacts:
     when: always
     paths:
-    - $CI_PROJECT_DIR/logs/
+    - $CI_PROJECT_DIR/tools/logs/
 
 deploy-qemu:
   stage: deploy
@@ -237,17 +296,17 @@ deploy-qemu:
     # save log
     - mkdir $CI_PROJECT_DIR/test_logs
     - mkdir $CI_PROJECT_DIR/Documents
-    - cp $CI_PROJECT_DIR/logs/ $CI_PROJECT_DIR/test_logs/ -r
-    - cp $CI_PROJECT_DIR/cmsis-5-riscv/logs/ $CI_PROJECT_DIR/test_logs/ -r
-    - cp $CI_PROJECT_DIR/nuclei-sdk/logs/ $CI_PROJECT_DIR/test_logs/ -r
+    - cp $CI_PROJECT_DIR/tools/logs/ $CI_PROJECT_DIR/test_logs/ -r
+    - cp $CI_PROJECT_DIR/tools/cmsis-5-riscv/logs/ $CI_PROJECT_DIR/test_logs/ -r
+    - cp $CI_PROJECT_DIR/tools/sdk/nuclei-sdk/logs/ $CI_PROJECT_DIR/test_logs/ -r
 
     # docs
-    - git clone git@gito.corp.nucleisys.com:software/riscv-gnu-toolchain/qemu.wiki.git
-    - cp qemu.wiki/*pdf $CI_PROJECT_DIR/Documents -r
-    - cp qemu.wiki/nuclei-qemu-版本发布说明.md $CI_PROJECT_DIR/Documents -r
+    #- git clone git@gito.corp.nucleisys.com:software/riscv-gnu-toolchain/qemu.wiki.git
+    - cp $CI_PROJECT_DIR/tools/qemu.wiki/*pdf $CI_PROJECT_DIR/Documents -r
+    - cp $CI_PROJECT_DIR/tools/qemu.wiki/nuclei-qemu-版本发布说明.md $CI_PROJECT_DIR/Documents -r
   tags:
-    - env::native
-    - host::xls01
+    - env::docker
+    - net::outside
   artifacts:
     name: "${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     paths:
