@@ -618,6 +618,10 @@ GEN_RVP_R2_OOL(clo8);
 GEN_RVP_R2_OOL(swap8);
 GEN_RVP_R2_OOL_D(dkabs8);
 GEN_RVP_R2_OOL_D(dkabs16);
+GEN_RVP_R2_OOL(expd80);
+GEN_RVP_R2_OOL(expd81);
+GEN_RVP_R2_OOL(expd82);
+GEN_RVP_R2_OOL(expd83);
 
 /* 8-bit Unpacking Instructions */
 GEN_RVP_R2_OOL(sunpkd810);
