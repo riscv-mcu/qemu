@@ -45,12 +45,33 @@ rvpr(CPURISCVState *env, target_ulong a, target_ulong b,
     return result;
 }
 
+static inline uint64_t
+rvprd(CPURISCVState *env, uint64_t a, uint64_t b,
+     uint8_t step, uint8_t size, PackedFn3i *fn)
+{
+    int i, passes = sizeof(target_ulong)*2 / size;
+    uint64_t result = 0;
+
+    for (i = 0; i < passes; i += step) {
+        fn(env, &result, &a, &b, i);
+    }
+    return result;
+}
+
 #define RVPR(NAME, STEP, SIZE)                                  \
 target_ulong HELPER(NAME)(CPURISCVState *env, target_ulong a,   \
                           target_ulong b)                       \
 {                                                               \
     return rvpr(env, a, b, STEP, SIZE, (PackedFn3i *)do_##NAME);\
 }
+
+#define RVPRD(NAME, STEP, SIZE)                                  \
+uint64_t HELPER(NAME)(CPURISCVState *env, uint64_t a,            \
+                          uint64_t b)                            \
+{                                                                \
+    return rvprd(env, a, b, STEP, SIZE, (PackedFn3i *)do_##NAME);\
+}
+
 
 static inline int32_t hadd32(int32_t a, int32_t b)
 {
@@ -88,6 +109,15 @@ static inline void do_kadd16(CPURISCVState *env, void *vd, void *va,
 }
 
 RVPR(kadd16, 1, 2);
+
+static inline void do_dkadd16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+    d[i] = sadd16(env, 0, a[i], b[i]);
+}
+
+RVPRD(dkadd16, 1, 2);
 
 static inline void do_ukadd16(CPURISCVState *env, void *vd, void *va,
                               void *vb, uint8_t i)
@@ -143,6 +173,16 @@ static inline void do_ksub16(CPURISCVState *env, void *vd, void *va,
 }
 
 RVPR(ksub16, 1, 2);
+
+
+static inline void do_dksub16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+    d[i] = ssub16(env, 0, a[i], b[i]);
+}
+
+RVPRD(dksub16, 1, 2);
 
 static inline void do_uksub16(CPURISCVState *env, void *vd, void *va,
                               void *vb, uint8_t i)
@@ -390,6 +430,15 @@ static inline void do_ukadd8(CPURISCVState *env, void *vd, void *va,
 
 RVPR(ukadd8, 1, 1);
 
+static inline void do_dkadd8(CPURISCVState *env, void *vd, void *va,
+                            void *vb, uint8_t i)
+{
+    int8_t *d = vd, *a = va, *b = vb;
+    d[i] = sadd8(env, 0, a[i], b[i]);
+}
+
+RVPRD(dkadd8, 1, 1);
+
 static inline void do_rsub8(CPURISCVState *env, void *vd, void *va,
                             void *vb, uint8_t i)
 {
@@ -416,6 +465,15 @@ static inline void do_ksub8(CPURISCVState *env, void *vd, void *va,
 }
 
 RVPR(ksub8, 1, 1);
+
+static inline void do_dksub8(CPURISCVState *env, void *vd, void *va,
+                            void *vb, uint8_t i)
+{
+    int8_t *d = vd, *a = va, *b = vb;
+    d[i] = ssub8(env, 0, a[i], b[i]);
+}
+
+RVPRD(dksub8, 1, 1);
 
 static inline void do_uksub8(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
@@ -512,6 +570,23 @@ static inline void do_kslra16(CPURISCVState *env, void *vd, void *va,
 }
 
 RVPR(kslra16, 1, 2);
+
+static inline void do_dkslra16(CPURISCVState *env, void *vd, void *va,
+                              void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va;
+    int32_t shift = sextract32((*(target_ulong *)vb), 0, 5);
+
+    if (shift >= 0) {
+        do_ksll16(env, vd, va, vb, i);
+    } else {
+        shift = -shift;
+        shift = (shift == 16) ? 15 : shift;
+        d[i] = a[i] >> shift;
+    }
+}
+
+RVPRD(dkslra16, 1, 2);
 
 static inline void do_kslra16_u(CPURISCVState *env, void *vd, void *va,
                                 void *vb, uint8_t i)
@@ -614,6 +689,23 @@ static inline void do_kslra8(CPURISCVState *env, void *vd, void *va,
 }
 
 RVPR(kslra8, 1, 1);
+
+static inline void do_dkslra8(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int8_t *d = vd, *a = va;
+    int32_t shift = sextract32((*(uint32_t *)vb), 0, 4);
+
+    if (shift >= 0) {
+        do_ksll8(env, vd, va, vb, i);
+    } else {
+        shift = -shift;
+        shift = (shift == 8) ? 7 : shift;
+        d[i] = a[i] >> shift;
+    }
+}
+
+RVPRD(dkslra8, 1, 1);
 
 static inline void do_kslra8_u(CPURISCVState *env, void *vd, void *va,
                                void *vb, uint8_t i)
@@ -799,6 +891,21 @@ static inline void do_khm16(CPURISCVState *env, void *vd, void *va,
 
 RVPR(khm16, 1, 2);
 
+static inline void do_dkhm16(CPURISCVState *env, void *vd, void *va,
+                            void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+
+    if (a[i] == INT16_MIN && b[i] == INT16_MIN) {
+        env->vxsat = 1;
+        d[i] = INT16_MAX;
+    } else {
+        d[i] = (int32_t)a[i] * b[i] >> 15;
+    }
+}
+
+RVPRD(dkhm16, 1, 2);
+
 static inline void do_khmx16(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
 {
@@ -891,6 +998,21 @@ static inline void do_khm8(CPURISCVState *env, void *vd, void *va,
 }
 
 RVPR(khm8, 1, 1);
+
+static inline void do_dkhm8(CPURISCVState *env, void *vd, void *va,
+                           void *vb, uint8_t i)
+{
+    int8_t *d = vd, *a = va, *b = vb;
+
+    if (a[i] == INT8_MIN && b[i] == INT8_MIN) {
+        env->vxsat = 1;
+        d[i] = INT8_MAX;
+    } else {
+        d[i] = (int16_t)a[i] * b[i] >> 7;
+    }
+}
+
+RVPRD(dkhm8, 1, 1);
 
 static inline void do_khmx8(CPURISCVState *env, void *vd, void *va,
                             void *vb, uint8_t i)
@@ -1035,10 +1157,28 @@ static inline target_ulong rvpr2(CPURISCVState *env, target_ulong a,
     return result;
 }
 
+static inline uint64_t rvpr2d(CPURISCVState *env, uint64_t a,
+                                 uint8_t step, uint8_t size, PackedFn2i *fn)
+{
+    int i, passes = sizeof(target_ulong) * 2 / size;
+    uint64_t result;
+    for (i = 0; i < passes; i += step) 
+    {
+        fn(env, &result, &a, i);
+    }
+    return result;
+}
+
 #define RVPR2(NAME, STEP, SIZE)                                  \
 target_ulong HELPER(NAME)(CPURISCVState *env, target_ulong a)    \
 {                                                                \
     return rvpr2(env, a, STEP, SIZE, (PackedFn2i *)do_##NAME);   \
+}
+
+#define RVPR2D(NAME, STEP, SIZE)                                  \
+uint64_t HELPER(NAME)(CPURISCVState *env, uint64_t a1)            \
+{                                                                 \
+    return rvpr2d(env, a1, STEP, SIZE, (PackedFn2i *)do_##NAME);  \
 }
 
 static inline void do_kabs16(CPURISCVState *env, void *vd, void *va, uint8_t i)
@@ -1054,6 +1194,21 @@ static inline void do_kabs16(CPURISCVState *env, void *vd, void *va, uint8_t i)
 }
 
 RVPR2(kabs16, 1, 2);
+
+
+static inline void do_dkabs16(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int16_t *d = vd, *a = va;
+
+    if (a[i] == INT16_MIN) {
+        d[i] = INT16_MAX;
+        env->vxsat = 0x1;
+    } else {
+        d[i] = abs(a[i]);
+    }
+}
+
+RVPR2D(dkabs16, 1, 2);
 
 static inline void do_clrs16(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
@@ -1161,6 +1316,19 @@ static inline void do_kabs8(CPURISCVState *env, void *vd, void *va, uint8_t i)
 
 RVPR2(kabs8, 1, 1);
 
+static inline void do_dkabs8(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int8_t *d = vd, *a = va;
+    if (a[i] == INT8_MIN) {
+        d[i] = INT8_MAX;
+        env->vxsat = 0x1;
+    } else {
+        d[i] = abs(a[i]);
+    }
+}
+
+RVPR2D(dkabs8, 1, 1);
+
 static inline void do_clrs8(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
     int8_t *d = vd, *a = va;
@@ -1254,6 +1422,58 @@ do_sunpkd832(CPURISCVState *env, void *vd, void *va, uint8_t i)
 }
 
 RVPR2(sunpkd832, 4, 1);
+
+static inline void
+do_expd80(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int8_t *a = va;
+    int8_t *d = vd;
+    d[0] = a[0];
+    d[1] = a[0];
+    d[2] = a[0];
+    d[3] = a[0];
+}
+
+RVPR2(expd80, 4, 1);
+
+static inline void
+do_expd81(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int8_t *a = va;
+    int8_t *d = vd;
+    d[0] = a[1];
+    d[1] = a[1];
+    d[2] = a[1];
+    d[3] = a[1];
+}
+
+RVPR2(expd81, 4, 1);
+
+static inline void
+do_expd82(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int8_t *a = va;
+    int8_t *d = vd;
+    d[0] = a[2];
+    d[1] = a[2];
+    d[2] = a[2];
+    d[3] = a[2];
+}
+
+RVPR2(expd82, 4, 1);
+
+static inline void
+do_expd83(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int8_t *a = va;
+    int8_t *d = vd;
+    d[0] = a[3];
+    d[1] = a[3];
+    d[2] = a[3];
+    d[3] = a[3];
+}
+
+RVPR2(expd83, 4, 1);
 
 static inline void
 do_zunpkd810(CPURISCVState *env, void *vd, void *va, uint8_t i)
