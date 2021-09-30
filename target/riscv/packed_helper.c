@@ -1210,6 +1210,8 @@ static inline void do_dkabs16(CPURISCVState *env, void *vd, void *va, uint8_t i)
 
 RVPR2D(dkabs16, 1, 2);
 
+
+
 static inline void do_clrs16(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
     int16_t *d = vd, *a = va;
@@ -1431,6 +1433,60 @@ do_sunpkd832(CPURISCVState *env, void *vd, void *va, uint8_t i)
 }
 
 RVPR2(sunpkd832, 4, 1);
+
+
+static inline void
+do_expd80(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int8_t *a = va;
+    int8_t *d = vd;
+    d[0] = a[0];
+    d[1] = a[0];
+    d[2] = a[0];
+    d[3] = a[0];
+}
+
+RVPR2(expd80, 4, 1);
+
+static inline void
+do_expd81(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int8_t *a = va;
+    int8_t *d = vd;
+    d[0] = a[1];
+    d[1] = a[1];
+    d[2] = a[1];
+    d[3] = a[1];
+}
+
+RVPR2(expd81, 4, 1);
+
+
+static inline void
+do_expd82(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int8_t *a = va;
+    int8_t *d = vd;
+    d[0] = a[2];
+    d[1] = a[2];
+    d[2] = a[2];
+    d[3] = a[2];
+}
+
+RVPR2(expd82, 4, 1);
+
+static inline void
+do_expd83(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int8_t *a = va;
+    int8_t *d = vd;
+    d[0] = a[3];
+    d[1] = a[3];
+    d[2] = a[3];
+    d[3] = a[3];
+}
+
+RVPR2(expd83, 4, 1);
 
 static inline void
 do_zunpkd810(CPURISCVState *env, void *vd, void *va, uint8_t i)
