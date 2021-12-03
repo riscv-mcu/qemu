@@ -860,6 +860,16 @@ static void cpu_set_ext_state(Object *obj, const char *value, Error **errp)
     memcpy(isa_str, value, slen);
     for (ii = 0; ii < slen; ii++) 
     {
+        if(isa_str[ii] == 'b')
+        {
+            cpu->env.misa |= RVB;
+        }
+
+        if(isa_str[ii] == 'k')
+        {
+            cpu->env.misa |= RVK;
+        }
+
         if(isa_str[ii] == 'p')
         {
             cpu->env.misa |= RVP;
