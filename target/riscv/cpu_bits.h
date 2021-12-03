@@ -162,6 +162,13 @@
 /* 32-bit only */
 #define CSR_MSTATUSH        0x310
 
+
+/* Legacy Counter Setup (priv v1.9.1) */
+/* Update to #define CSR_MCOUNTINHIBIT 0x320 for 1.11.0 */
+#define CSR_MUCOUNTEREN     0x320
+#define CSR_MSCOUNTEREN     0x321
+#define CSR_MHCOUNTEREN     0x322
+
 /* Machine Trap Handling */
 #define CSR_MSCRATCH        0x340
 #define CSR_MEPC            0x341

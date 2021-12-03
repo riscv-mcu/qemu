@@ -1,21 +1,22 @@
 /*
- * Nuclei N series  SOC machine interface
+ * QEMU RISC-V Nuclei  Hbird Board Compatible  with Nuclei SDK
  *
+ * Copyright (c) 2020  PLCT Lab
  * Copyright (c) 2020 Gao ZhiYuan <alapha23@gmail.com>
- * Copyright (c) 2020-2021 PLCT Lab.All rights reserved.
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Provides a board compatible with the Nuclei SDK:
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2 or later, as published by the Free Software Foundation.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "qemu/osdep.h"
 #include "qemu/log.h"
@@ -72,9 +73,6 @@ static void riscv_nuclei_n_machine_init(MachineState *machine)
     const struct MemmapEntry *memmap = nuclei_n_memmap;
     NucleiNState *s = RISCV_NUCLEI_N_MACHINE(machine);
     MemoryRegion *system_memory = get_system_memory();
-    MemoryRegion *main_mem = g_new(MemoryRegion, 1);
-    MemoryRegion *flash = g_new(MemoryRegion, 1);
-    target_ulong start_addr = memmap[HBIRD_ILM].base;
     int i;
 
     /* TODO: Add qtest support */
@@ -106,25 +104,6 @@ static void riscv_nuclei_n_machine_init(MachineState *machine)
     }else if(!strcmp(s->download, "ddr"))
     {
         start_addr = memmap[NUCLEI_N_DEV_DDR].base;
-    }
-
-    switch (s->msel)
-    {
-    case MSEL_ILM:
-        start_addr = memmap[HBIRD_ILM].base;
-        break;
-    case MSEL_FLASH:
-        start_addr = memmap[HBIRD_XIP].base;
-        break;
-    case MSEL_FLASHXIP:
-        start_addr = memmap[HBIRD_XIP].base;
-        break;
-    case MSEL_DDR:
-        start_addr = memmap[HBIRD_DRAM].base;
-        break;
-    default:
-        start_addr = memmap[HBIRD_ILM].base;
-        break;
     }
 
     /* reset vector */
@@ -180,7 +159,7 @@ static void riscv_nuclei_n_soc_realize(DeviceState *dev, Error **errp)
     MemoryRegion *sys_mem = get_system_memory();
     Error *err = NULL;
 
-    object_property_set_str(OBJECT(&s->cpus), "cpu-type", ms->cpu_type,
+    object_property_set_str(OBJECT(&s->cpus),  "cpu-type", ms->cpu_type,
                             &error_abort);
     sysbus_realize(SYS_BUS_DEVICE(&s->cpus), &error_abort);
 
@@ -250,6 +229,7 @@ static void riscv_nuclei_n_machine_class_init(ObjectClass *oc, void *data)
     mc->desc = "Nuclei RISC-V demosoc on Kit(MCU200T/DDR200T), support Nuclei N/NX class processor";
     mc->init = riscv_nuclei_n_machine_init;
     mc->max_cpus = 1;
+    mc->is_default = false;
     mc->default_cpu_type = NUCLEI_N_CPU;
 
     object_class_property_add_str(oc, "download",
@@ -259,24 +239,6 @@ static void riscv_nuclei_n_machine_class_init(ObjectClass *oc, void *data)
                                           "Set on to tell QEMU's ROM to jump to "
                                           "download modes. Otherwise QEMU will jump to DRAM "
                                           "nuclei support three download modes(flashxip,flash,ilm,ddr)");
-}
-
-static void riscv_nuclei_n_machine_instance_init(Object *obj)
-{
-    //todo
-}
-
-static const TypeInfo riscv_nuclei_n_machine_typeinfo = {
-    .name       = MACHINE_TYPE_NAME("nuclei_n"),
-    .parent     = TYPE_MACHINE,
-    .class_init = riscv_nuclei_n_machine_class_init,
-    .instance_init = riscv_nuclei_n_machine_instance_init,
-    .instance_size = sizeof(NucleiNState),
-};
-
-static void riscv_nuclei_n_machine_init_register_types(void)
-{
-    type_register_static(&riscv_nuclei_n_machine_typeinfo);
 }
 
 static void riscv_nuclei_n_machine_instance_init(Object *obj)

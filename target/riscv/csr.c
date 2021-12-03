@@ -449,7 +449,7 @@ static int read_mcycle(CPURISCVState *env, int csrno, target_ulong *val)
 #else
     *val = cpu_get_host_ticks();
 #endif
-    return 0;
+    return RISCV_EXCP_NONE;
 }
 /* User Timers and Counters */
 static RISCVException read_instret(CPURISCVState *env, int csrno,
@@ -2169,10 +2169,8 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
 
     [CSR_MSTATUSH]    = { "mstatush",   any32, read_mstatush,    write_mstatush    },
 
-/*
     [CSR_MUCOUNTEREN] =         { "mucounteren", any,  read_mucounteren, write_mucounteren },
     [CSR_MSCOUNTEREN] = { "msounteren", any,   read_mscounteren, write_mscounteren },
-*/
 
     /* Machine Trap Handling */
     [CSR_MSCRATCH] = { "mscratch", any,  read_mscratch, write_mscratch },
