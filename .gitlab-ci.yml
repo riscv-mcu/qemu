@@ -84,7 +84,7 @@ build_linux_qemu:
   tags:
     - os::linux
     - env::docker
-  image: ubuntu:16.04
+  image: ubuntu:18.04
   script:
     - apt-get -y update --fix-missing 
     - apt-get install -y --fix-missing git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libpixman-1-dev autoconf automake libtool flex bison make
