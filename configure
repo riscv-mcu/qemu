@@ -2079,9 +2079,9 @@ cat > $TMPC << EOF
 #endif
 int main (void) { return 0; }
 EOF
-if ! compile_prog "" "" ; then
-    error_exit "You need at least GCC v7.5 or Clang v6.0 (or XCode Clang v10.0)"
-fi
+# if ! compile_prog "" "" ; then
+#     error_exit "You need at least GCC v7.5 or Clang v6.0 (or XCode Clang v10.0)"
+# fi
 
 # Accumulate -Wfoo and -Wno-bar separately.
 # We will list all of the enable flags first, and the disable flags second.
