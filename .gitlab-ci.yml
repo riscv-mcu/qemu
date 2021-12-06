@@ -125,7 +125,7 @@ build_windows_qemu:
     - os::linux
     - env::docker
   image: 
-    name: build-windows-qemu
+    name: build-windows-qemu:v1
     entrypoint: ["/bin/sh", "-c"]
   script:
     # install software
