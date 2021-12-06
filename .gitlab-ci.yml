@@ -13,40 +13,16 @@ prepare_tools:
     - git clone git@gito.corp.nucleisys.com:software/riscv-gnu-toolchain/qemu.wiki.git
     # gcc
     - mkdir -p $CI_PROJECT_DIR/tools/gcc
-    - cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.07-eng1/gcc/ gcc/ -r
+    - cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.11-eng1/gcc/ gcc/ -r
     #- cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.09-rvp-eng2-linux/gcc/ gcc/ -r
     - export PATH=$CI_PROJECT_DIR/tools/gcc/gcc/bin:$PATH
     # test sdk
     - mkdir -p $CI_PROJECT_DIR/tools/sdk
     - cd $CI_PROJECT_DIR/tools/sdk
     - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
-    - cd nuclei-sdk
-    - git checkout fix_qemu_test
     # nuclei-sdk
     - cd $CI_PROJECT_DIR/tools/
     - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
-    - cd nuclei-sdk
-    - git checkout fix_qemu_test
-    # cmsis-5
-    - cd  $CI_PROJECT_DIR/tools
-    - git clone git@gito.corp.nucleisys.com:software/library/cmsis-5-riscv.git
-    - cd  $CI_PROJECT_DIR/tools/cmsis-5-riscv/CMSIS
-    - git checkout dev_nuclei
-    - git clone git@gito.corp.nucleisys.com:snippets/3.git
-    - git clone git@gito.corp.nucleisys.com:snippets/6.git
-    - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
-    - cd nuclei-sdk
-    - git checkout fix_qemu_test
-    - cd $CI_PROJECT_DIR/tools/cmsis-5-riscv/CMSIS
-    - export NUCLEI_SDK_ROOT=$(readlink -f nuclei-sdk)
-    - make PARELLEL=1 gen
-    - make PARELLEL=1 release_code
-    - make PARELLEL=1 build_release
-    - export NUCLEI_SDK_NMSIS=$(readlink -f nmsis_release/NMSIS)
-    - sed -i 's/LENGTH = 64K/LENGTH = 4M/g' nuclei-sdk/SoC/demosoc/Board/nuclei_fpga_eval/Source/GCC/gcc_demosoc_ilm.ld
-    - cp 3/nuclei_cmsis_5_ci_qemu.json .
-    - cd nmsis_release/NMSIS/NN/NN_Lib_Tests
-    - make gen
     # nmsis
     - cd  $CI_PROJECT_DIR/tools/
     - git clone git@gito.corp.nucleisys.com:software/library/NMSIS.git
@@ -188,61 +164,6 @@ test_sdk:
     paths:
     - $CI_PROJECT_DIR/tools/sdk/nuclei-sdk/logs/
 
-test_cmsis_5:
-  stage: test
-  timeout: 2h 30m
-  script:
-    - apt-get -y update --fix-missing 
-    - apt-get install -y --fix-missing cmake git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libpixman-1-dev autoconf automake libtool flex bison make
-    #- apt-get install -y python3-pip
-    - apt-get install -y software-properties-common
-    - apt-get install wget openssl libssl-dev -y
-    - wget http://www.python.org/ftp/python/3.6.4/Python-3.6.4.tgz
-    - tar -xvzf Python-3.6.4.tgz
-    - cd Python-3.6.4
-    - ./configure --with-ssl
-    - make -j8 && make install
-    - which python3
-    - rm /usr/bin/python && ln -s /usr/local/bin/python3 /usr/bin/python
-    - ln -s -f /usr/local/python3/bin/pip3  /usr/bin/pip3  && ln -s -f /usr/local/bin/pip3 /usr/bin/pip
-    # find qemu and gcc
-    - cd $CI_PROJECT_DIR
-    - export QEMU_PATH_LINUX=$(readlink -f linux_qemu/bin)
-    - export PATH=$QEMU_PATH_LINUX:$PATH
-    - export PATH=$CI_PROJECT_DIR/tools/gcc/gcc/bin:$PATH
-    - qemu-system-riscv32 -M ?
-    - riscv-nuclei-elf-gcc -v
-    ################################################
-    # start build cmsis5
-    - cd $CI_PROJECT_DIR/tools/cmsis-5-riscv
-    - cd CMSIS
-    - export NUCLEI_SDK_ROOT=$(readlink -f nuclei-sdk)
-    - export NUCLEI_SDK_NMSIS=$(readlink -f nmsis_release/NMSIS)
-    - ls -al
-    #- make strip
-    - cd $CI_PROJECT_DIR/tools/cmsis-5-riscv
-    - pip3 install -r CMSIS/nuclei-sdk/tools/scripts/requirements.txt
-    - python3 CMSIS/nuclei-sdk/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg CMSIS/nuclei_cmsis_5_ci_qemu.json --parallel=-j --logdir logs/dsp --run --run_target "qemu"
-    # test vector=on dsp=on
-    - cp CMSIS/6/build.mk CMSIS/nuclei-sdk/SoC/demosoc/build.mk
-    - cp CMSIS/3/nuclei_cmsis_5_ci_qemu_vector.json CMSIS/
-    - python3 CMSIS/nuclei-sdk/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg CMSIS/nuclei_cmsis_5_ci_qemu_vector.json --parallel=-j --logdir logs/vector_on_dsp_on --run --run_target "qemu"
-    # test vector=on dsp=off
-    - cp CMSIS/3/nuclei_cmsis_5_ci_qemu_vector_on_dsp_off.json CMSIS/
-    - python3 CMSIS/nuclei-sdk/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg CMSIS/nuclei_cmsis_5_ci_qemu_vector_on_dsp_off.json --parallel=-j --logdir logs/vector_on_dsp_off --run --run_target "qemu"
-    # test vector=off dsp=off
-    - cp CMSIS/3/nuclei_cmsis_5_ci_qemu_vector_off_dsp_off.json CMSIS/
-    - python3 CMSIS/nuclei-sdk/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg CMSIS/nuclei_cmsis_5_ci_qemu_vector_off_dsp_off.json --parallel=-j --logdir logs/vector_off_dsp_off --run --run_target "qemu"
-  tags:
-    - os::linux
-    - env::docker
-  image: ubuntu:16.04
-  allow_failure: true
-  artifacts:
-    when: always
-    paths:
-    - $CI_PROJECT_DIR/tools/cmsis-5-riscv/logs/
-
 test_nmsis:
   stage: test
   timeout: 2h 30m
@@ -297,7 +218,6 @@ deploy-qemu:
     - mkdir $CI_PROJECT_DIR/test_logs
     - mkdir $CI_PROJECT_DIR/Documents
     - cp $CI_PROJECT_DIR/tools/logs/ $CI_PROJECT_DIR/test_logs/ -r
-    - cp $CI_PROJECT_DIR/tools/cmsis-5-riscv/logs/ $CI_PROJECT_DIR/test_logs/ -r
     - cp $CI_PROJECT_DIR/tools/sdk/nuclei-sdk/logs/ $CI_PROJECT_DIR/test_logs/ -r
 
     # docs
