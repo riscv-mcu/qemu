@@ -125,16 +125,16 @@ build_windows_qemu:
     - os::linux
     - env::docker
   image: 
-    name: fedora:34
+    name: build-windows-qemu
     entrypoint: ["/bin/sh", "-c"]
   script:
     # install software
     # - dnf install updates
-    - dnf install -y git mingw64-pixman mingw64-gmp mingw64-SDL2 mingw64-pkg-config mingw64-bzip2 bzip2 make diffutils pkg-config autoconf automake libtool flex bison
-    - dnf install -y http://ftp.pbone.net/mirror/archive.fedoraproject.org/fedora-secondary/releases/28/Everything/ppc64/os/Packages/m/mingw64-glib2-2.54.1-1.fc28.noarch.rpm
-    - dnf install -y ninja-build
-    - dnf install -y gcc
-    - dnf install -y https://download-ib01.fedoraproject.org/pub/fedora/linux/releases/34/Everything/aarch64/os/Packages/m/meson-0.56.2-2.fc34.noarch.rpm
+    # - dnf install -y git mingw64-pixman mingw64-gmp mingw64-SDL2 mingw64-pkg-config mingw64-bzip2 bzip2 make diffutils pkg-config autoconf automake libtool flex bison
+    # - dnf install -y http://ftp.pbone.net/mirror/archive.fedoraproject.org/fedora-secondary/releases/28/Everything/ppc64/os/Packages/m/mingw64-glib2-2.54.1-1.fc28.noarch.rpm
+    # - dnf install -y ninja-build
+    # - dnf install -y gcc
+    # - dnf install -y https://download-ib01.fedoraproject.org/pub/fedora/linux/releases/34/Everything/aarch64/os/Packages/m/meson-0.56.2-2.fc34.noarch.rpm
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git submodule update --remote
