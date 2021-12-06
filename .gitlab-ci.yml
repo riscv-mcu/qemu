@@ -84,23 +84,23 @@ build_linux_qemu:
   tags:
     - os::linux
     - env::docker
-  image: ubuntu:16.04
+  image: rego.corp.nucleisys.com/software/build-linux-qemu:v1
   script:
-    - apt-get -y update --fix-missing 
-    - apt-get install -y --fix-missing git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libpixman-1-dev autoconf automake libtool flex bison make
-    # gcc 7.5
-    - apt-get install -y software-properties-common
-    - apt-get install wget openssl libssl-dev -y
-    - wget http://www.python.org/ftp/python/3.6.4/Python-3.6.4.tgz
-    - tar -xvzf Python-3.6.4.tgz
-    - cd Python-3.6.4
-    - ./configure --with-ssl
-    - make -j8 && make install
-    - which python3
-    - rm /usr/bin/python && ln -s /usr/local/bin/python3 /usr/bin/python
-    - ln -s -f /usr/local/python3/bin/pip3  /usr/bin/pip3  && ln -s -f /usr/local/bin/pip3 /usr/bin/pip
-    - pip3 install ninja
-    - pip3 install meson==0.57.2
+    # - apt-get -y update --fix-missing 
+    # - apt-get install -y --fix-missing git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libpixman-1-dev autoconf automake libtool flex bison make
+    # # gcc 7.5
+    # - apt-get install -y software-properties-common
+    # - apt-get install wget openssl libssl-dev -y
+    # - wget http://www.python.org/ftp/python/3.6.4/Python-3.6.4.tgz
+    # - tar -xvzf Python-3.6.4.tgz
+    # - cd Python-3.6.4
+    # - ./configure --with-ssl
+    # - make -j8 && make install
+    # - which python3
+    # - rm /usr/bin/python && ln -s /usr/local/bin/python3 /usr/bin/python
+    # - ln -s -f /usr/local/python3/bin/pip3  /usr/bin/pip3  && ln -s -f /usr/local/bin/pip3 /usr/bin/pip
+    # - pip3 install ninja
+    # - pip3 install meson==0.57.2
     # git submodule
     - cd $CI_PROJECT_DIR
     - git submodule sync --recursive
