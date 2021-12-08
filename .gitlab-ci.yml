@@ -20,9 +20,13 @@ prepare_tools:
     - mkdir -p $CI_PROJECT_DIR/tools/sdk
     - cd $CI_PROJECT_DIR/tools/sdk
     - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
+    - cd nuclei-sdk
+    - git checkout hqfang/pv_gcc10
     # nuclei-sdk
     - cd $CI_PROJECT_DIR/tools/
     - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
+    - cd nuclei-sdk
+    - git checkout hqfang/pv_gcc10
     # nmsis
     - cd  $CI_PROJECT_DIR/tools/
     - git clone git@gito.corp.nucleisys.com:software/library/NMSIS.git
