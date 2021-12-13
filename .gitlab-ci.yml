@@ -13,7 +13,9 @@ prepare_tools:
     - git clone git@gito.corp.nucleisys.com:software/riscv-gnu-toolchain/qemu.wiki.git
     # gcc
     - mkdir -p $CI_PROJECT_DIR/tools/gcc
-    - cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.11-eng1/gcc/ gcc/ -r
+    #- cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.11-eng1/gcc/ gcc/ -r
+    # 2021.07-eng1
+    - cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.07-eng1/gcc/ gcc/ -r
     #- cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.09-rvp-eng2-linux/gcc/ gcc/ -r
     - export PATH=$CI_PROJECT_DIR/tools/gcc/gcc/bin:$PATH
     # test sdk
