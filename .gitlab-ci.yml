@@ -16,7 +16,7 @@ prepare_tools:
     # /home/xl_ci/toolchain//nuclei_gnu/linux64/newlibc/2021.1215.eng1/gcc
     #- cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.11-eng1/gcc/ gcc/ -r
     # 2021.07-eng1
-    - cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.1215.eng1/gcc/ gcc/ -r
+    - cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.1216.eng1/gcc/ gcc/ -r
     #- cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.09-rvp-eng2-linux/gcc/ gcc/ -r
     - export PATH=$CI_PROJECT_DIR/tools/gcc/gcc/bin:$PATH
     # test sdk
