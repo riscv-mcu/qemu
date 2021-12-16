@@ -35,6 +35,7 @@ prepare_tools:
     - git clone git@gito.corp.nucleisys.com:software/library/NMSIS.git
     - git clone git@gito.corp.nucleisys.com:snippets/1.git
     - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS/
+    - git checkout test
     # build dsp lib
     - make gen_dsp_lib
     - make strip_dsp_lib
