@@ -38,10 +38,10 @@ prepare_tools:
     - git checkout test
     # build dsp lib
     - make gen_dsp_lib
-    - make strip_dsp_lib
+    #- make strip_dsp_lib
     # build nn lib
     - make gen_nn_lib
-    - make strip_nn_lib
+    #- make strip_nn_lib
     - cd $CI_PROJECT_DIR/tools/nuclei-sdk
     - pip3 install -r tools/scripts/requirements.txt
     - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS/
