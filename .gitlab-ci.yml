@@ -24,33 +24,36 @@ prepare_tools:
     - cd $CI_PROJECT_DIR/tools/sdk
     - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
     - cd nuclei-sdk
-    - git checkout hqfang/pv_gcc10
-    # nuclei-sdk
-    - cd $CI_PROJECT_DIR/tools/
-    - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
-    - cd nuclei-sdk
-    - git checkout hqfang/pv_gcc10
+    - git checkout dev_xlspike_next
     # nmsis
     - cd  $CI_PROJECT_DIR/tools/
     - git clone git@gito.corp.nucleisys.com:software/library/NMSIS.git
-    - git clone git@gito.corp.nucleisys.com:snippets/1.git
+    - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS
+    - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
+    - cd nuclei-sdk
+    - git checkout dev_xlspike_next
+    #- git clone git@gito.corp.nucleisys.com:snippets/1.git
     - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS/
-    - git checkout qemu_test
+    - git checkout hqfang/libncrt_gcc10.2
     # build dsp lib
     - make gen_dsp_lib
     #- make strip_dsp_lib
     # build nn lib
     - make gen_nn_lib
     #- make strip_nn_lib
-    - cd $CI_PROJECT_DIR/tools/nuclei-sdk
+    - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS/nuclei-sdk
     - pip3 install -r tools/scripts/requirements.txt
-    - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS/
-    - export NUCLEI_SDK_ROOT=$CI_PROJECT_DIR/tools/nuclei-sdk
-    - export NUCLEI_SDK_NMSIS=$CI_PROJECT_DIR/tools/NMSIS/NMSIS/
-    - export SOC=demosoc
-    - sed -i 's/LENGTH = 64K/LENGTH = 4M/g' $CI_PROJECT_DIR/tools/nuclei-sdk/SoC/demosoc/Board/nuclei_fpga_eval/Source/GCC/gcc_demosoc_ilm.ld
-    - cd $CI_PROJECT_DIR/tools/nuclei-sdk
-    - cp $CI_PROJECT_DIR/tools/1/application.json $CI_PROJECT_DIR/tools/nuclei-sdk/tools/scripts/nsdk_cli/configs/
+    - cd $CI_PROJECT_DIR/tools/NMSIS/
+    - export NUCLEI_SDK_ROOT=$(readlink -f NMSIS/nuclei_sdk)
+    - export NUCLEI_SDK_NMSIS=$(readlink -f NMSIS)
+    - source NMSIS/env.sh
+    #- export SOC=demosoc
+    #- sed -i 's/LENGTH = 64K/LENGTH = 4M/g' $CI_PROJECT_DIR/tools/nuclei-sdk/SoC/demosoc/Board/nuclei_fpga_eval/Source/GCC/gcc_demosoc_ilm.ld
+    #- cd $CI_PROJECT_DIR/tools/nuclei-sdk
+    #- cp $CI_PROJECT_DIR/tools/1/application.json $CI_PROJECT_DIR/tools/nuclei-sdk/tools/scripts/nsdk_cli/configs/
+    - cd NMSIS
+    - make gen
+    - make gen_nnref_lib
     - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS/NN/NN_Lib_Tests/
     - make gen
   tags:
@@ -197,14 +200,16 @@ test_nmsis:
     - qemu-system-riscv32 -M ?
     - riscv-nuclei-elf-gcc -v
     ############################################################
-    - cd $CI_PROJECT_DIR/tools/nuclei-sdk
+    - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS/nuclei-sdk
     - pip3 install -r tools/scripts/requirements.txt
-    - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS/
-    - export NUCLEI_SDK_ROOT=$CI_PROJECT_DIR/tools/nuclei-sdk
-    - export NUCLEI_SDK_NMSIS=$CI_PROJECT_DIR/tools/NMSIS/NMSIS/
-    - export SOC=demosoc
-    - cd $CI_PROJECT_DIR/tools
-    - python3 nuclei-sdk/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg nuclei-sdk/tools/scripts/nsdk_cli/configs/application.json --parallel=-j --logdir logs/nuclei_fpga_ci_nmsis_qemu --run --run_target "qemu"
+    - cd $CI_PROJECT_DIR/tools/NMSIS/
+    - export NUCLEI_SDK_ROOT=$(readlink -f NMSIS/nuclei_sdk)
+    - export NUCLEI_SDK_NMSIS=$(readlink -f NMSIS)
+    - export NMSIS_LOGS=$NUCLEI_SDK_NMSIS/Logs
+    - mkdir $NMSIS_LOGS
+    - source NMSIS/env.sh
+    - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS
+    - python3 $NUCLEI_SDK_ROOT/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg Scripts/Runner/nmsis_dsp.json --logdir $NMSIS_LOGS/nmsis_dsp --parallel=-j --run_target qemu --run
   tags:
     - os::linux
     - env::docker
