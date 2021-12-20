@@ -203,7 +203,7 @@ test_nmsis:
     - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS/nuclei-sdk
     - pip3 install -r tools/scripts/requirements.txt
     - cd $CI_PROJECT_DIR/tools/NMSIS/
-    - export NUCLEI_SDK_ROOT=$(readlink -f NMSIS/nuclei_sdk)
+    - export NUCLEI_SDK_ROOT=$(readlink -f NMSIS/nuclei-sdk)
     - export NUCLEI_SDK_NMSIS=$(readlink -f NMSIS)
     - export NMSIS_LOGS=$NUCLEI_SDK_NMSIS/Logs
     - mkdir $NMSIS_LOGS
