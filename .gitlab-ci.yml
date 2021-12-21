@@ -209,6 +209,7 @@ test_nmsis:
     - source NMSIS/env.sh
     - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS
     - python3 $NUCLEI_SDK_ROOT/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg Scripts/Runner/nmsis_dsp.json --logdir $NMSIS_LOGS/nmsis_dsp --parallel=-j --run_target qemu --run
+    - python3 $NUCLEI_SDK_ROOT/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg Scripts/Runner/nmsis_nn.json  --logdir $NMSIS_LOGS/nmsis_nn  --parallel=-j --run_target qemu --run
   tags:
     - os::linux
     - env::docker
