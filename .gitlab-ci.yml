@@ -217,7 +217,7 @@ test_nmsis:
   artifacts:
     when: always
     paths:
-    - $CI_PROJECT_DIR/tools/NMSIS
+    - $CI_PROJECT_DIR/tools/NMSIS/NMSIS/Logs
 
 deploy-qemu:
   stage: deploy
