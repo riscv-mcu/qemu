@@ -230,7 +230,7 @@ deploy-qemu:
     # save log
     - mkdir $CI_PROJECT_DIR/test_logs
     - mkdir $CI_PROJECT_DIR/Documents
-    - cp $CI_PROJECT_DIR/tools/logs/ $CI_PROJECT_DIR/test_logs/ -r
+    - cp $CI_PROJECT_DIR/tools/NMSIS/NMSIS/Logs $CI_PROJECT_DIR/test_logs/ -r
     - cp $CI_PROJECT_DIR/tools/sdk/nuclei-sdk/logs/ $CI_PROJECT_DIR/test_logs/ -r
 
     # docs
