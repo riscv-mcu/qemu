@@ -328,6 +328,17 @@ static void rv32eacu_nuclei_cpu_init(Object *obj)
     qdev_prop_set_bit(DEVICE(obj), "mmu", false);
     set_resetvec(env, DEFAULT_RSTVEC);
 }
+
+static void rv32imcu_nuclei_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    set_misa(env, RV32 | RVI | RVM | RVC | RVU);
+    set_priv_version(env, PRIV_VERSION_1_10_0);
+    qdev_prop_set_bit(DEVICE(obj), "mmu", false);
+    set_resetvec(env, DEFAULT_RSTVEC);
+    set_feature(env, RISCV_FEATURE_PMP);
+}
+
 static void rv32imacu_nuclei_cpu_init(Object *obj)
 {
     CPURISCVState *env = &RISCV_CPU(obj)->env;
@@ -994,6 +1005,7 @@ static const TypeInfo riscv_cpu_type_infos[] = {
     DEFINE_CPU(TYPE_RISCV_CPU_SIFIVE_U34,       rv32_sifive_u_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_PLCT_N32,         rv32_plct_n32_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_PLCT_U32,         rv32_plct_u32_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N200,      rv32imcu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N201,      rv32iacu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N201E,     rv32eacu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N203,      rv32imacu_nuclei_cpu_init),
