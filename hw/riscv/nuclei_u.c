@@ -82,8 +82,10 @@ static const struct MemmapEntry
     [NUCLEI_U_DEV_GPIO] = {0x10012000, 0x1000},
     [NUCLEI_U_SPI0] = {0x10014000, 0x1000},
     [NUCLEI_U_SPI2] = {0x10034000, 0x1000},
-    [NUCLEI_U_DEV_FLASH0] = {0x20000000, 0x10000000},
-    [NUCLEI_U_DEV_DRAM] = {0xa0000000, 0x0},
+    [NUCLEI_U_DEV_FLASH0]   = { 0x20000000,  0x10000000},
+    [NUCLEI_U_DEV_ILM]   = { 0x80000000,  0x2000000 },
+    [NUCLEI_U_DEV_DLM]   = { 0x90000000,  0x2000000 },
+    [NUCLEI_U_DEV_DRAM]   = { 0xA0000000,  0x4000000 },
 };
 
 #define OTP_SERIAL 1
@@ -424,30 +426,31 @@ static void nuclei_u_machine_init(MachineState *machine)
     /* create device tree */
     create_fdt(s, memmap, machine->ram_size, machine->kernel_cmdline);
 
-    if (s->start_in_flash)
+    start_addr = memmap[NUCLEI_U_DEV_ILM].base;
+
+    if(s->download == NULL)
     {
-        /*
-         * If start_in_flash property is given, assign s->msel to a value
-         * that representing booting from QSPI0 memory-mapped flash.
-         *
-         * This also means that when both start_in_flash and msel properties
-         * are given, start_in_flash takes the precedence over msel.
-         *
-         * Note this is to keep backward compatibility not to break existing
-         * users that use start_in_flash property.
-         */
-        s->msel = MSEL_MEMMAP_QSPI0_FLASH;
+
+    }else if(!strcmp(s->download, "flash"))
+    {
+        start_addr = memmap[NUCLEI_U_DEV_FLASH0].base;
+    }else if(!strcmp(s->download, "flashxip"))
+    {
+        start_addr = memmap[NUCLEI_U_DEV_FLASH0].base;
+    }else if(!strcmp(s->download, "ddr"))
+    {
+        start_addr = memmap[NUCLEI_U_DEV_DRAM].base;
     }
 
-    switch (s->msel)
-    {
-    case MSEL_MEMMAP_QSPI0_FLASH:
-        start_addr = memmap[NUCLEI_U_DEV_FLASH0].base;
-        break;
-    default:
-        start_addr = memmap[NUCLEI_U_DEV_DRAM].base;
-        break;
-    }
+    // switch (s->msel)
+    // {
+    // case MSEL_MEMMAP_QSPI0_FLASH:
+    //     start_addr = memmap[NUCLEI_U_DEV_FLASH0].base;
+    //     break;
+    // default:
+    //     start_addr = memmap[NUCLEI_U_DEV_DRAM].base;
+    //     break;
+    // }
 
     firmware_end_addr = riscv_find_and_load_firmware(machine, BIOS_FILENAME,
                                                      start_addr, NULL);
@@ -543,19 +546,6 @@ static void nuclei_u_machine_init(MachineState *machine)
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->soc.spi2), 1, sd_cs);
 }
 
-static bool sifive_u_machine_get_start_in_flash(Object *obj, Error **errp)
-{
-    NucLeiUState *s = RISCV_NUCLEI_U_MACHINE(obj);
-
-    return s->start_in_flash;
-}
-
-static void sifive_u_machine_set_start_in_flash(Object *obj, bool value, Error **errp)
-{
-    NucLeiUState *s = RISCV_NUCLEI_U_MACHINE(obj);
-
-    s->start_in_flash = value;
-}
 
 static void sifive_u_machine_get_uint32_prop(Object *obj, Visitor *v,
                                              const char *name, void *opaque,
@@ -590,6 +580,18 @@ static void nuclei_u_machine_instance_init(Object *obj)
     object_property_set_description(obj, "serial", "Board serial number");
 }
 
+static char* nuclei_u_machine_get_download(Object *obj, Error **errp)
+{
+    NucLeiUState *s = RISCV_NUCLEI_U_MACHINE(obj);
+    return g_strdup(s->download);
+}
+
+static void nuclei_u_machine_set_download(Object *obj, const char *value, Error **errp)
+{
+    NucLeiUState *s = RISCV_NUCLEI_U_MACHINE(obj);
+    s->download = g_strdup(value);
+}
+
 static void nuclei_u_machine_class_init(ObjectClass *oc, void *data)
 {
     MachineClass *mc = MACHINE_CLASS(oc);
@@ -601,13 +603,14 @@ static void nuclei_u_machine_class_init(ObjectClass *oc, void *data)
     mc->default_cpu_type = TYPE_RISCV_CPU_SIFIVE_U54;
     mc->default_cpus = mc->min_cpus;
 
-    object_class_property_add_bool(oc, "start-in-flash",
-                                   sifive_u_machine_get_start_in_flash,
-                                   sifive_u_machine_set_start_in_flash);
-    object_class_property_set_description(oc, "start-in-flash",
+    object_class_property_add_str(oc, "download",
+                                   nuclei_u_machine_get_download,
+                                   nuclei_u_machine_set_download);
+    object_class_property_set_description(oc, "download",
                                           "Set on to tell QEMU's ROM to jump to "
-                                          "flash. Otherwise QEMU will jump to DRAM "
-                                          "or L2LIM depending on the msel value");
+                                          "download modes. Otherwise QEMU will jump to DRAM "
+                                          "nuclei support three download modes(flashxip,flash,ilm,ddr)");
+
 }
 
 static const TypeInfo nuclei_u_machine_typeinfo = {

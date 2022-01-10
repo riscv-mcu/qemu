@@ -75,6 +75,7 @@ typedef struct NucLeiUState
     int fdt_size;
 
     bool start_in_flash;
+    const char *download;
     uint32_t msel;
     uint32_t serial;
 } NucLeiUState;
@@ -89,6 +90,8 @@ enum
     NUCLEI_U_DEV_UART1,
     NUCLEI_U_DEV_GPIO,
     NUCLEI_U_DEV_FLASH0,
+    NUCLEI_U_DEV_ILM,
+    NUCLEI_U_DEV_DLM,
     NUCLEI_U_DEV_DRAM,
     NUCLEI_U_SPI0,
     NUCLEI_U_SPI2
