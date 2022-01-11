@@ -24,17 +24,13 @@ prepare_tools:
     - cd $CI_PROJECT_DIR/tools/sdk
     - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
     - cd nuclei-sdk
-    - git checkout dev_xlspike_next
     # nmsis
     - cd  $CI_PROJECT_DIR/tools/
     - git clone git@gito.corp.nucleisys.com:software/library/NMSIS.git
     - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS
     - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
     - cd nuclei-sdk
-    - git checkout dev_xlspike_next
-    #- git clone git@gito.corp.nucleisys.com:snippets/1.git
     - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS/
-    - git checkout zfj_dev
     # build dsp lib
     - make gen
     #- make strip_dsp_lib
@@ -47,10 +43,6 @@ prepare_tools:
     - export NUCLEI_SDK_ROOT=$(readlink -f NMSIS/nuclei_sdk)
     - export NUCLEI_SDK_NMSIS=$(readlink -f NMSIS)
     - source NMSIS/env.sh
-    #- export SOC=demosoc
-    #- sed -i 's/LENGTH = 64K/LENGTH = 4M/g' $CI_PROJECT_DIR/tools/nuclei-sdk/SoC/demosoc/Board/nuclei_fpga_eval/Source/GCC/gcc_demosoc_ilm.ld
-    #- cd $CI_PROJECT_DIR/tools/nuclei-sdk
-    #- cp $CI_PROJECT_DIR/tools/1/application.json $CI_PROJECT_DIR/tools/nuclei-sdk/tools/scripts/nsdk_cli/configs/
     - export SILENT=1
     - cd NMSIS
     - make gen
