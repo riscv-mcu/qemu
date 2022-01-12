@@ -183,7 +183,7 @@ static int riscv_gdb_get_vector(CPURISCVState *env, GByteArray *buf, int n)
     target_ulong val = 0;
     int result = riscv_csrrw_debug(env, csrno, &val, 0, 0);
 
-    if (result == 0) {
+    if (result == RISCV_EXCP_NONE) {
         return gdb_get_regl(buf, val);
     }
 
@@ -210,7 +210,7 @@ static int riscv_gdb_set_vector(CPURISCVState *env, uint8_t *mem_buf, int n)
     target_ulong val = ldtul_p(mem_buf);
     int result = riscv_csrrw_debug(env, csrno, NULL, val, -1);
 
-    if (result == 0) {
+    if (result == RISCV_EXCP_NONE) {
         return sizeof(target_ulong);
     }
 
@@ -286,7 +286,7 @@ static int riscv_gen_dynamic_csr_xml(CPUState *cs, int base_reg)
 
     for (i = 0; i < CSR_TABLE_SIZE; i++) {
         predicate = csr_ops[i].predicate;
-        if (predicate && !predicate(env, i)) {
+        if (predicate && (predicate(env, i) == RISCV_EXCP_NONE)) {
             if (csr_ops[i].name) {
                 g_string_append_printf(s, "<reg name=\"%s\"", csr_ops[i].name);
             } else {
