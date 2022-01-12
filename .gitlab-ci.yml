@@ -81,8 +81,8 @@ build_linux_qemu:
     # - pip3 install meson==0.57.2
     # git submodule
     - cd $CI_PROJECT_DIR
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
+    - git submodule sync
+    - git submodule update --init
     - git submodule update --remote
     - sync
     # glib
@@ -113,8 +113,8 @@ build_windows_qemu:
     # - dnf install -y ninja-build
     # - dnf install -y gcc
     # - dnf install -y https://download-ib01.fedoraproject.org/pub/fedora/linux/releases/34/Everything/aarch64/os/Packages/m/meson-0.56.2-2.fc34.noarch.rpm
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
+    - git submodule sync
+    - git submodule update --init
     - git submodule update --remote
     #- git submodule update --remote
     - sync
