@@ -594,6 +594,12 @@ static RISCVException read_zero(CPURISCVState *env, int csrno,
     return RISCV_EXCP_NONE;
 }
 
+static RISCVException write_any(CPURISCVState *env, int csrno,
+                                target_ulong val)
+{
+    return RISCV_EXCP_NONE;
+}
+
 static RISCVException read_mhartid(CPURISCVState *env, int csrno,
                                    target_ulong *val)
 {
@@ -2166,6 +2172,7 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_WFE] =                 { "wfe", any,  read_wfe,         write_wfe         },
     [CSR_SLEEPVALUE] =          { "sleepvalue", any,  read_sleepvalue,  write_sleepvalue  },
     [CSR_TXEVT] =               { "txevt", any,  read_txevt,       write_txevt       },
+    [CSR_CCM_SUEN] =            { "ccm_suen", any,  read_zero,       write_any       },
 
     [CSR_MSTATUSH]    = { "mstatush",   any32, read_mstatush,    write_mstatush    },
 

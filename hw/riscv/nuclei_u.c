@@ -73,24 +73,25 @@ static const struct MemmapEntry
     hwaddr base;
     hwaddr size;
 } nuclei_u_memmap[] = {
-    [NUCLEI_U_DEV_MROM] = {0x1000, 0xf000},
-    [NUCLEI_U_DEV_TIMER] = {0x2000000, 0x10000},
-    [NUCLEI_U_DEV_CLINT] = {0x2001000, 0x10000},
-    [NUCLEI_U_DEV_PLIC] = {0x8000000, 0x4000000},
-    [NUCLEI_U_DEV_UART0] = {0x10013000, 0x1000},
-    [NUCLEI_U_DEV_UART1] = {0x10023000, 0x1000},
-    [NUCLEI_U_DEV_GPIO] = {0x10012000, 0x1000},
-    [NUCLEI_U_SPI0] = {0x10014000, 0x1000},
-    [NUCLEI_U_SPI2] = {0x10034000, 0x1000},
-    [NUCLEI_U_DEV_FLASH0]   = { 0x20000000,  0x10000000},
-    [NUCLEI_U_DEV_ILM]   = { 0x80000000,  0x2000000 },
-    [NUCLEI_U_DEV_DLM]   = { 0x90000000,  0x2000000 },
-    [NUCLEI_U_DEV_DRAM]   = { 0xA0000000,  0x4000000 },
+    [NUCLEI_U_DEV_MROM]   = {0x00001000, 0x0000f000},
+    [NUCLEI_U_DEV_SMP]    = {0x12000000, 0x00001000},
+    [NUCLEI_U_DEV_TIMER]  = {0x02000000, 0x00010000},
+    [NUCLEI_U_DEV_CLINT]  = {0x02001000, 0x00010000},
+    [NUCLEI_U_DEV_PLIC]   = {0x08000000, 0x04000000},
+    [NUCLEI_U_DEV_UART0]  = {0x10013000, 0x00001000},
+    [NUCLEI_U_DEV_UART1]  = {0x10023000, 0x00001000},
+    [NUCLEI_U_DEV_GPIO]   = {0x10012000, 0x00001000},
+    [NUCLEI_U_SPI0]       = {0x10014000, 0x00001000},
+    [NUCLEI_U_SPI2]       = {0x10034000, 0x00001000},
+    [NUCLEI_U_DEV_FLASH0] = {0x20000000, 0x10000000},
+    [NUCLEI_U_DEV_ILM]    = {0x80000000, 0x02000000},
+    [NUCLEI_U_DEV_DLM]    = {0x90000000, 0x02000000},
+    [NUCLEI_U_DEV_DRAM]   = {0xA0000000, 0x10000000},
 };
 
 #define OTP_SERIAL 1
 
-static void create_fdt(NucLeiUState *s, const struct MemmapEntry *memmap,
+static void create_fdt(NucleiUState *s, const struct MemmapEntry *memmap,
                        uint64_t mem_size, const char *cmdline)
 {
     MachineState *ms = MACHINE(qdev_get_machine());
@@ -133,7 +134,6 @@ static void create_fdt(NucLeiUState *s, const struct MemmapEntry *memmap,
     qemu_fdt_setprop_cell(fdt, "/soc", "#size-cells", 0x2);
     qemu_fdt_setprop_cell(fdt, "/soc", "#address-cells", 0x2);
 
-    qemu_fdt_add_subnode(fdt, "/chosen");
 
     qemu_fdt_add_subnode(fdt, "/console");
     qemu_fdt_setprop_string(fdt, "/console", "compatible", "sbi,console");
@@ -164,23 +164,15 @@ static void create_fdt(NucLeiUState *s, const struct MemmapEntry *memmap,
     qemu_fdt_setprop_cell(fdt, "/cpus", "#size-cells", 0x0);
     qemu_fdt_setprop_cell(fdt, "/cpus", "#address-cells", 0x1);
 
-    for (cpu = ms->smp.cpus - 1; cpu >= 0; cpu--)
+    for (cpu = 0; cpu < ms->smp.cpus; cpu ++)
     {
         int cpu_phandle = phandle++;
         nodename = g_strdup_printf("/cpus/cpu@%d", cpu);
         char *intc = g_strdup_printf("/cpus/cpu@%d/interrupt-controller", cpu);
         char *isa;
         qemu_fdt_add_subnode(fdt, nodename);
-        /* cpu 0 is the management hart that does not have mmu */
-        if (cpu != 0)
-        {
-            qemu_fdt_setprop_string(fdt, nodename, "mmu-type", "riscv,sv39");
-            isa = riscv_isa_string(&s->soc.u_cpus.harts[cpu - 1]);
-        }
-        else
-        {
-            isa = riscv_isa_string(&s->soc.e_cpus.harts[0]);
-        }
+        qemu_fdt_setprop_string(fdt, nodename, "mmu-type", "riscv,sv39");
+        isa = riscv_isa_string(&s->soc.u_cpus.harts[cpu]);
         qemu_fdt_setprop_string(fdt, nodename, "riscv,isa", isa);
         qemu_fdt_setprop_string(fdt, nodename, "compatible", "riscv");
         qemu_fdt_setprop_string(fdt, nodename, "status", "okay");
@@ -209,7 +201,7 @@ static void create_fdt(NucLeiUState *s, const struct MemmapEntry *memmap,
         g_free(nodename);
     }
 
-    nodename = g_strdup_printf("/clint@%lx",
+    nodename = g_strdup_printf("/soc/clint@%lx",
                                (long)memmap[NUCLEI_U_DEV_CLINT].base);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "riscv,clint0");
@@ -221,47 +213,37 @@ static void create_fdt(NucLeiUState *s, const struct MemmapEntry *memmap,
     g_free(cells);
     g_free(nodename);
 
-    nodename = g_strdup_printf("/timer@%lx",
+    nodename = g_strdup_printf("/soc/timer@%lx",
                                (long)memmap[NUCLEI_U_DEV_TIMER].base);
     qemu_fdt_add_subnode(fdt, nodename);
-    qemu_fdt_setprop_string(fdt, nodename, "compatible", "riscv,timer0");
+    qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,timer0");
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
                            0x0, memmap[NUCLEI_U_DEV_TIMER].base,
                            0x0, memmap[NUCLEI_U_DEV_TIMER].size);
     g_free(nodename);
 
-    plic_phandle = phandle++;
-    cells = g_new0(uint32_t, ms->smp.cpus * 4 - 2);
+    cells = g_new0(uint32_t, ms->smp.cpus * 4);
     for (cpu = 0; cpu < ms->smp.cpus; cpu++)
     {
         nodename =
             g_strdup_printf("/cpus/cpu@%d/interrupt-controller", cpu);
         uint32_t intc_phandle = qemu_fdt_get_phandle(fdt, nodename);
-        /* cpu 0 is the management hart that does not have S-mode */
-        if (cpu == 0)
-        {
-            cells[0] = cpu_to_be32(intc_phandle);
-            cells[1] = cpu_to_be32(IRQ_M_EXT);
-        }
-        else
-        {
-            cells[cpu * 4 - 2] = cpu_to_be32(intc_phandle);
-            cells[cpu * 4 - 1] = cpu_to_be32(IRQ_M_EXT);
-            cells[cpu * 4 + 0] = cpu_to_be32(intc_phandle);
-            cells[cpu * 4 + 1] = cpu_to_be32(IRQ_S_EXT);
-        }
+        cells[cpu * 4 + 0] = cpu_to_be32(intc_phandle);
+        cells[cpu * 4 + 1] = cpu_to_be32(IRQ_M_EXT);
+        cells[cpu * 4 + 2] = cpu_to_be32(intc_phandle);
+        cells[cpu * 4 + 3] = cpu_to_be32(IRQ_S_EXT);
         g_free(nodename);
     }
 
     plic_phandle = phandle++;
-    nodename = g_strdup_printf("/interrupt-controller@%lx",
+    nodename = g_strdup_printf("/soc/interrupt-controller@%lx",
                                (long)memmap[NUCLEI_U_DEV_PLIC].base);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_cell(fdt, nodename, "#interrupt-cells", 1);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "riscv,plic0");
     qemu_fdt_setprop(fdt, nodename, "interrupt-controller", NULL, 0);
     qemu_fdt_setprop(fdt, nodename, "interrupts-extended",
-                     cells, (ms->smp.cpus * 4 - 2) * sizeof(uint32_t));
+                     cells, (ms->smp.cpus * 4 ) * sizeof(uint32_t));
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
                            0x0, memmap[NUCLEI_U_DEV_PLIC].base,
                            0x0, memmap[NUCLEI_U_DEV_PLIC].size);
@@ -270,82 +252,8 @@ static void create_fdt(NucLeiUState *s, const struct MemmapEntry *memmap,
     g_free(cells);
     g_free(nodename);
 
-    uart_phandle = phandle++;
-    nodename = g_strdup_printf("/serial@%lx",
-                               (long)memmap[NUCLEI_U_DEV_UART0].base);
-    qemu_fdt_add_subnode(fdt, nodename);
-    qemu_fdt_setprop_string(fdt, nodename, "compatible", "sifive,uart0");
-    qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           0x0, memmap[NUCLEI_U_DEV_UART0].base,
-                           0x0, memmap[NUCLEI_U_DEV_UART0].size);
-    qemu_fdt_setprop_cell(fdt, nodename, "clocks", hfclk_phandle);
-    qemu_fdt_setprop_cell(fdt, nodename, "interrupt-parent", plic_phandle);
-    qemu_fdt_setprop_cell(fdt, nodename, "interrupts", NUCLEI_U_UART0_IRQ);
-    qemu_fdt_setprop_cell(fdt, nodename, "phandle", uart_phandle);
-    qemu_fdt_setprop_string(fdt, nodename, "status", "disabled");
-    g_free(nodename);
-
-    nodename = g_strdup_printf("/serial@%lx",
-                               (long)memmap[NUCLEI_U_DEV_UART1].base);
-    qemu_fdt_add_subnode(fdt, nodename);
-    qemu_fdt_setprop_string(fdt, nodename, "compatible", "sifive,uart0");
-    qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           0x0, memmap[NUCLEI_U_DEV_UART1].base,
-                           0x0, memmap[NUCLEI_U_DEV_UART1].size);
-    qemu_fdt_setprop_cell(fdt, nodename, "clocks", hfclk_phandle);
-    qemu_fdt_setprop_cell(fdt, nodename, "interrupt-parent", plic_phandle);
-    qemu_fdt_setprop_cell(fdt, nodename, "interrupts", NUCLEI_U_UART1_IRQ);
-    qemu_fdt_setprop_cell(fdt, nodename, "phandle", uart_phandle);
-    qemu_fdt_setprop_string(fdt, nodename, "status", "disabled");
-    g_free(nodename);
-
-    nodename = g_strdup_printf("/spi@%lx",
-                               memmap[NUCLEI_U_SPI0].base);
-    qemu_fdt_add_subnode(fdt, nodename);
-    qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,spi0");
-    qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           0x0, memmap[NUCLEI_U_SPI0].base,
-                           0x0, memmap[NUCLEI_U_SPI0].size,
-                           0x0, 0x20000000,
-                           0x0, 0x10000000);
-    qemu_fdt_setprop_string(fdt, nodename, "reg-names", "control");
-    qemu_fdt_setprop_cells(fdt, nodename, "clocks", hfclk_phandle);
-    qemu_fdt_setprop_cells(fdt, nodename, "interrupt-parent", plic_phandle);
-    qemu_fdt_setprop_cells(fdt, nodename, "interrupts", NUCLEI_U_SPI0_IRQ);
-    qemu_fdt_setprop_cell(fdt, nodename, "#address-cells", 1);
-    qemu_fdt_setprop_cell(fdt, nodename, "#size-cells", 0);
-    qemu_fdt_setprop_string(fdt, nodename, "status", "okay");
-    g_free(nodename);
-
-    nodename = g_strdup_printf("/spi@%lx/flash@0",
-                               (long)memmap[NUCLEI_U_SPI0].base);
-    qemu_fdt_add_subnode(fdt, nodename);
-    qemu_fdt_setprop_string(fdt, nodename, "compatible", "jedec,spi-nor");
-    qemu_fdt_setprop_cells(fdt, nodename, "reg", 0x0);
-    qemu_fdt_setprop_cells(fdt, nodename, "spi-max-frequency", 1000000);
-    // qemu_fdt_setprop_cells(fdt, nodename, "m25p,fast-read");
-    qemu_fdt_setprop_cells(fdt, nodename, "#spi-tx-bus-width", 0x1);
-    qemu_fdt_setprop_cells(fdt, nodename, "#spi-rx-bus-width", 0x1);
-    g_free(nodename);
-
-    nodename = g_strdup_printf("/spi@%lx",
-                               (long)memmap[NUCLEI_U_SPI2].base);
-    qemu_fdt_add_subnode(fdt, nodename);
-    qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,spi0");
-    qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           0x0, memmap[NUCLEI_U_SPI2].base,
-                           0x0, memmap[NUCLEI_U_SPI2].size);
-    qemu_fdt_setprop_string(fdt, nodename, "reg-names", "control");
-    qemu_fdt_setprop_cells(fdt, nodename, "clocks", hfclk_phandle);
-    qemu_fdt_setprop_cells(fdt, nodename, "interrupt-parent", plic_phandle);
-    qemu_fdt_setprop_cells(fdt, nodename, "interrupts", NUCLEI_U_SPI2_IRQ);
-    qemu_fdt_setprop_cell(fdt, nodename, "#address-cells", 1);
-    qemu_fdt_setprop_cell(fdt, nodename, "#size-cells", 0);
-    qemu_fdt_setprop_string(fdt, nodename, "status", "okay");
-    g_free(nodename);
-
     gpio_phandle = phandle++;
-    nodename = g_strdup_printf("/gpio@%lx",
+    nodename = g_strdup_printf("/soc/gpio@%lx",
                                (long)memmap[NUCLEI_U_DEV_GPIO].base);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_cell(fdt, nodename, "clocks", hfclk_phandle);
@@ -361,14 +269,65 @@ static void create_fdt(NucLeiUState *s, const struct MemmapEntry *memmap,
                            NUCLEI_U_GPIO_IRQ4, NUCLEI_U_GPIO_IRQ5, NUCLEI_U_GPIO_IRQ6,
                            NUCLEI_U_GPIO_IRQ7, NUCLEI_U_GPIO_IRQ8, NUCLEI_U_GPIO_IRQ9,
                            NUCLEI_U_GPIO_IRQ10, NUCLEI_U_GPIO_IRQ11, NUCLEI_U_GPIO_IRQ12,
-                           NUCLEI_U_GPIO_IRQ13, NUCLEI_U_GPIO_IRQ14, NUCLEI_U_GPIO_IRQ15);
+                           NUCLEI_U_GPIO_IRQ13, NUCLEI_U_GPIO_IRQ14, NUCLEI_U_GPIO_IRQ15,
+                           NUCLEI_U_GPIO_IRQ16, NUCLEI_U_GPIO_IRQ17, NUCLEI_U_GPIO_IRQ18,
+                           NUCLEI_U_GPIO_IRQ19, NUCLEI_U_GPIO_IRQ20, NUCLEI_U_GPIO_IRQ21,
+                           NUCLEI_U_GPIO_IRQ22, NUCLEI_U_GPIO_IRQ23, NUCLEI_U_GPIO_IRQ24,
+                           NUCLEI_U_GPIO_IRQ25, NUCLEI_U_GPIO_IRQ26, NUCLEI_U_GPIO_IRQ27,
+                           NUCLEI_U_GPIO_IRQ28, NUCLEI_U_GPIO_IRQ29, NUCLEI_U_GPIO_IRQ30,
+                           NUCLEI_U_GPIO_IRQ31);
     qemu_fdt_setprop_cell(fdt, nodename, "interrupt-parent", plic_phandle);
-    qemu_fdt_setprop_string(fdt, nodename, "compatible", "sifive,gpio0");
+    qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,gpio0");
     qemu_fdt_setprop_cell(fdt, nodename, "phandle", gpio_phandle);
-    qemu_fdt_setprop_string(fdt, nodename, "status", "okay");
+    qemu_fdt_setprop_string(fdt, nodename, "status", "disabled");
     g_free(nodename);
 
-    nodename = g_strdup_printf("/spi@%lx/mmc@0",
+    nodename = g_strdup_printf("/soc/spi@%lx",
+                               memmap[NUCLEI_U_SPI0].base);
+    qemu_fdt_add_subnode(fdt, nodename);
+    qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,spi0");
+    qemu_fdt_setprop_cells(fdt, nodename, "reg",
+                           0x0, memmap[NUCLEI_U_SPI0].base,
+                           0x0, memmap[NUCLEI_U_SPI0].size,
+                           0x0, 0x20000000,
+                           0x0, 0x10000000);
+    qemu_fdt_setprop_string(fdt, nodename, "reg-names", "control");
+    qemu_fdt_setprop_cells(fdt, nodename, "clocks", hfclk_phandle);
+    qemu_fdt_setprop_cells(fdt, nodename, "interrupt-parent", plic_phandle);
+    qemu_fdt_setprop_cells(fdt, nodename, "interrupts", NUCLEI_U_SPI0_IRQ);
+    qemu_fdt_setprop_cell(fdt, nodename, "#address-cells", 1);
+    qemu_fdt_setprop_cell(fdt, nodename, "#size-cells", 0);
+    qemu_fdt_setprop_string(fdt, nodename, "status", "disabled");
+    g_free(nodename);
+
+    nodename = g_strdup_printf("/soc/spi@%lx/flash@0",
+                               (long)memmap[NUCLEI_U_SPI0].base);
+    qemu_fdt_add_subnode(fdt, nodename);
+    qemu_fdt_setprop_string(fdt, nodename, "compatible", "jedec,spi-nor");
+    qemu_fdt_setprop_cells(fdt, nodename, "reg", 0x0);
+    qemu_fdt_setprop_cells(fdt, nodename, "spi-max-frequency", 1000000);
+    // qemu_fdt_setprop_cells(fdt, nodename, "m25p,fast-read");
+    qemu_fdt_setprop_cells(fdt, nodename, "#spi-tx-bus-width", 0x1);
+    qemu_fdt_setprop_cells(fdt, nodename, "#spi-rx-bus-width", 0x1);
+    g_free(nodename);
+
+    nodename = g_strdup_printf("/soc/spi@%lx",
+                               (long)memmap[NUCLEI_U_SPI2].base);
+    qemu_fdt_add_subnode(fdt, nodename);
+    qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,spi0");
+    qemu_fdt_setprop_cells(fdt, nodename, "reg",
+                           0x0, memmap[NUCLEI_U_SPI2].base,
+                           0x0, memmap[NUCLEI_U_SPI2].size);
+    qemu_fdt_setprop_string(fdt, nodename, "reg-names", "control");
+    qemu_fdt_setprop_cells(fdt, nodename, "clocks", hfclk_phandle);
+    qemu_fdt_setprop_cells(fdt, nodename, "interrupt-parent", plic_phandle);
+    qemu_fdt_setprop_cells(fdt, nodename, "interrupts", NUCLEI_U_SPI2_IRQ);
+    qemu_fdt_setprop_cell(fdt, nodename, "#address-cells", 1);
+    qemu_fdt_setprop_cell(fdt, nodename, "#size-cells", 0);
+    qemu_fdt_setprop_string(fdt, nodename, "status", "disabled");
+    g_free(nodename);
+
+    nodename = g_strdup_printf("/soc/spi@%lx/mmc@0",
                                (long)memmap[NUCLEI_U_SPI2].base);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "mmc-spi-slot");
@@ -376,7 +335,43 @@ static void create_fdt(NucLeiUState *s, const struct MemmapEntry *memmap,
     qemu_fdt_setprop_cells(fdt, nodename, "spi-max-frequency", 20000000);
     qemu_fdt_setprop_cells(fdt, nodename, "voltage-ranges", 3300, 3300);
     qemu_fdt_setprop_cells(fdt, nodename, "disable-wp");
-    qemu_fdt_setprop_cells(fdt, nodename, "gpios", gpio_phandle, 30, 31);
+    g_free(nodename);
+
+    uart_phandle = phandle++;
+    qemu_fdt_add_subnode(fdt, "/aliases");
+    nodename = g_strdup_printf("/soc/serial@%lx",
+                               (long)memmap[NUCLEI_U_DEV_UART0].base);
+    qemu_fdt_add_subnode(fdt, nodename);
+    qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,uart0");
+    qemu_fdt_setprop_cells(fdt, nodename, "reg",
+                           0x0, memmap[NUCLEI_U_DEV_UART0].base,
+                           0x0, memmap[NUCLEI_U_DEV_UART0].size);
+    qemu_fdt_setprop_cell(fdt, nodename, "clocks", hfclk_phandle);
+    qemu_fdt_setprop_cell(fdt, nodename, "interrupt-parent", plic_phandle);
+    qemu_fdt_setprop_cell(fdt, nodename, "interrupts", NUCLEI_U_UART0_IRQ);
+    qemu_fdt_setprop_cell(fdt, nodename, "phandle", uart_phandle);
+    qemu_fdt_setprop_string(fdt, nodename, "status", "okay");
+    qemu_fdt_setprop_string(fdt, "/aliases", "serial0", nodename);
+    g_free(nodename);
+
+    uart_phandle = phandle++;
+    nodename = g_strdup_printf("/soc/serial@%lx",
+                               (long)memmap[NUCLEI_U_DEV_UART1].base);
+    qemu_fdt_add_subnode(fdt, nodename);
+    qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,uart0");
+    qemu_fdt_setprop_cells(fdt, nodename, "reg",
+                           0x0, memmap[NUCLEI_U_DEV_UART1].base,
+                           0x0, memmap[NUCLEI_U_DEV_UART1].size);
+    qemu_fdt_setprop_cell(fdt, nodename, "clocks", hfclk_phandle);
+    qemu_fdt_setprop_cell(fdt, nodename, "interrupt-parent", plic_phandle);
+    qemu_fdt_setprop_cell(fdt, nodename, "interrupts", NUCLEI_U_UART1_IRQ);
+    qemu_fdt_setprop_cell(fdt, nodename, "phandle", uart_phandle);
+    qemu_fdt_setprop_string(fdt, nodename, "status", "okay");
+    qemu_fdt_setprop_string(fdt, "/aliases", "serial1", nodename);
+
+    qemu_fdt_add_subnode(fdt, "/chosen");
+    // set stdout-path for opensbi
+    qemu_fdt_setprop_string(fdt, "/chosen", "stdout-path", "serial0");
     g_free(nodename);
 
 update_bootargs:
@@ -389,10 +384,13 @@ update_bootargs:
 static void nuclei_u_machine_init(MachineState *machine)
 {
     const struct MemmapEntry *memmap = nuclei_u_memmap;
-    NucLeiUState *s = RISCV_NUCLEI_U_MACHINE(machine);
+    NucleiUState *s = RISCV_NUCLEI_U_MACHINE(machine);
     MemoryRegion *system_memory = get_system_memory();
     MemoryRegion *main_mem = g_new(MemoryRegion, 1);
     MemoryRegion *flash0 = g_new(MemoryRegion, 1);
+    MemoryRegion *ilm = g_new(MemoryRegion, 1);
+    MemoryRegion *dlm = g_new(MemoryRegion, 1);
+    MemoryRegion *nuclei_smp = g_new(MemoryRegion, 1);
     target_ulong start_addr = memmap[NUCLEI_U_DEV_DRAM].base;
     target_ulong firmware_end_addr, kernel_start_addr;
     uint32_t start_addr_hi32 = 0x00000000;
@@ -417,48 +415,62 @@ static void nuclei_u_machine_init(MachineState *machine)
     memory_region_add_subregion(system_memory, memmap[NUCLEI_U_DEV_DRAM].base,
                                 main_mem);
 
+    memory_region_init_ram(ilm, NULL, "riscv.nuclei.u.ram.ilm",
+        memmap[NUCLEI_U_DEV_ILM].size, &error_fatal);
+    memory_region_add_subregion(system_memory, 
+        memmap[NUCLEI_U_DEV_ILM].base, ilm);
+
+    memory_region_init_ram(dlm, NULL, "riscv.nuclei.u.ram.dlm",
+        memmap[NUCLEI_U_DEV_DLM].size, &error_fatal);
+    memory_region_add_subregion(system_memory, 
+        memmap[NUCLEI_U_DEV_DLM].base, dlm);
+
+    memory_region_init_ram(nuclei_smp, NULL, "riscv.nuclei.u.ram.smp",
+        memmap[NUCLEI_U_DEV_SMP].size, &error_fatal);
+    memory_region_add_subregion(system_memory, 
+        memmap[NUCLEI_U_DEV_SMP].base, nuclei_smp);
+
     /* register QSPI0 Flash */
     memory_region_init_ram(flash0, NULL, "riscv.nuclei.u.flash0",
                            memmap[NUCLEI_U_DEV_FLASH0].size, &error_fatal);
     memory_region_add_subregion(system_memory, memmap[NUCLEI_U_DEV_FLASH0].base,
                                 flash0);
-
     /* create device tree */
     create_fdt(s, memmap, machine->ram_size, machine->kernel_cmdline);
 
     start_addr = memmap[NUCLEI_U_DEV_ILM].base;
 
-    if(s->download == NULL)
+    if (s->download == NULL)
     {
-
-    }else if(!strcmp(s->download, "flash"))
-    {
-        start_addr = memmap[NUCLEI_U_DEV_FLASH0].base;
-    }else if(!strcmp(s->download, "flashxip"))
+    }
+    else if (!strcmp(s->download, "flash"))
     {
         start_addr = memmap[NUCLEI_U_DEV_FLASH0].base;
-    }else if(!strcmp(s->download, "ddr"))
+    }
+    else if (!strcmp(s->download, "flashxip"))
+    {
+        start_addr = memmap[NUCLEI_U_DEV_FLASH0].base;
+    }
+    else if (!strcmp(s->download, "ddr"))
     {
         start_addr = memmap[NUCLEI_U_DEV_DRAM].base;
     }
 
-    // switch (s->msel)
-    // {
-    // case MSEL_MEMMAP_QSPI0_FLASH:
-    //     start_addr = memmap[NUCLEI_U_DEV_FLASH0].base;
-    //     break;
-    // default:
-    //     start_addr = memmap[NUCLEI_U_DEV_DRAM].base;
-    //     break;
-    // }
-
-    firmware_end_addr = riscv_find_and_load_firmware(machine, BIOS_FILENAME,
+    if (machine->firmware) {
+        firmware_end_addr = riscv_find_and_load_firmware(machine, BIOS_FILENAME,
                                                      start_addr, NULL);
+    } else {
+        firmware_end_addr = 0xFFFFFFFFF;
+    }
 
     if (machine->kernel_filename)
     {
-        kernel_start_addr = riscv_calc_kernel_start_addr(&s->soc.u_cpus,
+        if (firmware_end_addr != 0xFFFFFFFFF) {
+            kernel_start_addr = riscv_calc_kernel_start_addr(&s->soc.u_cpus,
                                                          firmware_end_addr);
+        } else {
+            kernel_start_addr = start_addr;
+        }
 
         kernel_entry = riscv_load_kernel(machine->kernel_filename,
                                          kernel_start_addr, NULL);
@@ -487,7 +499,6 @@ static void nuclei_u_machine_init(MachineState *machine)
     /* Compute the fdt load address in dram */
     fdt_load_addr = riscv_load_fdt(memmap[NUCLEI_U_DEV_DRAM].base,
                                    machine->ram_size, s->fdt);
-    printf(">> fdt_load_addr %x\n", fdt_load_addr);
 #if defined(TARGET_RISCV64)
     start_addr_hi32 = start_addr >> 32;
 #endif
@@ -547,48 +558,20 @@ static void nuclei_u_machine_init(MachineState *machine)
 }
 
 
-static void sifive_u_machine_get_uint32_prop(Object *obj, Visitor *v,
-                                             const char *name, void *opaque,
-                                             Error **errp)
-{
-    visit_type_uint32(v, name, (uint32_t *)opaque, errp);
-}
-
-static void sifive_u_machine_set_uint32_prop(Object *obj, Visitor *v,
-                                             const char *name, void *opaque,
-                                             Error **errp)
-{
-    visit_type_uint32(v, name, (uint32_t *)opaque, errp);
-}
-
 static void nuclei_u_machine_instance_init(Object *obj)
 {
-    NucLeiUState *s = RISCV_NUCLEI_U_MACHINE(obj);
 
-    s->start_in_flash = false;
-    s->msel = 0;
-    object_property_add(obj, "msel", "uint32",
-                        sifive_u_machine_get_uint32_prop,
-                        sifive_u_machine_set_uint32_prop, NULL, &s->msel);
-    object_property_set_description(obj, "msel",
-                                    "Mode Select (MSEL[3:0]) pin state");
-
-    s->serial = OTP_SERIAL;
-    object_property_add(obj, "serial", "uint32",
-                        sifive_u_machine_get_uint32_prop,
-                        sifive_u_machine_set_uint32_prop, NULL, &s->serial);
-    object_property_set_description(obj, "serial", "Board serial number");
 }
 
 static char* nuclei_u_machine_get_download(Object *obj, Error **errp)
 {
-    NucLeiUState *s = RISCV_NUCLEI_U_MACHINE(obj);
+    NucleiUState *s = RISCV_NUCLEI_U_MACHINE(obj);
     return g_strdup(s->download);
 }
 
 static void nuclei_u_machine_set_download(Object *obj, const char *value, Error **errp)
 {
-    NucLeiUState *s = RISCV_NUCLEI_U_MACHINE(obj);
+    NucleiUState *s = RISCV_NUCLEI_U_MACHINE(obj);
     s->download = g_strdup(value);
 }
 
@@ -598,9 +581,9 @@ static void nuclei_u_machine_class_init(ObjectClass *oc, void *data)
 
     mc->desc = "Nuclei RISC-V demosoc on Kit(MCU200T/DDR200T), support Nuclei UX class processor with MMU";
     mc->init = nuclei_u_machine_init;
-    mc->max_cpus = NUCLEI_U_MANAGEMENT_CPU_COUNT + NUCLEI_U_COMPUTE_CPU_COUNT;
-    mc->min_cpus = NUCLEI_U_MANAGEMENT_CPU_COUNT + 1;
-    mc->default_cpu_type = TYPE_RISCV_CPU_SIFIVE_U54;
+    mc->max_cpus = NUCLEI_U_COMPUTE_CPU_COUNT;
+    mc->min_cpus = 1;
+    mc->default_cpu_type = NUCLEI_U_CPU;
     mc->default_cpus = mc->min_cpus;
 
     object_class_property_add_str(oc, "download",
@@ -610,7 +593,6 @@ static void nuclei_u_machine_class_init(ObjectClass *oc, void *data)
                                           "Set on to tell QEMU's ROM to jump to "
                                           "download modes. Otherwise QEMU will jump to DRAM "
                                           "nuclei support three download modes(flashxip,flash,ilm,ddr)");
-
 }
 
 static const TypeInfo nuclei_u_machine_typeinfo = {
@@ -618,7 +600,7 @@ static const TypeInfo nuclei_u_machine_typeinfo = {
     .parent = TYPE_MACHINE,
     .class_init = nuclei_u_machine_class_init,
     .instance_init = nuclei_u_machine_instance_init,
-    .instance_size = sizeof(NucLeiUState),
+    .instance_size = sizeof(NucleiUState),
 };
 
 static void nuclei_u_machine_init_register_types(void)
@@ -628,19 +610,9 @@ static void nuclei_u_machine_init_register_types(void)
 
 type_init(nuclei_u_machine_init_register_types)
 
-    static void nuclei_u_soc_instance_init(Object *obj)
+static void nuclei_u_soc_instance_init(Object *obj)
 {
-    NucLeiUSoCState *s = RISCV_NUCLEI_U_SOC(obj);
-
-    object_initialize_child(obj, "e-cluster", &s->e_cluster, TYPE_CPU_CLUSTER);
-    qdev_prop_set_uint32(DEVICE(&s->e_cluster), "cluster-id", 0);
-
-    object_initialize_child(OBJECT(&s->e_cluster), "e-cpus", &s->e_cpus,
-                            TYPE_RISCV_HART_ARRAY);
-    qdev_prop_set_uint32(DEVICE(&s->e_cpus), "num-harts", 1);
-    qdev_prop_set_uint32(DEVICE(&s->e_cpus), "hartid-base", 0);
-    qdev_prop_set_string(DEVICE(&s->e_cpus), "cpu-type", NUCLEI_U_CPU);
-    qdev_prop_set_uint64(DEVICE(&s->e_cpus), "resetvec", 0x1004);
+    NucleiUSoCState *s = RISCV_NUCLEI_U_SOC(obj);
 
     object_initialize_child(obj, "u-cluster", &s->u_cluster, TYPE_CPU_CLUSTER);
     qdev_prop_set_uint32(DEVICE(&s->u_cluster), "cluster-id", 1);
@@ -657,7 +629,7 @@ type_init(nuclei_u_machine_init_register_types)
 static void nuclei_u_soc_realize(DeviceState *dev, Error **errp)
 {
     MachineState *ms = MACHINE(qdev_get_machine());
-    NucLeiUSoCState *s = RISCV_NUCLEI_U_SOC(dev);
+    NucleiUSoCState *s = RISCV_NUCLEI_U_SOC(dev);
     const struct MemmapEntry *memmap = nuclei_u_memmap;
     MemoryRegion *system_memory = get_system_memory();
     MemoryRegion *mask_rom = g_new(MemoryRegion, 1);
@@ -665,12 +637,12 @@ static void nuclei_u_soc_realize(DeviceState *dev, Error **errp)
     size_t plic_hart_config_len;
     int i;
 
-    qdev_prop_set_uint32(DEVICE(&s->u_cpus), "num-harts", ms->smp.cpus - 1);
-    qdev_prop_set_uint32(DEVICE(&s->u_cpus), "hartid-base", 1);
+    qdev_prop_set_uint32(DEVICE(&s->u_cpus), "num-harts", ms->smp.cpus);
+    qdev_prop_set_uint32(DEVICE(&s->u_cpus), "hartid-base", 0);
     qdev_prop_set_string(DEVICE(&s->u_cpus), "cpu-type", s->cpu_type);
     qdev_prop_set_uint64(DEVICE(&s->u_cpus), "resetvec", 0x1004);
 
-    sysbus_realize(SYS_BUS_DEVICE(&s->e_cpus), &error_abort);
+    // sysbus_realize(SYS_BUS_DEVICE(&s->e_cpus), &error_abort);
     sysbus_realize(SYS_BUS_DEVICE(&s->u_cpus), &error_abort);
 
     /*
@@ -679,7 +651,6 @@ static void nuclei_u_soc_realize(DeviceState *dev, Error **errp)
      * CPU must exist and have been parented into the cluster before the
      * cluster is realized.
      */
-    qdev_realize(DEVICE(&s->e_cluster), NULL, &error_abort);
     qdev_realize(DEVICE(&s->u_cluster), NULL, &error_abort);
 
     /* boot rom */
@@ -694,15 +665,11 @@ static void nuclei_u_soc_realize(DeviceState *dev, Error **errp)
     plic_hart_config = g_malloc0(plic_hart_config_len);
     for (i = 0; i < ms->smp.cpus; i++)
     {
-        if (i != 0)
-        {
-            strncat(plic_hart_config, "," NUCLEI_U_PLIC_HART_CONFIG,
-                    plic_hart_config_len);
+        if (i != 0) {
+            strncat(plic_hart_config, ",", plic_hart_config_len);
         }
-        else
-        {
-            strncat(plic_hart_config, "M", plic_hart_config_len);
-        }
+        strncat(plic_hart_config, NUCLEI_U_PLIC_HART_CONFIG,
+                plic_hart_config_len);
         plic_hart_config_len -= (strlen(NUCLEI_U_PLIC_HART_CONFIG) + 1);
     }
 
@@ -738,7 +705,7 @@ static void nuclei_u_soc_realize(DeviceState *dev, Error **errp)
     sysbus_mmio_map(SYS_BUS_DEVICE(&s->timer), 0, memmap[NUCLEI_U_DEV_TIMER].base);
     s->timer.timebase_freq = NUCLEI_U_TIMEBASE_FREQ;
 
-    qdev_prop_set_uint32(DEVICE(&s->gpio), "ngpio", 16);
+    qdev_prop_set_uint32(DEVICE(&s->gpio), "ngpio", 32);
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->gpio), errp))
     {
         return;
@@ -749,7 +716,7 @@ static void nuclei_u_soc_realize(DeviceState *dev, Error **errp)
     qdev_pass_gpios(DEVICE(&s->gpio), dev, NULL);
 
     /* Connect GPIO interrupts to the PLIC */
-    for (i = 0; i < 16; i++)
+    for (i = 0; i < 32; i++)
     {
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->gpio), i,
                            qdev_get_gpio_in(DEVICE(s->plic),
@@ -758,20 +725,22 @@ static void nuclei_u_soc_realize(DeviceState *dev, Error **errp)
 
     sysbus_realize(SYS_BUS_DEVICE(&s->spi0), errp);
     sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi0), 0,
-                    memmap[NUCLEI_U_SPI0_IRQ].base);
+                    memmap[NUCLEI_U_SPI0].base);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi0), 0,
                        qdev_get_gpio_in(DEVICE(s->plic), NUCLEI_U_SPI0_IRQ));
     sysbus_realize(SYS_BUS_DEVICE(&s->spi2), errp);
     sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi2), 0,
-                    memmap[NUCLEI_U_SPI2_IRQ].base);
+                    memmap[NUCLEI_U_SPI2].base);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi2), 0,
                        qdev_get_gpio_in(DEVICE(s->plic), NUCLEI_U_SPI2_IRQ));
+
 }
 
 static Property nuclei_u_soc_props[] = {
-    DEFINE_PROP_UINT32("serial", NucLeiUSoCState, serial, OTP_SERIAL),
-    DEFINE_PROP_STRING("cpu-type", NucLeiUSoCState, cpu_type),
-    DEFINE_PROP_END_OF_LIST()};
+    DEFINE_PROP_UINT32("serial", NucleiUSoCState, serial, OTP_SERIAL),
+    DEFINE_PROP_STRING("cpu-type", NucleiUSoCState, cpu_type),
+    DEFINE_PROP_END_OF_LIST()
+};
 
 static void nuclei_u_soc_class_init(ObjectClass *oc, void *data)
 {
@@ -786,7 +755,7 @@ static void nuclei_u_soc_class_init(ObjectClass *oc, void *data)
 static const TypeInfo nuclei_u_soc_type_info = {
     .name = TYPE_RISCV_NUCLEI_U_SOC,
     .parent = TYPE_DEVICE,
-    .instance_size = sizeof(NucLeiUSoCState),
+    .instance_size = sizeof(NucleiUSoCState),
     .instance_init = nuclei_u_soc_instance_init,
     .class_init = nuclei_u_soc_class_init,
 };
