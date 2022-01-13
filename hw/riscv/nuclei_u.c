@@ -75,7 +75,7 @@ static const struct MemmapEntry
 } nuclei_u_memmap[] = {
     [NUCLEI_U_DEV_MROM]   = {0x00001000, 0x0000f000},
     [NUCLEI_U_DEV_SMP]    = {0x12000000, 0x00001000},
-    [NUCLEI_U_DEV_TIMER]  = {0x02000000, 0x00010000},
+    [NUCLEI_U_DEV_TIMER]  = {0x02000000, 0x00001000},
     [NUCLEI_U_DEV_CLINT]  = {0x02001000, 0x00010000},
     [NUCLEI_U_DEV_ECLIC]  = {0x0c000000, 0x00010000},
     [NUCLEI_U_DEV_PLIC]   = {0x08000000, 0x04000000},
@@ -418,17 +418,17 @@ static void nuclei_u_machine_init(MachineState *machine)
 
     memory_region_init_ram(ilm, NULL, "riscv.nuclei.u.ram.ilm",
         memmap[NUCLEI_U_DEV_ILM].size, &error_fatal);
-    memory_region_add_subregion(system_memory, 
+    memory_region_add_subregion(system_memory,
         memmap[NUCLEI_U_DEV_ILM].base, ilm);
 
     memory_region_init_ram(dlm, NULL, "riscv.nuclei.u.ram.dlm",
         memmap[NUCLEI_U_DEV_DLM].size, &error_fatal);
-    memory_region_add_subregion(system_memory, 
+    memory_region_add_subregion(system_memory,
         memmap[NUCLEI_U_DEV_DLM].base, dlm);
 
     memory_region_init_ram(nuclei_smp, NULL, "riscv.nuclei.u.ram.smp",
         memmap[NUCLEI_U_DEV_SMP].size, &error_fatal);
-    memory_region_add_subregion(system_memory, 
+    memory_region_add_subregion(system_memory,
         memmap[NUCLEI_U_DEV_SMP].base, nuclei_smp);
 
     /* register QSPI0 Flash */
@@ -436,6 +436,11 @@ static void nuclei_u_machine_init(MachineState *machine)
                            memmap[NUCLEI_U_DEV_FLASH0].size, &error_fatal);
     memory_region_add_subregion(system_memory, memmap[NUCLEI_U_DEV_FLASH0].base,
                                 flash0);
+
+    for (i = 0; i < machine->smp.cpus; i ++) {
+        s->soc.u_cpus.harts[i].env.msmpcfg_info = (memmap[NUCLEI_U_DEV_SMP].base & ~(1<<10)) | 0xF;
+    }
+
     /* create device tree */
     create_fdt(s, memmap, machine->ram_size, machine->kernel_cmdline);
 
@@ -659,7 +664,6 @@ static void nuclei_u_soc_realize(DeviceState *dev, Error **errp)
                            memmap[NUCLEI_U_DEV_MROM].size, &error_fatal);
     memory_region_add_subregion(system_memory, memmap[NUCLEI_U_DEV_MROM].base,
                                 mask_rom);
-
     /* create PLIC hart topology configuration string */
     plic_hart_config_len = (strlen(NUCLEI_U_PLIC_HART_CONFIG) + 1) *
                            ms->smp.cpus;
@@ -698,7 +702,7 @@ static void nuclei_u_soc_realize(DeviceState *dev, Error **errp)
                         memmap[NUCLEI_U_DEV_CLINT].size, 0, ms->smp.cpus,
                         SIFIVE_SIP_BASE, SIFIVE_TIMECMP_BASE, SIFIVE_TIME_BASE,
                         SIFIVE_CLINT_TIMEBASE_FREQ, false);
-    
+
     /* MMIO */
     s->eclic = nuclei_eclic_create(memmap[NUCLEI_U_DEV_ECLIC].base,
         memmap[NUCLEI_U_DEV_ECLIC].size, NUCLEI_U_INT_MAX);

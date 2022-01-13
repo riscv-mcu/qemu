@@ -252,6 +252,7 @@ struct CPURISCVState {
     target_ulong wfe;
     target_ulong sleepvalue;
     target_ulong txevt;
+    target_ulong msmpcfg_info;
 
     /* Hypervisor CSRs */
     target_ulong hstatus;
