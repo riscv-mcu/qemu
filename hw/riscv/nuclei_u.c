@@ -77,6 +77,7 @@ static const struct MemmapEntry
     [NUCLEI_U_DEV_SMP]    = {0x12000000, 0x00001000},
     [NUCLEI_U_DEV_TIMER]  = {0x02000000, 0x00010000},
     [NUCLEI_U_DEV_CLINT]  = {0x02001000, 0x00010000},
+    [NUCLEI_U_DEV_ECLIC]  = {0x0c000000, 0x00010000},
     [NUCLEI_U_DEV_PLIC]   = {0x08000000, 0x04000000},
     [NUCLEI_U_DEV_UART0]  = {0x10013000, 0x00001000},
     [NUCLEI_U_DEV_UART1]  = {0x10023000, 0x00001000},
@@ -697,6 +698,13 @@ static void nuclei_u_soc_realize(DeviceState *dev, Error **errp)
                         memmap[NUCLEI_U_DEV_CLINT].size, 0, ms->smp.cpus,
                         SIFIVE_SIP_BASE, SIFIVE_TIMECMP_BASE, SIFIVE_TIME_BASE,
                         SIFIVE_CLINT_TIMEBASE_FREQ, false);
+    
+    /* MMIO */
+    s->eclic = nuclei_eclic_create(memmap[NUCLEI_U_DEV_ECLIC].base,
+        memmap[NUCLEI_U_DEV_ECLIC].size, NUCLEI_U_INT_MAX);
+
+    // s->timer = nuclei_systimer_create(memmap[NUCLEI_U_DEV_TIMER].base,
+    //             memmap[NUCLEI_U_DEV_TIMER].size, s->eclic, NUCLEI_U_TIMEBASE_FREQ);
 
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->timer), errp))
     {

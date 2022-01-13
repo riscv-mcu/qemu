@@ -46,6 +46,7 @@ typedef struct NucleiUSoCState
     RISCVHartArrayState u_cpus;
 
     DeviceState *plic;
+    DeviceState *eclic;
     SIFIVEGPIOState gpio;
     // SiFiveSPIState spi[NUCLEI_NUM_SPIS];
     SiFivePDMAState dma;
@@ -82,6 +83,7 @@ enum
 {
     NUCLEI_U_DEV_MROM,
     NUCLEI_U_DEV_SMP,
+    NUCLEI_U_DEV_ECLIC,
     NUCLEI_U_DEV_TIMER,
     NUCLEI_U_DEV_CLINT,
     NUCLEI_U_DEV_PLIC,
@@ -134,7 +136,8 @@ enum
     NUCLEI_U_UART1_IRQ = 34,
     NUCLEI_U_SPI0_IRQ = 35,
     NUCLEI_U_SPI1_IRQ = 36,
-    NUCLEI_U_SPI2_IRQ = 37
+    NUCLEI_U_SPI2_IRQ = 37,
+    NUCLEI_U_INT_MAX
 };
 
 enum
