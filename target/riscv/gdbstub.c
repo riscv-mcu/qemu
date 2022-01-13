@@ -224,7 +224,7 @@ static int riscv_gdb_get_csr(CPURISCVState *env, GByteArray *buf, int n)
         int result;
 
         result = riscv_csrrw_debug(env, n, &val, 0, 0);
-        if (result == RISCV_EXCP_NONE) {
+        if ((result == RISCV_EXCP_NONE) || (n == CSR_TIME)) {
             return gdb_get_regl(buf, val);
         }
     }

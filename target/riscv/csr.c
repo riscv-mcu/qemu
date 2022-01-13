@@ -516,7 +516,7 @@ static RISCVException read_time(CPURISCVState *env, int csrno,
     uint64_t delta = riscv_cpu_virt_enabled(env) ? env->htimedelta : 0;
 
     if (!env->rdtime_fn) {
-        return RISCV_EXCP_NONE;
+        return RISCV_EXCP_ILLEGAL_INST;
     }
 
     *val = env->rdtime_fn(env->rdtime_fn_arg) + delta;
