@@ -16,7 +16,7 @@ prepare_tools:
     # /home/xl_ci/toolchain//nuclei_gnu/linux64/newlibc/2021.1215.eng1/gcc
     #- cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.11-eng1/gcc/ gcc/ -r
     # 2021.07-eng1
-    - cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.1222.eng1/gcc/ gcc/ -r
+    - cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2022.01-RC3/gcc/ gcc/ -r
     #- cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.09-rvp-eng2-linux/gcc/ gcc/ -r
     - export PATH=$CI_PROJECT_DIR/tools/gcc/gcc/bin:$PATH
     # test sdk
@@ -30,6 +30,7 @@ prepare_tools:
     - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS
     - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
     - cd nuclei-sdk
+    - git checkout dev_xlspike_next
     - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS/
     # build dsp lib
     - make gen
