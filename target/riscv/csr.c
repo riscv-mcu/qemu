@@ -516,7 +516,7 @@ static RISCVException read_time(CPURISCVState *env, int csrno,
     uint64_t delta = riscv_cpu_virt_enabled(env) ? env->htimedelta : 0;
 
     if (!env->rdtime_fn) {
-        return RISCV_EXCP_ILLEGAL_INST;
+        return RISCV_EXCP_NONE;
     }
 
     *val = env->rdtime_fn(env->rdtime_fn_arg) + delta;
@@ -1986,61 +1986,13 @@ static RISCVException write_sentropy(CPURISCVState *env, int csrno,
 }
 #endif
 
-/*
- * riscv_csrrw - read and/or update control and status register
- *
- * csrr   <->  riscv_csrrw(env, csrno, ret_value, 0, 0);
- * csrrw  <->  riscv_csrrw(env, csrno, ret_value, value, -1);
- * csrrs  <->  riscv_csrrw(env, csrno, ret_value, -1, value);
- * csrrc  <->  riscv_csrrw(env, csrno, ret_value, 0, value);
- */
-
-RISCVException riscv_csrrw(CPURISCVState *env, int csrno,
-                           target_ulong *ret_value,
-                           target_ulong new_value, target_ulong write_mask, bool write)
+static RISCVException riscv_csrrw_do64(CPURISCVState *env, int csrno,
+                                       target_ulong *ret_value,
+                                       target_ulong new_value,
+                                       target_ulong write_mask)
 {
     RISCVException ret;
     target_ulong old_value;
-    RISCVCPU *cpu = env_archcpu(env);
-
-    /* check privileges and return -1 if check fails */
-#if !defined(CONFIG_USER_ONLY)
-    int effective_priv = env->priv;
-    int read_only = get_field(csrno, 0xC00) == 3;
-
-    if (riscv_has_ext(env, RVH) &&
-        env->priv == PRV_S &&
-        !riscv_cpu_virt_enabled(env)) {
-        /*
-         * We are in S mode without virtualisation, therefore we are in HS Mode.
-         * Add 1 to the effective privledge level to allow us to access the
-         * Hypervisor CSRs.
-         */
-        effective_priv++;
-    }
-
-    if ((write && read_only) ||
-        (!env->debugger && (effective_priv < get_field(csrno, 0x300)))) {
-        return RISCV_EXCP_ILLEGAL_INST;
-    }
-    if (!write && (csrno == CSR_SENTROPY)) {
-        return RISCV_EXCP_ILLEGAL_INST;
-    }
-#endif
-
-    /* ensure the CSR extension is enabled. */
-    if (!cpu->cfg.ext_icsr) {
-        return RISCV_EXCP_ILLEGAL_INST;
-    }
-
-    /* check predicate */
-    if (!csr_ops[csrno].predicate) {
-        return RISCV_EXCP_ILLEGAL_INST;
-    }
-    ret = csr_ops[csrno].predicate(env, csrno);
-    if (ret != RISCV_EXCP_NONE) {
-        return ret;
-    }
 
     /* execute combined read/write operation if it exists */
     if (csr_ops[csrno].op) {
@@ -2076,6 +2028,73 @@ RISCVException riscv_csrrw(CPURISCVState *env, int csrno,
     return RISCV_EXCP_NONE;
 }
 
+
+/*
+ * riscv_csrrw - read and/or update control and status register
+ *
+ * csrr   <->  riscv_csrrw(env, csrno, ret_value, 0, 0);
+ * csrrw  <->  riscv_csrrw(env, csrno, ret_value, value, -1);
+ * csrrs  <->  riscv_csrrw(env, csrno, ret_value, -1, value);
+ * csrrc  <->  riscv_csrrw(env, csrno, ret_value, 0, value);
+ */
+
+static inline RISCVException riscv_csrrw_check(CPURISCVState *env,
+                                               int csrno,
+                                               bool write_mask,
+                                               RISCVCPU *cpu)
+{
+    /* check privileges and return RISCV_EXCP_ILLEGAL_INST if check fails */
+    int read_only = get_field(csrno, 0xC00) == 3;
+#if !defined(CONFIG_USER_ONLY)
+    int effective_priv = env->priv;
+
+    if (riscv_has_ext(env, RVH) &&
+        env->priv == PRV_S &&
+        !riscv_cpu_virt_enabled(env)) {
+        /*
+         * We are in S mode without virtualisation, therefore we are in HS Mode.
+         * Add 1 to the effective privledge level to allow us to access the
+         * Hypervisor CSRs.
+         */
+        effective_priv++;
+    }
+
+    if (!env->debugger && (effective_priv < get_field(csrno, 0x300))) {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
+#endif
+    if (write_mask && read_only) {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
+
+    /* ensure the CSR extension is enabled. */
+    if (!cpu->cfg.ext_icsr) {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
+
+    /* check predicate */
+    if (!csr_ops[csrno].predicate) {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
+
+    return csr_ops[csrno].predicate(env, csrno);
+}
+
+
+RISCVException riscv_csrrw(CPURISCVState *env, int csrno,
+                           target_ulong *ret_value,
+                           target_ulong new_value, target_ulong write_mask)
+{
+    RISCVCPU *cpu = env_archcpu(env);
+
+    RISCVException ret = riscv_csrrw_check(env, csrno, write_mask, cpu);
+    if (ret != RISCV_EXCP_NONE) {
+        return ret;
+    }
+
+    return riscv_csrrw_do64(env, csrno, ret_value, new_value, write_mask);
+}
+
 /*
  * Debugger support.  If not in user mode, set env->debugger before the
  * riscv_csrrw call and clear it after the call.
@@ -2089,7 +2108,7 @@ RISCVException riscv_csrrw_debug(CPURISCVState *env, int csrno,
 #if !defined(CONFIG_USER_ONLY)
     env->debugger = true;
 #endif
-    ret = riscv_csrrw(env, csrno, ret_value, new_value, write_mask, true);
+    ret = riscv_csrrw(env, csrno, ret_value, new_value, write_mask);
 #if !defined(CONFIG_USER_ONLY)
     env->debugger = false;
 #endif
