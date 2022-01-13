@@ -157,7 +157,6 @@
 #define CSR_MIE             0x304
 #define CSR_MTVEC           0x305
 #define CSR_MCOUNTEREN      0x306
-#define CSR_MTVT      0x307
 
 /* 32-bit only */
 #define CSR_MSTATUSH        0x310
@@ -175,10 +174,6 @@
 #define CSR_MCAUSE          0x342
 #define CSR_MTVAL           0x343
 #define CSR_MIP             0x344
-#define CSR_MNXTI             0x345
-#define CSR_MINTSTATUS        0x346
-#define CSR_MSCRATCHCSW        0x348
-#define CSR_MSCRATCHCSWL        0x349
 
 /* Supervisor Trap Setup */
 #define CSR_SSTATUS         0x100

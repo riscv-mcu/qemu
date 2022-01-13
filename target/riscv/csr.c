@@ -2110,12 +2110,71 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_VL]       = { "vl",       vs,     read_vl                    },
     [CSR_VTYPE]    = { "vtype",    vs,     read_vtype                 },
     [CSR_VLENB]    = { "vlenb",    vs,     read_vlenb                 },
+
+    /* nuclei custom tee csr */
+    [CSR_SPMPCFG0]    = { "spmpcfg0",    any,   read_zero, write_any},
+    [CSR_SPMPCFG1]    = { "spmpcfg1",    any,   read_zero, write_any},
+    [CSR_SPMPCFG2]    = { "spmpcfg2",    any,   read_zero, write_any},
+    [CSR_SPMPCFG3]    = { "spmpcfg3",    any,   read_zero, write_any},
+
+    [CSR_SPMPADDR0]    = { "spmpaddr0",    any,   read_zero, write_any},
+    [CSR_SPMPADDR1]    = { "spmpaddr1",    any,   read_zero, write_any},
+    [CSR_SPMPADDR2]    = { "spmpaddr2",    any,   read_zero, write_any},
+    [CSR_SPMPADDR3]    = { "spmpaddr3",    any,   read_zero, write_any},
+    [CSR_SPMPADDR4]    = { "spmpaddr4",    any,   read_zero, write_any},
+    [CSR_SPMPADDR5]    = { "spmpaddr5",    any,   read_zero, write_any},
+    [CSR_SPMPADDR6]    = { "spmpaddr6",    any,   read_zero, write_any},
+    [CSR_SPMPADDR7]    = { "spmpaddr7",    any,   read_zero, write_any},
+    [CSR_SPMPADDR8]    = { "spmpaddr8",    any,   read_zero, write_any},
+    [CSR_SPMPADDR9]    = { "spmpaddr9",    any,   read_zero, write_any},
+    [CSR_SPMPADDR10]    = { "spmpaddr10",    any,   read_zero, write_any},
+    [CSR_SPMPADDR11]    = { "spmpaddr11",    any,   read_zero, write_any},
+    [CSR_SPMPADDR12]    = { "spmpaddr12",    any,   read_zero, write_any},
+    [CSR_SPMPADDR13]    = { "spmpaddr13",    any,   read_zero, write_any},
+    [CSR_SPMPADDR14]    = { "spmpaddr14",    any,   read_zero, write_any},
+    [CSR_SPMPADDR15]    = { "spmpaddr15",    any,   read_zero, write_any},
+
+    [CSR_JALSNXTI]      = { "jalsnxti",      any,   read_zero, write_any},
+    [CSR_STVT2]         = { "stvt2",         any,   read_zero, write_any},
+    [CSR_PUSHSCAUSE]    = { "pushscause",    any,   read_zero, write_any},
+    [CSR_PUSHSEPC]      = { "pushsepc",      any,   read_zero, write_any},
+
     /* User Timers and Counters */
     [CSR_CYCLE]    = { "cycle",    ctr,    read_instret  },
     [CSR_INSTRET]  = { "instret",  ctr,    read_instret  },
     [CSR_CYCLEH]   = { "cycleh",   ctr32,  read_instreth },
     [CSR_INSTRETH] = { "instreth", ctr32,  read_instreth },
 
+    /* P-Extension Registers */
+    [CSR_UCODE]    = { "ucode",    any,    read_zero, write_any},
+    /* === Nuclei custom CSR Registers === */
+    [CSR_MILM_CTL]    = { "milm_ctl",     any,    read_zero, write_any},
+    [CSR_MDLM_CTL]    = { "mdlm_ctl",     any,    read_zero, write_any},
+    [CSR_MECC_CODE]   = { "mecc_code",    any,    read_zero, write_any},
+    [CSR_MTLB_CTL]    = { "mtlb_ctl",     any,    read_zero, write_any},
+    [CSR_MECC_LOCK]   = { "mecc_lock",    any,    read_zero, write_any},
+    [CSR_MFP16MODE]   = { "mfp16mode",    any,    read_zero, write_any},
+    [CSR_LSTEPFORC]   = { "lstepforc",    any,    read_zero, write_any},
+    [CSR_MPPICFG_INFO]   = { "mppicfg_info",    any,    read_zero, write_any},
+    [CSR_MFIOCFG_INFO]   = { "mfiocfg_info",    any,    read_zero, write_any},
+    [CSR_MSMPCFG_INFO]   = { "msmpcfg_info",    any,    read_zero, write_any},
+    [CSR_MICFG_INFO]     = { "micfg_info",      any,    read_zero, write_any},
+    [CSR_MDCFG_INFO]     = { "mdcfg_info",      any,    read_zero, write_any},
+    [CSR_MCFG_INFO]      = { "mcfg_info",       any,    read_zero, write_any},
+    [CSR_MTLBCFG_INFO]      = { "mtlbcfg_info", any,    read_zero, write_any},
+
+    /* === Nuclei CCM Registers === */
+    [CSR_CCM_MBEGINADDR]      = { "ccm_mbeginaddr", any,    read_zero, write_any},
+    [CSR_CCM_MCOMMAND]        = { "ccm_mcommand",   any,    read_zero, write_any},
+    [CSR_CCM_MDATA]           = { "ccm_mdata",      any,    read_zero, write_any},
+    [CSR_CCM_SUEN]            = { "ccm_suen",       any,    read_zero, write_any},
+    [CSR_CCM_SBEGINADDR]      = { "ccm_sbeginaddr", any,    read_zero, write_any},
+    [CSR_CCM_SCOMMAND]        = { "ccm_scommand",   any,    read_zero, write_any},
+    [CSR_CCM_SDATA]           = { "ccm_sdata",      any,    read_zero, write_any},
+    [CSR_CCM_UBEGINADDR]      = { "ccm_ubeginaddr", any,    read_zero, write_any},
+    [CSR_CCM_UCOMMAND]        = { "ccm_ucommand",   any,    read_zero, write_any},
+    [CSR_CCM_UDATA]           = { "ccm_udata",      any,    read_zero, write_any},
+    [CSR_CCM_FPIPE]           = { "ccm_fpipe",      any,    read_zero, write_any},
     /*
      * In privileged mode, the monitor will have to emulate TIME CSRs only if
      * rdtime callback is not provided by machine/platform emulation.
@@ -2152,6 +2211,7 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_MINTSTATUS] =          {"mintstatus", any,  read_mintstatus,  write_mintstatus  },
     [CSR_MSCRATCHCSW] =         {"mscratchcsw", any,  read_mscratchcsw, write_mscratchcsw, rmw_mscratchcsw},
     [CSR_MSCRATCHCSWL] =        { "mscratchcswl", any,  read_mscratchcswl, write_mscratchcswl,  rmw_mscratchcswl},
+    [CSR_MCLICBASE] =           { "mclicbase", any,  read_zero},
     [CSR_MNVEC] =               { "mnvec", any,  read_mnvec,       write_mnvec       },
     [CSR_MSUBM] =               { "msubm", any,  read_msubm,       write_msubm       },
     [CSR_MDCAUSE] =             { "mdcause", any,  read_mdcause,     write_mdcause     },
@@ -2172,7 +2232,6 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_WFE] =                 { "wfe", any,  read_wfe,         write_wfe         },
     [CSR_SLEEPVALUE] =          { "sleepvalue", any,  read_sleepvalue,  write_sleepvalue  },
     [CSR_TXEVT] =               { "txevt", any,  read_txevt,       write_txevt       },
-    [CSR_CCM_SUEN] =            { "ccm_suen", any,  read_zero,       write_any       },
 
     [CSR_MSTATUSH]    = { "mstatush",   any32, read_mstatush,    write_mstatush    },
 
