@@ -348,6 +348,12 @@
 #define CSR_CCM_UDATA           0x4CD
 #define CSR_CCM_FPIPE           0x4CF
 
+//NCDEV
+#define CSR_MDEVB               0x7F3
+#define CSR_MDEVM               0x7F4
+#define CSR_MNOCB               0x7F5
+#define CSR_MNOCM               0x7F6
+
 /* Performance Counters */
 #define CSR_MHPMCOUNTER3    0xb03
 #define CSR_MHPMCOUNTER4    0xb04

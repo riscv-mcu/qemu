@@ -2199,6 +2199,11 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_CCM_UCOMMAND]        = { "ccm_ucommand",   any,    read_zero, write_any},
     [CSR_CCM_UDATA]           = { "ccm_udata",      any,    read_zero, write_any},
     [CSR_CCM_FPIPE]           = { "ccm_fpipe",      any,    read_zero, write_any},
+
+    [CSR_MDEVB]           = { "mdevb",      any,    read_zero, write_any},
+    [CSR_MDEVM]           = { "mdevm",      any,    read_zero, write_any},
+    [CSR_MNOCB]           = { "mnocb",      any,    read_zero, write_any},
+    [CSR_MNOCM]           = { "mnocm",      any,    read_zero, write_any},
     /*
      * In privileged mode, the monitor will have to emulate TIME CSRs only if
      * rdtime callback is not provided by machine/platform emulation.
