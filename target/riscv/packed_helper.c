@@ -273,6 +273,13 @@ static inline void do_dkwmmul(CPURISCVState *env, void *vd, void *va,
     } else {
         d[i] = (int64_t)a[i] * b[i] >> 31;
     }
+
+    if (a[i+1] == INT32_MIN && b[i+1] == INT32_MIN) {
+        env->vxsat = 0x1;
+        d[i+1] = INT32_MAX;
+    } else {
+        d[i+1] = (int64_t)a[i+1] * b[i+1] >> 31;
+    }
 }
 
 RVPRD(dkwmmul, 1, 2);
@@ -285,7 +292,14 @@ static inline void do_dkwmmulu(CPURISCVState *env, void *vd, void *va,
         env->vxsat = 0x1;
         d[i] = INT32_MAX;
     } else {
-        d[i] = (int64_t)a[i] * b[i] >> 31;
+        d[i] = ((int64_t)a[i] * b[i] + (1ull << 30)) >> 31;
+    }
+
+    if (a[i+1] == INT32_MIN && b[i+1] == INT32_MIN) {
+        env->vxsat = 0x1;
+        d[i+1] = INT32_MAX;
+    } else {
+        d[i+1] = ((int64_t)a[i+1] * b[i+1] + (1ull << 30)) >> 31;
     }
 }
 
