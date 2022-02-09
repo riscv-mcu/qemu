@@ -188,6 +188,7 @@ static inline void do_dkhmx8(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
 {
     int8_t *d = vd, *a = va, *b = vb;
+    i = i * 2;
     /*
      * t[x] = ra.B[x] s* rb.B[y];
      * rt.B[x] = SAT.Q7(t[x] s>> 7);
@@ -217,7 +218,7 @@ static inline void do_dkhmx16(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
 {
     int16_t *d = vd, *a = va, *b = vb;
-
+    i = i * 2;
     /*
      * t[x] = ra.H[x] s* rb.H[y];
      * rt.H[x] = SAT.Q15(t[x] s>> 15);
@@ -246,12 +247,8 @@ static inline void do_dsmmul(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
 {
     int32_t *d = vd, *a = va, *b = vb;
-    if (a[i] == INT32_MIN && b[i] == INT32_MIN) {
-        env->vxsat = 0x1;
-        d[i] = INT32_MAX;
-    } else {
-        d[i] = (int64_t)a[i] * b[i] >> 31;
-    }
+    d[i] = (int64_t)a[i] * b[i] >> 32;
+    d[i+1] = (int64_t)a[i+1] * b[i+1] >> 32;
 }
 
 RVPRD(dsmmul, 1, 2);
@@ -260,12 +257,8 @@ static inline void do_dsmmulu(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
 {
     int32_t *d = vd, *a = va, *b = vb;
-    if (a[i] == INT32_MIN && b[i] == INT32_MIN) {
-        env->vxsat = 0x1;
-        d[i] = INT32_MAX;
-    } else {
-        d[i] = (int64_t)a[i] * b[i] >> 31;
-    }
+    d[i] = ((int64_t)a[i] * b[i] + (uint32_t)INT32_MIN) >> 32;
+    d[i+1] = ((int64_t)a[i+1] * b[i+1] + (uint32_t)INT32_MIN) >> 32;
 }
 
 RVPRD(dsmmulu, 1, 2);
