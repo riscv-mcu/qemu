@@ -305,8 +305,6 @@ static inline void do_dkwmmulu(CPURISCVState *env, void *vd, void *va,
 
 RVPRD(dkwmmulu, 1, 2);
 
-
-
 static inline void do_dkadd32(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
 {
@@ -325,23 +323,56 @@ static inline void do_dksub32(CPURISCVState *env, void *vd, void *va,
 
 RVPRD(dksub32, 1, 4);
 
-static inline void do_dkmmac(CPURISCVState *env, void *vd, void *va,
-                             void *vb, uint8_t i)
+typedef void PackedFn4i(CPURISCVState *, void *, void *,
+                        void *, void *, uint8_t);
+
+static inline uint64_t
+rvpr_acc_d(CPURISCVState *env, uint64_t a,
+         uint64_t b, uint64_t c,
+         uint8_t step, uint8_t size, PackedFn4i *fn)
 {
-    int16_t *d = vd, *a = va, *b = vb;
-    d[i] = hsub32(a[i], b[i]);
+    int i, passes = sizeof(target_ulong) * 2 / size;
+    uint64_t result = 0;
+
+    for (i = 0; i < passes; i += step) {
+        fn(env, &result, &a, &b, &c, i);
+    }
+    return result;
 }
 
-RVPRD(dkmmac, 1, 2);
+#define RVPR_ACC_D(NAME, STEP, SIZE)                                     \
+uint64_t HELPER(NAME)(CPURISCVState *env, uint64_t a,          \
+                          uint64_t b, uint64_t c)              \
+{                                                                      \
+    return rvpr_acc_d(env, a, b, c, STEP, SIZE, (PackedFn4i *)do_##NAME);\
+}
+
+
+#define RVPR_ACC(NAME, STEP, SIZE)                                     \
+target_ulong HELPER(NAME)(CPURISCVState *env, target_ulong a,          \
+                          target_ulong b, target_ulong c)              \
+{                                                                      \
+    return rvpr_acc(env, a, b, c, STEP, SIZE, (PackedFn4i *)do_##NAME);\
+}
+
+static inline void do_dkmmac(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb, *c = vc;
+    d[i] = sadd32(env, 0, ((int64_t)a[i] * b[i]) >> 32, c[i]);
+}
+
+RVPR_ACC_D(dkmmac, 1, 8);
 
 static inline void do_dkmmacu(CPURISCVState *env, void *vd, void *va,
-                             void *vb, uint8_t i)
+                            void *vb, void *vc, uint8_t i)
 {
-    int16_t *d = vd, *a = va, *b = vb;
-    d[i] = hsub32(a[i], b[i]);
+    int32_t *d = vd, *a = va, *b = vb, *c = vc;
+    d[i] = sadd32(env, 0, ((int64_t)a[i] * b[i] +
+                           (uint32_t)INT32_MIN) >> 32, c[i]);
 }
 
-RVPRD(dkmmacu, 1, 2);
+RVPR_ACC_D(dkmmacu, 1, 8);
 
 static inline void do_dkmmsb(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
@@ -2118,8 +2149,6 @@ static inline void do_smmul_u(CPURISCVState *env, void *vd, void *va,
 
 RVPR(smmul_u, 1, 4);
 
-typedef void PackedFn4i(CPURISCVState *, void *, void *,
-                        void *, void *, uint8_t);
 
 static inline target_ulong
 rvpr_acc(CPURISCVState *env, target_ulong a,
@@ -2135,16 +2164,11 @@ rvpr_acc(CPURISCVState *env, target_ulong a,
     return result;
 }
 
-#define RVPR_ACC(NAME, STEP, SIZE)                                     \
-target_ulong HELPER(NAME)(CPURISCVState *env, target_ulong a,          \
-                          target_ulong b, target_ulong c)              \
-{                                                                      \
-    return rvpr_acc(env, a, b, c, STEP, SIZE, (PackedFn4i *)do_##NAME);\
-}
 
 static inline void do_kmmac(CPURISCVState *env, void *vd, void *va,
                             void *vb, void *vc, uint8_t i)
 {
+    printf("do_kmmac is %d\n", i);
     int32_t *d = vd, *a = va, *b = vb, *c = vc;
     d[i] = sadd32(env, 0, ((int64_t)a[i] * b[i]) >> 32, c[i]);
 }

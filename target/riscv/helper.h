@@ -1541,7 +1541,7 @@ DEF_HELPER_3(dkadd8,  i64, env, i64, i64)
 DEF_HELPER_3(dkadd16, i64, env, i64, i64)
 DEF_HELPER_3(dksub8,  i64, env, i64, i64)
 DEF_HELPER_3(dksub16, i64, env, i64, i64)
-//n2
+/* n2 */
 DEF_HELPER_3(dkhmx8, i64, env, i64, i64)
 DEF_HELPER_3(dkhmx16, i64, env, i64, i64)
 DEF_HELPER_3(dsmmul, i64, env, i64, i64)
@@ -1552,9 +1552,9 @@ DEF_HELPER_2(dkabs32,i64, env, i64)
 DEF_HELPER_3(dkslra32, i64, env, i64, i64)
 DEF_HELPER_3(dkadd32, i64, env, i64, i64)
 DEF_HELPER_3(dksub32, i64, env, i64, i64)
-//n3
-DEF_HELPER_3(dkmmac, i64, env, i64, i64)
-DEF_HELPER_3(dkmmacu, i64, env, i64, i64)
+/* n3 */
+DEF_HELPER_4(dkmmac, i64, env, i64, i64, i64)
+DEF_HELPER_4(dkmmacu, i64, env, i64, i64, i64)
 DEF_HELPER_3(dkmmsb, i64, env, i64, i64)
 DEF_HELPER_3(dkmmsbu, i64, env, i64, i64)
 DEF_HELPER_3(dkmada, i64, env, i64, i64)

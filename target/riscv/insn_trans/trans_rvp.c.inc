@@ -490,8 +490,41 @@ GEN_RVP_R_OOL_D(dkadd32);
 GEN_RVP_R_OOL_D(dksub32);
 
 //N3
-GEN_RVP_R_OOL_D(dkmmac);
-GEN_RVP_R_OOL_D(dkmmacu);
+static inline bool r_acc_ool_d(DisasContext *ctx, arg_r *a,
+                             void (* fn)(TCGv, TCGv_ptr, TCGv, TCGv, TCGv))
+{
+    TCGv src1, src2, src3, dst;
+    if (!has_ext(ctx, RVP)) {
+        return false;
+    }
+
+    src1 = tcg_temp_new();
+    src2 = tcg_temp_new();
+    src3 = tcg_temp_new();
+    dst = tcg_temp_new();
+
+    gen_get_gpr(src1, a->rs1);
+    gen_get_gpr(src2, a->rs2);
+    gen_get_gpr(src3, a->rd);
+    fn(dst, cpu_env, src1, src2, src3);
+    gen_set_gpr(a->rd, dst);
+
+    tcg_temp_free(src1);
+    tcg_temp_free(src2);
+    tcg_temp_free(src3);
+    tcg_temp_free(dst);
+    return true;
+}
+
+#define GEN_RVP_R_ACC_OOL_D(NAME)                        \
+static bool trans_##NAME(DisasContext *s, arg_r *a)    \
+{                                                      \
+    return r_acc_ool_d(s, a, gen_helper_##NAME);         \
+}
+
+GEN_RVP_R_ACC_OOL_D(dkmmac);
+GEN_RVP_R_ACC_OOL_D(dkmmacu);
+
 GEN_RVP_R_OOL_D(dkmmsb);
 GEN_RVP_R_OOL_D(dkmmsbu);
 GEN_RVP_R_OOL_D(dkmada);
