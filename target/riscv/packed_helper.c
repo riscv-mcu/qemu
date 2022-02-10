@@ -305,40 +305,25 @@ static inline void do_dkwmmulu(CPURISCVState *env, void *vd, void *va,
 
 RVPRD(dkwmmulu, 1, 2);
 
-static inline void do_dkslra32(CPURISCVState *env, void *vd, void *va,
-                             void *vb, uint8_t i)
-{
-    int32_t *d = vd, *a = va;
-    int64_t shift = sextract64(*(uint64_t *)vb, 0, 6);
 
-    if (shift >= 0) {
-        //do_ksll32(env, vd, va, vb, i);
-    } else {
-        shift = -shift;
-        shift = (shift == 32) ? 31 : shift;
-        d[i] = a[i] >> shift;
-    }
-}
-
-RVPRD(dkslra32, 1, 2);
 
 static inline void do_dkadd32(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
 {
-    int16_t *d = vd, *a = va, *b = vb;
-    d[i] = hadd32(a[i], b[i]);
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = sadd32(env, 0, a[i], b[i]);
 }
 
-RVPRD(dkadd32, 1, 2);
+RVPRD(dkadd32, 1, 4);
 
 static inline void do_dksub32(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
 {
-    int16_t *d = vd, *a = va, *b = vb;
-    d[i] = hsub32(a[i], b[i]);
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = ssub32(env, 0, a[i], b[i]);
 }
 
-RVPRD(dksub32, 1, 2);
+RVPRD(dksub32, 1, 4);
 
 static inline void do_dkmmac(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
@@ -4088,6 +4073,23 @@ static inline void do_ksll32(CPURISCVState *env, void *vd, void *va,
 
 RVPR64_64_64(ksll32, 1, 4);
 
+static inline void do_dkslra32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va;
+    int64_t shift = sextract64(*(uint64_t *)vb, 0, 6);
+
+    if (shift >= 0) {
+        do_ksll32(env, vd, va, vb, i);
+    } else {
+        shift = -shift;
+        shift = (shift == 32) ? 31 : shift;
+        d[i] = a[i] >> shift;
+    }
+}
+
+RVPRD(dkslra32, 1, 4);
+
 static inline void do_kslra32(CPURISCVState *env, void *vd, void *va,
                               void *vb, uint8_t i)
 {
@@ -4606,13 +4608,13 @@ RVPR64_64_64(pktt32, 2, 4);
 
 static inline void do_dkabs32(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
-    int8_t *d = vd, *a = va;
-    if (a[i] == INT8_MIN) {
-        d[i] = INT8_MAX;
+    int32_t *d = vd, *a = va;
+    if (a[i] == INT32_MIN) {
+        d[i] = INT32_MAX;
         env->vxsat = 0x1;
     } else {
         d[i] = abs(a[i]);
     }
 }
 
-RVPR2D(dkabs32, 1, 1);
+RVPR2D(dkabs32, 1, 4);
