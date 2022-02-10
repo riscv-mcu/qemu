@@ -2168,7 +2168,6 @@ rvpr_acc(CPURISCVState *env, target_ulong a,
 static inline void do_kmmac(CPURISCVState *env, void *vd, void *va,
                             void *vb, void *vc, uint8_t i)
 {
-    printf("do_kmmac is %d\n", i);
     int32_t *d = vd, *a = va, *b = vb, *c = vc;
     d[i] = sadd32(env, 0, ((int64_t)a[i] * b[i]) >> 32, c[i]);
 }
