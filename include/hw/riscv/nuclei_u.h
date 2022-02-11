@@ -82,6 +82,7 @@ typedef struct NucleiUState
 enum
 {
     NUCLEI_U_DEV_MROM,
+    NUCLEI_U_TEST,
     NUCLEI_U_DEV_SMP,
     NUCLEI_U_DEV_ECLIC,
     NUCLEI_U_DEV_TIMER,

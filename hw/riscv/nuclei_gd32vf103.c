@@ -31,6 +31,7 @@
 #include "hw/intc/nuclei_eclic.h"
 #include "hw/char/gd32vf103_usart.h"
 #include "hw/riscv/nuclei_gd32vf103.h"
+#include "hw/misc/sifive_test.h"
 #include "hw/riscv/boot.h"
 #include "chardev/char.h"
 #include "sysemu/arch_init.h"
@@ -61,6 +62,7 @@ static const struct MemmapEntry
     [GD32VF103_BL] = {0x1FFFB000, 0x800},
     [GD32VF103_MAINFLASH] = {0x8000000, 0x20000},
     [GD32VF103_MFOL] = {0x0, 0x20000},
+    [GD32VF103_TEST] = {0x100000,     0x1000 },
     [GD32VF103_ECLIC] = {0xD2000000, 0x10000},
     [GD32VF103_TIMER0] = {0x40012C00, 0x400},
     [GD32VF103_SYSTIMER] = {0xD1000000, 0x1000},
@@ -266,6 +268,8 @@ static void riscv_nuclei_soc_realize(DeviceState *dev, Error **errp)
             nuclei_eclic_get_irq(DEVICE(s->eclic),
             GD32VF103_USART0_IRQn));
     }
+    /* SiFive Test MMIO device */
+    sifive_test_create(memmap[GD32VF103_TEST].base);
 }
 
 static void nuclei_eval_board_init(MachineState *machine)

@@ -69,6 +69,7 @@ typedef struct
 enum {
     NUCLEI_N_DEV_DEBUG,
     NUCLEI_N_DEV_ROM,
+    NUCLEI_N_TEST,
     NUCLEI_N_DEV_TIMER,
     NUCLEI_N_DEV_ECLIC,
     NUCLEI_N_DEV_GPIO,

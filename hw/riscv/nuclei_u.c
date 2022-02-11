@@ -53,6 +53,7 @@
 #include "hw/char/sifive_uart.h"
 #include "hw/intc/sifive_clint.h"
 #include "hw/intc/sifive_plic.h"
+#include "hw/misc/sifive_test.h"
 #include "chardev/char.h"
 #include "net/eth.h"
 #include "sysemu/arch_init.h"
@@ -74,6 +75,7 @@ static const struct MemmapEntry
     hwaddr size;
 } nuclei_u_memmap[] = {
     [NUCLEI_U_DEV_MROM]   = {0x00001000, 0x0000f000},
+    [NUCLEI_U_TEST]       = {0x100000,      0x1000 },
     [NUCLEI_U_DEV_SMP]    = {0x12000000, 0x00001000},
     [NUCLEI_U_DEV_TIMER]  = {0x02000000, 0x00001000},
     [NUCLEI_U_DEV_CLINT]  = {0x02001000, 0x00010000},
@@ -101,7 +103,7 @@ static void create_fdt(NucleiUState *s, const struct MemmapEntry *memmap,
     uint32_t *cells;
     char *nodename;
     uint32_t plic_phandle, uart_phandle, gpio_phandle, phandle = 1;
-    uint32_t hfclk_phandle;
+    uint32_t hfclk_phandle,test_phandle;
 
     if (ms->dtb)
     {
@@ -251,6 +253,40 @@ static void create_fdt(NucleiUState *s, const struct MemmapEntry *memmap,
     qemu_fdt_setprop_cell(fdt, nodename, "riscv,ndev", 0x35);
     qemu_fdt_setprop_cell(fdt, nodename, "phandle", plic_phandle);
     g_free(cells);
+    g_free(nodename);
+
+    test_phandle = phandle++;
+    nodename = g_strdup_printf("/soc/test@%lx",
+        (long)memmap[NUCLEI_U_TEST].base);
+    qemu_fdt_add_subnode(fdt, nodename);
+    {
+        static const char * const compat[3] = {
+            "sifive,test1", "sifive,test0", "syscon"
+        };
+        qemu_fdt_setprop_string_array(fdt, nodename, "compatible", (char **)&compat,
+                                      ARRAY_SIZE(compat));
+    }
+    qemu_fdt_setprop_cells(fdt, nodename, "reg",
+        0x0, memmap[NUCLEI_U_TEST].base,
+        0x0, memmap[NUCLEI_U_TEST].size);
+    qemu_fdt_setprop_cell(fdt, nodename, "phandle", test_phandle);
+    test_phandle = qemu_fdt_get_phandle(fdt, nodename);
+    g_free(nodename);
+
+    nodename = g_strdup_printf("/soc/reboot");
+    qemu_fdt_add_subnode(fdt, nodename);
+    qemu_fdt_setprop_string(fdt, nodename, "compatible", "syscon-reboot");
+    qemu_fdt_setprop_cell(fdt, nodename, "regmap", test_phandle);
+    qemu_fdt_setprop_cell(fdt, nodename, "offset", 0x0);
+    qemu_fdt_setprop_cell(fdt, nodename, "value", FINISHER_RESET);
+    g_free(nodename);
+
+    nodename = g_strdup_printf("/soc/poweroff");
+    qemu_fdt_add_subnode(fdt, nodename);
+    qemu_fdt_setprop_string(fdt, nodename, "compatible", "syscon-poweroff");
+    qemu_fdt_setprop_cell(fdt, nodename, "regmap", test_phandle);
+    qemu_fdt_setprop_cell(fdt, nodename, "offset", 0x0);
+    qemu_fdt_setprop_cell(fdt, nodename, "value", FINISHER_PASS);
     g_free(nodename);
 
     gpio_phandle = phandle++;

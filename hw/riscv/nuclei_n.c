@@ -30,6 +30,7 @@
 #include "hw/misc/unimp.h"
 #include "hw/char/riscv_htif.h"
 #include "hw/riscv/riscv_hart.h"
+#include "hw/misc/sifive_test.h"
 #include "hw/intc/nuclei_eclic.h"
 #include "hw/char/nuclei_uart.h"
 #include "hw/riscv/nuclei_n.h"
@@ -50,6 +51,7 @@ static const struct MemmapEntry
 } nuclei_n_memmap[] = {
     [NUCLEI_N_DEV_DEBUG] = {        0x0,     0x1000 },
     [NUCLEI_N_DEV_ROM]   = {     0x1000,     0x1000 },
+    [NUCLEI_N_TEST]      = {   0x100000,     0x1000 },
     [NUCLEI_N_DEV_TIMER] = {  0x2000000,     0x1000 },
     [NUCLEI_N_DEV_ECLIC] = {  0xc000000,    0x10000 },
     [NUCLEI_N_DEV_GPIO]  = { 0x10012000,     0x1000 },
@@ -208,6 +210,9 @@ static void riscv_nuclei_n_soc_realize(DeviceState *dev, Error **errp)
                         memmap[NUCLEI_N_DEV_DDR].size, &error_fatal);
     memory_region_add_subregion(sys_mem,
                         memmap[NUCLEI_N_DEV_DDR].base, &s->ddr);
+
+    /* SiFive Test MMIO device */
+    sifive_test_create(memmap[NUCLEI_N_TEST].base);
 }
 
 static char* nuclei_n_machine_get_download(Object *obj, Error **errp)
