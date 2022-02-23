@@ -498,21 +498,34 @@ static inline bool r_acc_ool_d(DisasContext *ctx, arg_r *a,
         return false;
     }
 
-    src1 = tcg_temp_new();
-    src2 = tcg_temp_new();
-    src3 = tcg_temp_new();
-    dst = tcg_temp_new();
+    src1 = tcg_temp_new_i64();
+    src2 = tcg_temp_new_i64();
+    src3 = tcg_temp_new_i64();
+    dst = tcg_temp_new_i64();
 
-    gen_get_gpr(src1, a->rs1);
-    gen_get_gpr(src2, a->rs2);
-    gen_get_gpr(src3, a->rd);
+    TCGv t0, t1;
+    t0 = tcg_temp_new();
+    t1 = tcg_temp_new();
+    gen_get_gpr(t0, a->rs1);
+    gen_get_gpr(t1, a->rs1 + 1);
+    tcg_gen_concat_tl_i64(src1, t0, t1);
+
+    gen_get_gpr(t0, a->rs2);
+    gen_get_gpr(t1, a->rs2 + 1);
+    tcg_gen_concat_tl_i64(src2, t0, t1);
+
+    gen_get_gpr(t0, a->rd);
+    gen_get_gpr(t1, a->rd + 1);
+    tcg_gen_concat_tl_i64(src3, t0, t1);
     fn(dst, cpu_env, src1, src2, src3);
-    gen_set_gpr(a->rd, dst);
+    set_pair_regs(ctx, dst, a->rd);
+    tcg_temp_free(t0);
+    tcg_temp_free(t1);
 
-    tcg_temp_free(src1);
-    tcg_temp_free(src2);
-    tcg_temp_free(src3);
-    tcg_temp_free(dst);
+    tcg_temp_free_i64(src1);
+    tcg_temp_free_i64(src2);
+    tcg_temp_free_i64(src3);
+    tcg_temp_free_i64(dst);
     return true;
 }
 
