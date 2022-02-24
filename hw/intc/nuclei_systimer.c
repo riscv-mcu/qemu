@@ -45,7 +45,7 @@ static void nuclei_timer_update_compare(NucLeiSYSTIMERState *s)
     uint64_t cmp, real_time;
     int64_t diff;
 
-    real_time =  s->mtime_lo | ((uint64_t)s->mtime_hi << 32);
+    real_time = s->mtime_lo | ((uint64_t)s->mtime_hi << 32);
 
     //env->mtimer->expire_time  = real_time;
 
@@ -98,7 +98,7 @@ static uint64_t nuclei_timer_read(void *opaque, hwaddr offset,
         else
         {
             value = cpu_riscv_read_rtc(s->timebase_freq);
-            s->mtime_lo =  value & 0xffffffff;
+            s->mtime_lo = value & 0xffffffff;
             s->mtime_hi = (value >> 32) & 0xffffffff;
             value = s->mtime_lo;
         }
@@ -110,7 +110,7 @@ static uint64_t nuclei_timer_read(void *opaque, hwaddr offset,
         }
         else
         {
-            value =  s->mtime_hi;
+            value = s->mtime_hi;
         }
         break;
     case NUCLEI_SYSTIMER_REG_MTIMECMPLO:
@@ -147,25 +147,27 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
     switch (offset) {
     case NUCLEI_SYSTIMER_REG_MTIMELO:
         s->mtime_lo = value;
-        env->mtimer->expire_time |= (value &0xFFFFFFFF);
+        env->mtimer->expire_time &= 0xFFFFFFFF00000000ULL;
+        env->mtimer->expire_time |= (value & 0xFFFFFFFF);
         break;
     case NUCLEI_SYSTIMER_REG_MTIMEHI:
         s->mtime_hi = value;
-        env->mtimer->expire_time |= ((value << 32)&0xFFFFFFFF);
+        env->mtimer->expire_time &= 0x00000000FFFFFFFFULL;
+        env->mtimer->expire_time |= (value << 32);
         break;
     case NUCLEI_SYSTIMER_REG_MTIMECMPLO:
-            s->mtimecmp_lo = value;
-            s->mtimecmp_hi = 0xFFFFFFFF;
-            env->mtimecmp  |= (value &0xFFFFFFFF);
-            nuclei_timer_update_compare(s);
+        s->mtimecmp_lo = value;
+        //s->mtimecmp_hi = 0xFFFFFFFF;
+        //env->mtimecmp  |= (value &0xFFFFFFFF);
+        nuclei_timer_update_compare(s);
         break;
     case NUCLEI_SYSTIMER_REG_MTIMECMPHI:
-            s->mtimecmp_hi = value;
-            env->mtimecmp  |= ((value << 32)&0xFFFFFFFF);
-            nuclei_timer_update_compare(s);
+        s->mtimecmp_hi = value;
+        //env->mtimecmp  |= ((value << 32)&0xFFFFFFFF);
+        nuclei_timer_update_compare(s);
         break;
     case NUCLEI_SYSTIMER_REG_MSFTRST:
-	if (!(value & 0x80000000) == 0)
+        if (!(value & 0x80000000) == 0)
             nuclei_timer_reset((DeviceState *)s);
         break;
     case NUCLEI_SYSTIMER_REG_MSTOP:
