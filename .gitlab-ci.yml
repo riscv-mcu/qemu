@@ -30,8 +30,8 @@ prepare_tools:
     - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS
     - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
     - cd nuclei-sdk
-    - sed -i "s/64K/1M/g" SoC/demosoc/Board/nuclei_fpga_eval/Source/GCC/gcc_demosoc_ilm.ld
     - git checkout dev_xlspike_next
+    - sed -i "s/64K/1M/g" SoC/demosoc/Board/nuclei_fpga_eval/Source/GCC/gcc_demosoc_ilm.ld
     - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS/
     # build dsp lib
     - make gen
