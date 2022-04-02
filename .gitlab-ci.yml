@@ -219,6 +219,8 @@ deploy-qemu:
   script:
     - echo "This job deploys something from the $CI_COMMIT_BRANCH branch."
     - ls -al
+    - apt-get update
+    - apt-get -y install zip
     - cp $CI_PROJECT_DIR/tools/qemu.wiki/nuclei-qemu-版本发布说明.md windows_qemu/readme.md
     - cp $CI_PROJECT_DIR/tools/qemu.wiki/nuclei-qemu-版本发布说明.md linux_qemu/readme.md
 
