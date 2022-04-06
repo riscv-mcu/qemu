@@ -49,6 +49,11 @@ prepare_tools:
     - cd NMSIS
     - make gen
     - make gen_nnref_lib
+    #git submodule
+    - cd $CI_PROJECT_DIR/tools
+    - git clone git@gito.corp.nucleisys.com:software/qemu/internal-submudule.git
+    - cd $CI_PROJECT_DIR
+    - cp $CI_PROJECT_DIR/tools/qemu_submodule .gitmodules
   tags:
     - env::native
     - host::xls01
