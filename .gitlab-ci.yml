@@ -30,7 +30,7 @@ prepare_tools:
     - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS
     - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
     - cd nuclei-sdk
-    - git checkout dev_xlspike_next
+    - git checkout master
     - sed -i "s/64K/1M/g" SoC/demosoc/Board/nuclei_fpga_eval/Source/GCC/gcc_demosoc_ilm.ld
     - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS/
     # build dsp lib
@@ -49,11 +49,6 @@ prepare_tools:
     - cd NMSIS
     - make gen
     - make gen_nnref_lib
-    #git submodule
-    - cd $CI_PROJECT_DIR/tools
-    - git clone git@gito.corp.nucleisys.com:software/qemu/internal-submudule.git
-    - cd $CI_PROJECT_DIR
-    - cp $CI_PROJECT_DIR/tools/internal-submudule/qemu_submodule .gitmodules
   tags:
     - env::native
     - host::xls01
@@ -88,6 +83,8 @@ build_linux_qemu:
     # - pip3 install meson==0.57.2
     # git submodule
     - cd $CI_PROJECT_DIR
+    - sed -i 's|https://gitlab.com/qemu-project|http://gito.corp.nucleisys.com/software/qemu|g' .gitmodules
+    - git submodule init
     - git submodule sync
     - git submodule update --init
     - git submodule update --remote
@@ -120,6 +117,8 @@ build_windows_qemu:
     # - dnf install -y ninja-build
     # - dnf install -y gcc
     # - dnf install -y https://download-ib01.fedoraproject.org/pub/fedora/linux/releases/34/Everything/aarch64/os/Packages/m/meson-0.56.2-2.fc34.noarch.rpm
+    - sed -i 's|https://gitlab.com/qemu-project|http://gito.corp.nucleisys.com/software/qemu|g' .gitmodules
+    - git submodule init
     - git submodule sync
     - git submodule update --init
     - git submodule update --remote
