@@ -6,6 +6,8 @@ prepare_tools:
   stage: build
   timeout: 3h
   script:
+    - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+    - python3 -m pip install --upgrade pip
     - mkdir -p $CI_PROJECT_DIR/tools/
     - cd $CI_PROJECT_DIR/tools/
     # docs
