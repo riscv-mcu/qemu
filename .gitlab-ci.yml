@@ -20,6 +20,9 @@ prepare_tools:
     # important: need to avoid git ssh asking yes/no when clone
     # https://serverfault.com/questions/469052/ssh-failing-from-script-working-on-command-line-git
     - ssh-keyscan gito > ~/.ssh/known_hosts
+    - ssh-keyscan gito.corp.nucleisys.com >> ~/.ssh/known_hosts
+    - ssh -T git@gito
+    - ssh -T git@gito.corp.nucleisys.com
     - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
     - python3 -m pip install --upgrade pip
     - mkdir -p $CI_PROJECT_DIR/tools/
