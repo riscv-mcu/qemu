@@ -6,6 +6,17 @@ prepare_tools:
   stage: build
   timeout: 3h
   script:
+    # prepare for docker ssh environment
+    ## https://docs.gitlab.com/ee/ci/ssh_keys/#ssh-keys-when-using-the-docker-executor
+    - apt update
+    - command -v ssh-agent >/dev/null || ( apt-get update -y && apt-get install openssh-client -y )
+    - eval $(ssh-agent -s)
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    # important: need to avoid git ssh asking yes/no when clone
+    # https://serverfault.com/questions/469052/ssh-failing-from-script-working-on-command-line-git
+    - ssh-keyscan gito > ~/.ssh/known_hosts
     - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
     - python3 -m pip install --upgrade pip
     - mkdir -p $CI_PROJECT_DIR/tools/
@@ -14,11 +25,7 @@ prepare_tools:
     - git clone git@gito.corp.nucleisys.com:software/riscv-gnu-toolchain/qemu.wiki.git
     # gcc
     - mkdir -p $CI_PROJECT_DIR/tools/gcc
-    # /home/xl_ci/toolchain//nuclei_gnu/linux64/newlibc/2021.1215.eng1/gcc
-    #- cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.11-eng1/gcc/ gcc/ -r
-    # 2021.07-eng1
-    - cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2022.04/gcc/ gcc/ -r
-    #- cp /home/xl_ci/toolchain/nuclei_gnu/linux64/newlibc/2021.09-rvp-eng2-linux/gcc/ gcc/ -r
+    - cp $(dirname $(dirname $(which riscv-nuclei-elf-gcc))) gcc/ -r
     - export PATH=$CI_PROJECT_DIR/tools/gcc/gcc/bin:$PATH
     # test sdk
     - mkdir -p $CI_PROJECT_DIR/tools/sdk
@@ -44,8 +51,9 @@ prepare_tools:
     - make gen
     - make gen_nnref_lib
   tags:
-    - env::native
-    - host::xls01
+    - env::docker
+    - net::outside
+  image: rego.corp.nucleisys.com/software/sdkbuild:2022.05-eng4
   allow_failure: true
   artifacts:
     when: always
