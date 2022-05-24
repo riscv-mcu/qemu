@@ -2,6 +2,9 @@ before_script:
   - uname -a
   - cat /etc/issue
 
+default:
+  interruptible: true
+
 prepare_tools:
   stage: build
   timeout: 3h
