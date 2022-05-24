@@ -233,7 +233,7 @@ static void riscv_nuclei_n_machine_class_init(ObjectClass *oc, void *data)
 
     mc->desc = "Nuclei RISC-V demosoc on Kit(MCU200T/DDR200T), support Nuclei N/NX class processor";
     mc->init = riscv_nuclei_n_machine_init;
-    mc->max_cpus = 1;
+    mc->max_cpus = 16;
     mc->is_default = false;
     mc->default_cpu_type = NUCLEI_N_CPU;
 
