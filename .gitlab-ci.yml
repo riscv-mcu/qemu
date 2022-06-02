@@ -59,7 +59,7 @@ prepare_tools:
   tags:
     - env::docker
     - net::outside
-  image: rego.corp.nucleisys.com/software/sdkbuild:2022.05-eng4
+  image: rego.corp.nucleisys.com/software/sdkbuild:2022.05
   allow_failure: true
   artifacts:
     when: always
@@ -173,7 +173,7 @@ test_sdk:
   tags:
     - os::linux
     - env::docker
-  image: ubuntu:16.04
+  image: rego.corp.nucleisys.com/software/sdkbuild:2022.05
   allow_failure: true
   artifacts:
     when: always
@@ -219,7 +219,7 @@ test_nmsis:
   tags:
     - os::linux
     - env::docker
-  image: ubuntu:16.04
+  image: rego.corp.nucleisys.com/software/sdkbuild:2022.05
   allow_failure: true
   artifacts:
     when: always
@@ -235,7 +235,6 @@ deploy-qemu:
     - apt-get -y install zip
     - cp $CI_PROJECT_DIR/tools/qemu.wiki/nuclei-qemu-版本发布说明.md windows_qemu/readme.md
     - cp $CI_PROJECT_DIR/tools/qemu.wiki/nuclei-qemu-版本发布说明.md linux_qemu/readme.md
-
     - mkdir -p windows_qemu_fold
     - mkdir -p linux_qemu_fold
     # windows qemu
@@ -264,7 +263,6 @@ deploy-qemu:
     - mkdir $CI_PROJECT_DIR/test_logs
     - mkdir $CI_PROJECT_DIR/Documents
     - cp $CI_PROJECT_DIR/tools/sdk/nuclei-sdk/logs/ $CI_PROJECT_DIR/test_logs/ -r
-
     # docs
     #- git clone git@gito.corp.nucleisys.com:software/riscv-gnu-toolchain/qemu.wiki.git
     - cp $CI_PROJECT_DIR/tools/qemu.wiki/*pdf $CI_PROJECT_DIR/Documents -r
