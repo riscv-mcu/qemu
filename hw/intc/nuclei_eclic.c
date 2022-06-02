@@ -82,7 +82,7 @@ static uint64_t nuclei_eclic_read(void *opaque, hwaddr offset, unsigned size)
         value = eclic->cliccfg & 0xFF;
         break;
     case NUCLEI_ECLIC_REG_CLICINFO:
-        value = (CLICINTCTLBITS << 21) & 0xFFFFFFFF;
+        value = (CLICINTCTLBITS << 21) | (0x1 << 13) | 4095;
         break;
     case NUCLEI_ECLIC_REG_MTH:
         value = eclic->mth & 0xFF;
