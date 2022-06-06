@@ -23,8 +23,8 @@ prepare_tools:
     - ssh-keyscan gito.corp.nucleisys.com >> ~/.ssh/known_hosts
     - ssh -T git@gito
     - ssh -T git@gito.corp.nucleisys.com
-    - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
     - python3 -m pip install --upgrade pip
+    - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
     - mkdir -p $CI_PROJECT_DIR/tools/
     - cd $CI_PROJECT_DIR/tools/
     # docs
@@ -199,8 +199,8 @@ test_nmsis:
     - which python3
     - rm /usr/bin/python && ln -s /usr/local/bin/python3 /usr/bin/python
     - ln -s -f /usr/local/python3/bin/pip3  /usr/bin/pip3  && ln -s -f /usr/local/bin/pip3 /usr/bin/pip
-    - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
     - python3 -m pip install --upgrade pip
+    - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
     # find qemu and gcc
     - cd $CI_PROJECT_DIR
     - export QEMU_PATH_LINUX=$(readlink -f linux_qemu/bin)
