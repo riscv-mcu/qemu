@@ -425,7 +425,7 @@ static int read_mcycle(CPURISCVState *env, int csrno, target_ulong *val)
     if (icount_enabled()) {
         *val = icount_get();
     } else {
-        if( env->scounteren != 0)
+        if( env->mcounteren != 0)
         {
             *val = 0;
         }
@@ -459,7 +459,7 @@ static RISCVException read_instret(CPURISCVState *env, int csrno,
     if (icount_enabled()) {
         *val = icount_get();
     } else {
-        if( env->scounteren != 0)
+        if( env->mcounteren != 0)
         {
             *val = 0;
         }
@@ -1229,13 +1229,38 @@ static int read_mscounteren(CPURISCVState *env, int csrno, target_ulong *val)
 
 static int read_mucounteren(CPURISCVState *env, int csrno, target_ulong *val)
 {
-    *val = env->scounteren;
+    *val = env->mcounteren;
     return RISCV_EXCP_NONE;
 }
 
+int icount_flag = 0;
+int first_run_flag = 0;
 static int write_mucounteren(CPURISCVState *env, int csrno, target_ulong val)
 {
-    env->scounteren = val;
+    extern int use_icount;
+
+    if(first_run_flag == 0)
+    {
+        if(use_icount)
+        {
+            icount_flag = 1;
+        }
+        first_run_flag = 1;
+    }
+
+    if(icount_flag)
+    {
+        if(val > 0)
+        {
+            use_icount = 0;
+        }
+        else
+        {
+            use_icount = 1;
+        }
+    }
+
+    env->mcounteren = val;
     return RISCV_EXCP_NONE;
 }
 
