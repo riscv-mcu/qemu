@@ -31,13 +31,15 @@
 #define NUCLEI_SYSTIMER(obj) \
     OBJECT_CHECK(NucLeiSYSTIMERState, (obj), TYPE_NUCLEI_SYSTIMER)
 
-#define NUCLEI_SYSTIMER_REG_MTIMELO 0x0000
-#define NUCLEI_SYSTIMER_REG_MTIMEHI 0x0004
-#define NUCLEI_SYSTIMER_REG_MTIMECMPLO 0x0008
-#define NUCLEI_SYSTIMER_REG_MTIMECMPHI 0x000C
-#define NUCLEI_SYSTIMER_REG_MSFTRST 0xFF0
-#define NUCLEI_SYSTIMER_REG_MSTOP 0xFF8
-#define NUCLEI_SYSTIMER_REG_MSIP 0xFFC
+#define NUCLEI_SYSTIMER_REG_MTIMELO             (0x0000)
+#define NUCLEI_SYSTIMER_REG_MTIMEHI             (0x0004)
+#define NUCLEI_SYSTIMER_REG_MTIMECMPLO          (0x0008)
+#define NUCLEI_SYSTIMER_REG_MTIMECMPHI          (0x000C)
+#define NUCLEI_SYSTIMER_REG_MSFTRST             (0xFF0)
+#define NUCLEI_SYSTIMER_REG_MSTOP               (0xFF8)
+#define NUCLEI_SYSTIMER_REG_MSIP                (0xFFC)
+
+#define NUCLEI_SYSTIMER_CLINT_MSIP_HART0        (0x1000)
 
 typedef struct NucLeiSYSTIMERState
 {
@@ -58,6 +60,11 @@ typedef struct NucLeiSYSTIMERState
     uint32_t mstop;
     uint32_t msip;
 
+    uint32_t hartid_base;
+    uint32_t num_harts;
+    uint32_t sip_base;
+    uint32_t timecmp_base;
+    uint32_t time_base;
     uint32_t aperture_size;
     uint32_t timebase_freq;
 
@@ -67,7 +74,13 @@ typedef struct NucLeiSYSTIMERState
 #define  NUCLEI_N_TIMEBASE_FREQ     (32768)
 #define  NUCLEI_U_TIMEBASE_FREQ     (32768)
 
-DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size,
+enum {
+    NUCLEI_SIP_BASE     = 0x1000,
+    NUCLEI_TIMECMP_BASE = 0x5000,
+    NUCLEI_TIME_BASE    = 0xCFF8
+};
+
+DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_base, uint32_t num_harts,
                                     DeviceState *eclic, uint32_t timebase_freq);
 
 #endif

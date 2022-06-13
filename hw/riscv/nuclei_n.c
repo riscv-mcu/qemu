@@ -52,7 +52,8 @@ static const struct MemmapEntry
     [NUCLEI_N_DEV_DEBUG] = {        0x0,     0x1000 },
     [NUCLEI_N_DEV_ROM]   = {     0x1000,     0x1000 },
     [NUCLEI_N_TEST]      = {   0x100000,     0x1000 },
-    [NUCLEI_N_DEV_TIMER] = {  0x2000000,     0x1000 },
+    [NUCLEI_N_DEV_SMP]   = { 0x12000000, 0x00001000 },
+    [NUCLEI_N_DEV_TIMER] = {  0x2000000,    0x10000 },
     [NUCLEI_N_DEV_ECLIC] = {  0xc000000,    0x10000 },
     [NUCLEI_N_DEV_GPIO]  = { 0x10012000,     0x1000 },
     [NUCLEI_N_DEV_UART0] = { 0x10013000,     0x1000 },
@@ -160,6 +161,7 @@ static void riscv_nuclei_n_soc_realize(DeviceState *dev, Error **errp)
     NucleiNSoCState *s = RISCV_NUCLEI_N_SOC(dev);
     MemoryRegion *sys_mem = get_system_memory();
     Error *err = NULL;
+    int i = 0;
 
     object_property_set_str(OBJECT(&s->cpus),  "cpu-type", ms->cpu_type,
                             &error_abort);
@@ -176,7 +178,7 @@ static void riscv_nuclei_n_soc_realize(DeviceState *dev, Error **errp)
         memmap[NUCLEI_N_DEV_ECLIC].size, NUCLEI_N_INT_MAX);
 
     s->timer = nuclei_systimer_create(memmap[NUCLEI_N_DEV_TIMER].base,
-                memmap[NUCLEI_N_DEV_TIMER].size,
+                memmap[NUCLEI_N_DEV_TIMER].size, 0, ms->smp.cpus,
                  s->eclic,
                 NUCLEI_N_TIMEBASE_FREQ);
 
@@ -210,6 +212,16 @@ static void riscv_nuclei_n_soc_realize(DeviceState *dev, Error **errp)
                         memmap[NUCLEI_N_DEV_DDR].size, &error_fatal);
     memory_region_add_subregion(sys_mem,
                         memmap[NUCLEI_N_DEV_DDR].base, &s->ddr);
+
+    /* SMP */
+    memory_region_init_ram(&s->smp, OBJECT(dev), "riscv.nuclei.n.smp",
+                        memmap[NUCLEI_N_DEV_SMP].size, &error_fatal);
+    memory_region_add_subregion(sys_mem,
+                        memmap[NUCLEI_N_DEV_SMP].base, &s->smp);
+
+    for (i = 0; i < ms->smp.cpus; i ++) {
+        s->cpus.harts[i].env.msmpcfg_info = (memmap[NUCLEI_N_DEV_SMP].base & ~(1<<10)) | 0xF;
+    }
 
     /* SiFive Test MMIO device */
     sifive_test_create(memmap[NUCLEI_N_TEST].base);

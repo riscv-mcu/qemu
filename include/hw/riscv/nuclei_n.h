@@ -44,6 +44,7 @@ typedef struct NucleiNSoCState {
     MemoryRegion internal_rom;
     MemoryRegion xip_mem;
     MemoryRegion ddr;
+    MemoryRegion smp;
 
     DeviceState *timer;
     // NucLeiSYSTIMERState *timer;
@@ -70,6 +71,7 @@ enum {
     NUCLEI_N_DEV_DEBUG,
     NUCLEI_N_DEV_ROM,
     NUCLEI_N_TEST,
+    NUCLEI_N_DEV_SMP,
     NUCLEI_N_DEV_TIMER,
     NUCLEI_N_DEV_ECLIC,
     NUCLEI_N_DEV_GPIO,

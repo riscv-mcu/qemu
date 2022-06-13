@@ -206,7 +206,7 @@ static void riscv_nuclei_soc_realize(DeviceState *dev, Error **errp)
                                    memmap[GD32VF103_ECLIC].size, GD32VF103_SOC_INT_MAX);
 
     nuclei_systimer_create(memmap[GD32VF103_SYSTIMER].base,
-                           memmap[GD32VF103_SYSTIMER].size,
+                           memmap[GD32VF103_SYSTIMER].size, 0, 1,
                            s->eclic,
                            NUCLEI_GD32_TIMEBASE_FREQ);
 

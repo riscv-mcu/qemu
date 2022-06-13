@@ -77,8 +77,7 @@ static const struct MemmapEntry
     [NUCLEI_U_DEV_MROM]   = {0x00001000, 0x0000f000},
     [NUCLEI_U_TEST]       = {0x100000,      0x1000 },
     [NUCLEI_U_DEV_SMP]    = {0x12000000, 0x00001000},
-    [NUCLEI_U_DEV_TIMER]  = {0x02000000, 0x00001000},
-    [NUCLEI_U_DEV_CLINT]  = {0x02001000, 0x00010000},
+    [NUCLEI_U_DEV_TIMER]  = {0x02000000, 0x00010000},
     [NUCLEI_U_DEV_ECLIC]  = {0x0c000000, 0x00010000},
     [NUCLEI_U_DEV_PLIC]   = {0x08000000, 0x04000000},
     [NUCLEI_U_DEV_UART0]  = {0x10013000, 0x00001000},
@@ -205,12 +204,12 @@ static void create_fdt(NucleiUState *s, const struct MemmapEntry *memmap,
     }
 
     nodename = g_strdup_printf("/soc/clint@%lx",
-                               (long)memmap[NUCLEI_U_DEV_CLINT].base);
+                               (long)memmap[NUCLEI_U_DEV_TIMER].base + 0x1000);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "riscv,clint0");
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           0x0, memmap[NUCLEI_U_DEV_CLINT].base,
-                           0x0, memmap[NUCLEI_U_DEV_CLINT].size);
+                           0x0, memmap[NUCLEI_U_DEV_CLINT].base + 0x1000,
+                           0x0, 0x10000);
     qemu_fdt_setprop(fdt, nodename, "interrupts-extended",
                      cells, ms->smp.cpus * sizeof(uint32_t) * 4);
     g_free(cells);
@@ -734,24 +733,20 @@ static void nuclei_u_soc_realize(DeviceState *dev, Error **errp)
     sifive_uart_create(system_memory, memmap[NUCLEI_U_DEV_UART1].base,
                        serial_hd(1), qdev_get_gpio_in(DEVICE(s->plic), NUCLEI_U_UART1_IRQ));
 
-    sifive_clint_create(memmap[NUCLEI_U_DEV_CLINT].base,
-                        memmap[NUCLEI_U_DEV_CLINT].size, 0, ms->smp.cpus,
-                        SIFIVE_SIP_BASE, SIFIVE_TIMECMP_BASE, SIFIVE_TIME_BASE,
-                        SIFIVE_CLINT_TIMEBASE_FREQ, false);
 
     /* MMIO */
     s->eclic = nuclei_eclic_create(memmap[NUCLEI_U_DEV_ECLIC].base,
         memmap[NUCLEI_U_DEV_ECLIC].size, NUCLEI_U_INT_MAX);
 
-    // s->timer = nuclei_systimer_create(memmap[NUCLEI_U_DEV_TIMER].base,
-    //             memmap[NUCLEI_U_DEV_TIMER].size, s->eclic, NUCLEI_U_TIMEBASE_FREQ);
+    nuclei_systimer_create(memmap[NUCLEI_U_DEV_TIMER].base,
+                memmap[NUCLEI_U_DEV_TIMER].size, 0, ms->smp.cpus, NULL, NUCLEI_U_TIMEBASE_FREQ);
 
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->timer), errp))
     {
         return;
     }
-    sysbus_mmio_map(SYS_BUS_DEVICE(&s->timer), 0, memmap[NUCLEI_U_DEV_TIMER].base);
-    s->timer.timebase_freq = NUCLEI_U_TIMEBASE_FREQ;
+    // sysbus_mmio_map(SYS_BUS_DEVICE(&s->timer), 0, memmap[NUCLEI_U_DEV_TIMER].base);
+    // s->timer.timebase_freq = NUCLEI_U_TIMEBASE_FREQ;
 
     qdev_prop_set_uint32(DEVICE(&s->gpio), "ngpio", 32);
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->gpio), errp))
