@@ -79,7 +79,7 @@ build_linux_qemu:
   image: rego.corp.nucleisys.com/software/build-linux-qemu:v1
   script:
     - cd $CI_PROJECT_DIR
-    - sed -i 's|https://gitlab.com/qemu-project|http://gito.corp.nucleisys.com/software/qemu|g' .gitmodules
+    - sed -i 's|https://gitlab.com/qemu-project|https://gito.corp.nucleisys.com/software/qemu|g' .gitmodules
     - git submodule init
     - git submodule sync
     - git submodule update --init
@@ -105,7 +105,7 @@ build_windows_qemu:
     name: rego.corp.nucleisys.com/software/build-windows-qemu:v1
     entrypoint: ["/bin/sh", "-c"]
   script:
-    - sed -i 's|https://gitlab.com/qemu-project|http://gito.corp.nucleisys.com/software/qemu|g' .gitmodules
+    - sed -i 's|https://gitlab.com/qemu-project|https://gito.corp.nucleisys.com/software/qemu|g' .gitmodules
     - git submodule init
     - git submodule sync
     - git submodule update --init
