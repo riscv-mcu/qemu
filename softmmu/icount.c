@@ -41,6 +41,7 @@
 #include "sysemu/cpu-throttle.h"
 #include "timers-state.h"
 
+int icount_shift_flag = 0;
 /*
  * ICOUNT: Instruction Counter
  *
@@ -416,6 +417,7 @@ void icount_account_warp_timer(void)
 
 void icount_configure(QemuOpts *opts, Error **errp)
 {
+    icount_shift_flag = 1;
     const char *option = qemu_opt_get(opts, "shift");
     bool sleep = qemu_opt_get_bool(opts, "sleep", true);
     bool align = qemu_opt_get_bool(opts, "align", false);

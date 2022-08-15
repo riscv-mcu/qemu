@@ -25,6 +25,7 @@
 #include "qemu/guest-random.h"
 #include "qapi/error.h"
 
+int icount_cnt_flag = 0;
 /* CSR function table public API */
 void riscv_get_csr_ops(int csrno, riscv_csr_operations *ops)
 {
@@ -423,7 +424,14 @@ static int read_mcycle(CPURISCVState *env, int csrno, target_ulong *val)
 {
     #if !defined(CONFIG_USER_ONLY)
     if (icount_enabled()) {
-        *val = icount_get();
+        if(icount_cnt_flag == 0)
+        {
+            *val = icount_get();
+        }
+        else
+        {
+            *val = 0;
+        }
     } else {
         if( env->mcounteren != 0)
         {
@@ -457,7 +465,14 @@ static RISCVException read_instret(CPURISCVState *env, int csrno,
 {
 #if !defined(CONFIG_USER_ONLY)
     if (icount_enabled()) {
-        *val = icount_get();
+        if(icount_cnt_flag == 0)
+        {
+            *val = icount_get();
+        }
+        else
+        {
+            *val = 0;
+        }
     } else {
         if( env->mcounteren != 0)
         {
@@ -482,7 +497,14 @@ static RISCVException read_instreth(CPURISCVState *env, int csrno,
 {
 #if !defined(CONFIG_USER_ONLY)
     if (icount_enabled()) {
-        *val = icount_get() >> 32;
+        if(icount_cnt_flag == 0)
+        {
+            *val = icount_get() >> 32;
+        }
+        else
+        {
+            *val = 0;
+        }
     } else {
         //*val = cpu_get_host_ticks() >> 32;
         *val = 0;
@@ -1238,7 +1260,7 @@ int first_run_flag = 0;
 static int write_mucounteren(CPURISCVState *env, int csrno, target_ulong val)
 {
     extern int use_icount;
-
+    extern int icount_shift_flag;
     if(first_run_flag == 0)
     {
         if(use_icount)
@@ -1252,10 +1274,15 @@ static int write_mucounteren(CPURISCVState *env, int csrno, target_ulong val)
     {
         if(val > 0)
         {
-            use_icount = 0;
+            if(!icount_shift_flag)
+            {
+                use_icount = 0;
+            }
+            icount_cnt_flag = 1;
         }
         else
         {
+            icount_cnt_flag = 0;
             use_icount = 1;
         }
     }
