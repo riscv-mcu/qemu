@@ -254,11 +254,8 @@ deploy-qemu:
     - cd ../
     - tar -zcvf nuclei-qemu-${QEMU_VER}-linux-x64.tar.gz qemu
     - cp nuclei-qemu-${QEMU_VER}-linux-x64.tar.gz $CI_PROJECT_DIR/
-    # save log
-    - mkdir $CI_PROJECT_DIR/test_logs
-    - mkdir $CI_PROJECT_DIR/Documents
-    - cp $CI_PROJECT_DIR/prebuilt/sdk/nuclei-sdk/logs/ $CI_PROJECT_DIR/test_logs/ -r
     # docs
+    - mkdir $CI_PROJECT_DIR/Documents
     - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/*pdf $CI_PROJECT_DIR/Documents -r
     - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/nuclei-qemu-版本发布说明.md $CI_PROJECT_DIR/Documents -r
   tags:
@@ -270,5 +267,4 @@ deploy-qemu:
     paths:
     - $CI_PROJECT_DIR/nuclei-qemu-${QEMU_VER}-win32-x64.zip
     - $CI_PROJECT_DIR/nuclei-qemu-${QEMU_VER}-linux-x64.tar.gz
-    - $CI_PROJECT_DIR/test_logs/
     - $CI_PROJECT_DIR/Documents
