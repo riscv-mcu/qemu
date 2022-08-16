@@ -162,7 +162,7 @@ test_sdk:
     - qemu-system-riscv32 -M ?
     - riscv-nuclei-elf-gcc -v
     ################################################
-    - cd $CI_PROJECT_DIR/tools/sdk/nuclei-sdk
+    - cd $CI_PROJECT_DIR/prebuilt/sdk/nuclei-sdk
     - pip3 install -r tools/scripts/requirements.txt
     - python3 tools/scripts/nsdk_cli/nsdk_bench.py --appcfg tools/scripts/nsdk_cli/configs/application.json --hwcfg tools/scripts/nsdk_cli/configs/nuclei_fpga_eval_ci_qemu.json --parallel=-j --logdir logs/nuclei_fpga_eval_qemu_ci --run --run_target "qemu"
   tags:
@@ -196,15 +196,15 @@ test_nmsis:
     - qemu-system-riscv32 -M ?
     - riscv-nuclei-elf-gcc -v
     ############################################################
-    - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS/nuclei-sdk
+    - cd $CI_PROJECT_DIR/prebuilt/NMSIS/NMSIS/nuclei-sdk
     - pip3 install -r tools/scripts/requirements.txt
-    - cd $CI_PROJECT_DIR/tools/NMSIS/
+    - cd $CI_PROJECT_DIR/prebuilt/NMSIS/
     - export NUCLEI_SDK_ROOT=$(readlink -f NMSIS/nuclei-sdk)
     - export NUCLEI_SDK_NMSIS=$(readlink -f NMSIS)
     - export NMSIS_LOGS=$NUCLEI_SDK_NMSIS/Logs
     - mkdir $NMSIS_LOGS
     - source NMSIS/env.sh
-    - cd $CI_PROJECT_DIR/tools/NMSIS/NMSIS
+    - cd $CI_PROJECT_DIR/prebuilt/NMSIS/NMSIS
     - python3 $NUCLEI_SDK_ROOT/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg Scripts/Runner/nmsis_dsp.json --logdir $NMSIS_LOGS/nmsis_dsp --parallel=-j --run_target qemu --run
     - python3 $NUCLEI_SDK_ROOT/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg Scripts/Runner/nmsis_nn.json  --logdir $NMSIS_LOGS/nmsis_nn  --parallel=-j --run_target qemu --run
   tags:
