@@ -2,11 +2,17 @@ before_script:
   - uname -a
   - cat /etc/issue
 
+stages:
+  - build
+  - test
+  - deploy
+
 default:
   interruptible: true
 
 prepare_tools:
   stage: build
+  interruptible: true
   timeout: 3h
   script:
     # prepare for docker ssh environment
@@ -86,6 +92,7 @@ prepare_tools:
 
 build_linux_qemu:
   stage: build
+  interruptible: true
   tags:
     - os::linux
     - env::docker
@@ -110,6 +117,7 @@ build_linux_qemu:
 
 build_windows_qemu:
   stage: build
+  interruptible: true
   tags:
     - os::linux
     - env::docker
@@ -137,6 +145,7 @@ build_windows_qemu:
 test_sdk:
   stage: test
   timeout: 2h 30m
+  interruptible: true
   script:
     - apt-get -y update --fix-missing 
     - apt-get install -y --fix-missing git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libpixman-1-dev autoconf automake libtool flex bison make
@@ -170,6 +179,7 @@ test_sdk:
 test_nmsis:
   stage: test
   timeout: 4h
+  interruptible: true
   script:
     - apt-get -y update --fix-missing 
     - apt-get install -y --fix-missing git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libpixman-1-dev autoconf automake libtool flex bison make
@@ -210,10 +220,11 @@ test_nmsis:
 
 deploy-qemu:
   stage: deploy
+  interruptible: true
   variables:
       QEMU_VER: "2022.08"
   script:
-    - echo "This job deploys something from the $CI_COMMIT_BRANCH branch."
+    - echo "This job deploy qemu release ${QEMU_VER} from the $CI_COMMIT_BRANCH branch."
     - ls -al
     - apt-get update
     - apt-get -y install zip
