@@ -1261,6 +1261,7 @@ static int write_mucounteren(CPURISCVState *env, int csrno, target_ulong val)
 {
     extern int use_icount;
     extern int icount_shift_flag;
+    val = val & 0xffffffff;
     if(first_run_flag == 0)
     {
         if(use_icount)
