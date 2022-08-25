@@ -335,20 +335,28 @@ static void nuclei_eclic_update_intip(NucLeiECLICState *eclic, int irq, int new_
 
     int old_intip = eclic->clicintlist[irq].sig;
     int trigger = (eclic->clicintattr[irq] >> 1) & 0x3;
-    if (((trigger == 0) && new_intip) ||
-        ((trigger == 1) && !old_intip && new_intip) ||
-        ((trigger == 3) && old_intip && !new_intip))
+    if(old_intip == new_intip != 0)
     {
-        eclic->clicintip[irq] = 1;
-        eclic->clicintlist[irq].sig = new_intip;
-        eclic_insert_pending_list(eclic, irq);
+
     }
     else
     {
-        if (eclic->clicintip[irq])
-            eclic_remove_pending_list(eclic, irq);
-        eclic->clicintip[irq] = 0;
-        eclic->clicintlist[irq].sig = new_intip;
+        if (((trigger == 0) && new_intip) ||
+            ((trigger == 1) && !old_intip && new_intip) ||
+            ((trigger == 3) && old_intip && !new_intip))
+        {
+            eclic->clicintip[irq] = 1;
+            eclic->clicintlist[irq].sig = new_intip;
+            eclic_insert_pending_list(eclic, irq);
+        }
+        else
+        {
+            if (eclic->clicintip[irq])
+                eclic_remove_pending_list(eclic, irq);
+            eclic->clicintip[irq] = 0;
+            eclic->clicintlist[irq].sig = new_intip;
+        }
+
     }
 
     nuclei_eclic_next_interrupt(eclic);
