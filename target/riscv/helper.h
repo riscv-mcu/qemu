@@ -1464,3 +1464,13 @@ DEF_HELPER_FLAGS_1(aes64im, TCG_CALL_NO_RWG_SE, tl, tl)
 
 DEF_HELPER_FLAGS_3(sm4ed, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
 DEF_HELPER_FLAGS_3(sm4ks, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
+
+/* Nuclei Default SIMD DSP Additional Instruction */
+DEF_HELPER_2(expd80, tl, env, tl)
+DEF_HELPER_2(expd81, tl, env, tl)
+DEF_HELPER_2(expd82, tl, env, tl)
+DEF_HELPER_2(expd83, tl, env, tl)
+DEF_HELPER_2(expd84, tl, env, tl)
+DEF_HELPER_2(expd85, tl, env, tl)
+DEF_HELPER_2(expd86, tl, env, tl)
+DEF_HELPER_2(expd87, tl, env, tl)
