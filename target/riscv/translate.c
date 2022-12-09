@@ -133,6 +133,7 @@ static bool always_true_p(DisasContext *ctx  __attribute__((__unused__)))
     }
 
 MATERIALISE_EXT_PREDICATE(XVentanaCondOps);
+MATERIALISE_EXT_PREDICATE(p);
 
 #ifdef TARGET_RISCV32
 #define get_xl(ctx)    MXL_RV32
@@ -1042,6 +1043,9 @@ static uint32_t opcode_at(DisasContextBase *dcbase, target_ulong pc)
 /* Include decoders for factored-out extensions */
 #include "decode-XVentanaCondOps.c.inc"
 
+/* Include decoders for Nuclei SIMD DSP extensions */
+#include "decode-NucleiCustom.c.inc"
+
 /* The specification allows for longer insns, but not supported by qemu. */
 #define MAX_INSN_LEN  4
 
@@ -1062,6 +1066,7 @@ static void decode_opc(CPURISCVState *env, DisasContext *ctx, uint16_t opcode)
     } decoders[] = {
         { always_true_p,  decode_insn32 },
         { has_XVentanaCondOps_p,  decode_XVentanaCodeOps },
+        { has_p_p,  decode_NucleiCustom },
     };
 
     /* Check for compressed insn */
