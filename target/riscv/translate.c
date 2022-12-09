@@ -143,6 +143,7 @@ static bool has_xthead_p(DisasContext *ctx  __attribute__((__unused__)))
 
 MATERIALISE_EXT_PREDICATE(XVentanaCondOps);
 MATERIALISE_EXT_PREDICATE(xxlcz);
+MATERIALISE_EXT_PREDICATE(p);
 
 #ifdef TARGET_RISCV32
 #define get_xl(ctx)    MXL_RV32
@@ -1108,6 +1109,9 @@ static uint32_t opcode_at(DisasContextBase *dcbase, target_ulong pc)
 #include "decode-Xxlcz.c.inc"
 #include "insn_trans/trans_xxlcz.c.inc"
 
+/* Include decoders for Nuclei SIMD DSP extensions */
+#include "decode-NucleiCustom.c.inc"
+
 /* The specification allows for longer insns, but not supported by qemu. */
 #define MAX_INSN_LEN  4
 
@@ -1130,6 +1134,7 @@ static void decode_opc(CPURISCVState *env, DisasContext *ctx, uint16_t opcode)
         { has_xthead_p, decode_xthead },
         { has_XVentanaCondOps_p,  decode_XVentanaCodeOps },
         { has_xxlcz_p,  decode_Xxlcz },
+        { has_p_p,  decode_NucleiCustom },
     };
 
     ctx->virt_inst_excp = false;
