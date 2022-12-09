@@ -442,6 +442,17 @@ GEN_RVP_R_OOL_D(dkadd16);
 GEN_RVP_R_OOL_D(dksub8);
 GEN_RVP_R_OOL_D(dksub16);
 
+GEN_RVP_R_OOL_D(dkhmx8);
+GEN_RVP_R_OOL_D(dkhmx16);
+GEN_RVP_R_OOL_D(dsmmul);
+GEN_RVP_R_OOL_D(dsmmulu);
+GEN_RVP_R_OOL_D(dkwmmul);
+GEN_RVP_R_OOL_D(dkwmmulu);
+GEN_RVP_R2_OOL_D(dkabs32);
+GEN_RVP_R_OOL_D(dkslra32);
+GEN_RVP_R_OOL_D(dkadd32);
+GEN_RVP_R_OOL_D(dksub32);
+
 /* 8-bit Unpacking Instructions */
 GEN_RVP_R2_OOL(sunpkd810);
 GEN_RVP_R2_OOL(sunpkd820);
