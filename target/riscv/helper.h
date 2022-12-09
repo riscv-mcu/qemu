@@ -1498,3 +1498,13 @@ DEF_HELPER_FLAGS_4(xl_addrchk, TCG_CALL_NO_RWG_SE, tl, tl, tl, i32, i32)
 DEF_HELPER_FLAGS_4(xl_bezm, TCG_CALL_NO_RWG_SE, tl, tl, tl, i32, i32)
 DEF_HELPER_FLAGS_1(xl_nzmsk, TCG_CALL_NO_RWG_SE, tl, tl)
 DEF_HELPER_FLAGS_1(xl_ffnz, TCG_CALL_NO_RWG_SE, tl, tl)
+
+/* Nuclei Default SIMD DSP Additional Instruction */
+DEF_HELPER_2(expd80, tl, env, tl)
+DEF_HELPER_2(expd81, tl, env, tl)
+DEF_HELPER_2(expd82, tl, env, tl)
+DEF_HELPER_2(expd83, tl, env, tl)
+DEF_HELPER_2(expd84, i64, env, i64)
+DEF_HELPER_2(expd85, i64, env, i64)
+DEF_HELPER_2(expd86, i64, env, i64)
+DEF_HELPER_2(expd87, i64, env, i64)

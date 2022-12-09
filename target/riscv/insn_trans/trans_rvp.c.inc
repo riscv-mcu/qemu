@@ -313,6 +313,34 @@ static bool trans_##NAME(DisasContext *s, arg_r2 *a)   \
     return r2_ool(s, a, gen_helper_##NAME);            \
 }
 
+static bool
+r2_d64_s64_ool(DisasContext *ctx, arg_r2 *a,
+       void (* fn)(TCGv_i64, TCGv_ptr, TCGv_i64))
+{
+    TCGv t1;
+    TCGv_i64 src1, dst;
+    REQUIRE_64BIT(ctx);
+    REQUIRE_P(ctx);
+
+    src1 = tcg_temp_new_i64();
+    dst = tcg_temp_new_i64();
+
+    t1 = get_gpr(ctx, a->rs1, EXT_ZERO);
+    tcg_gen_ext_tl_i64(src1, t1);
+
+    fn(dst, cpu_env, src1);
+    tcg_gen_trunc_i64_tl(t1, dst);
+    gen_set_gpr(ctx, a->rd, t1);
+
+    return true;
+}
+
+#define GEN_RVP_R2_D64_S64_OOL(NAME)                   \
+static bool trans_##NAME(DisasContext *s, arg_r2 *a)   \
+{                                                      \
+    return r2_d64_s64_ool(s, a, gen_helper_##NAME);    \
+}
+
 GEN_RVP_R2_OOL(kabs16);
 GEN_RVP_R2_OOL(clrs16);
 GEN_RVP_R2_OOL(clz16);
@@ -330,6 +358,15 @@ GEN_RVP_R2_OOL(clrs8);
 GEN_RVP_R2_OOL(clz8);
 GEN_RVP_R2_OOL(clo8);
 GEN_RVP_R2_OOL(swap8);
+
+GEN_RVP_R2_OOL(expd80);
+GEN_RVP_R2_OOL(expd81);
+GEN_RVP_R2_OOL(expd82);
+GEN_RVP_R2_OOL(expd83);
+GEN_RVP_R2_D64_S64_OOL(expd84);
+GEN_RVP_R2_D64_S64_OOL(expd85);
+GEN_RVP_R2_D64_S64_OOL(expd86);
+GEN_RVP_R2_D64_S64_OOL(expd87);
 
 /* 8-bit Unpacking Instructions */
 GEN_RVP_R2_OOL(sunpkd810);
