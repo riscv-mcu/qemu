@@ -563,6 +563,78 @@ GEN_RVP_R_ACC_OOL(kmaxds);
 GEN_RVP_R_ACC_OOL(kmsda);
 GEN_RVP_R_ACC_OOL(kmsxda);
 
+static inline bool r_acc_ool_d(DisasContext *ctx, arg_r *a,
+                             void (* fn)(TCGv_i64, TCGv_ptr, TCGv_i64, TCGv_i64, TCGv_i64))
+{
+    TCGv_i64 src1, src2, src3, dst;
+    REQUIRE_P(ctx);
+
+    src1 = tcg_temp_new_i64();
+    src2 = tcg_temp_new_i64();
+    src3 = tcg_temp_new_i64();
+    dst = tcg_temp_new_i64();
+
+    TCGv t0, t1;
+    t0 = get_gpr(ctx, a->rs1, EXT_ZERO);
+    t1 = get_gpr(ctx, a->rs1 + 1, EXT_ZERO);
+    tcg_gen_concat_tl_i64(src1, t0, t1);
+
+    t0 = get_gpr(ctx, a->rs2, EXT_ZERO);
+    t1 = get_gpr(ctx, a->rs2 + 1, EXT_ZERO);
+    tcg_gen_concat_tl_i64(src2, t0, t1);
+
+    t0 = get_gpr(ctx, a->rd, EXT_ZERO);
+    t1 = get_gpr(ctx, a->rd + 1, EXT_ZERO);
+    tcg_gen_concat_tl_i64(src3, t0, t1);
+    fn(dst, cpu_env, src1, src2, src3);
+    set_pair_regs(ctx, dst, a->rd);
+
+    return true;
+}
+
+#define GEN_RVP_R_ACC_OOL_D(NAME)                        \
+static bool trans_##NAME(DisasContext *s, arg_r *a)    \
+{                                                      \
+    return r_acc_ool_d(s, a, gen_helper_##NAME);         \
+}
+
+GEN_RVP_R_ACC_OOL_D(dkmmac);
+GEN_RVP_R_ACC_OOL_D(dkmmacu);
+GEN_RVP_R_ACC_OOL_D(dkmmsb);
+GEN_RVP_R_ACC_OOL_D(dkmmsbu);
+GEN_RVP_R_ACC_OOL_D(dkmada);
+GEN_RVP_R_ACC_OOL_D(dkmaxda);
+GEN_RVP_R_ACC_OOL_D(dkmads);
+GEN_RVP_R_ACC_OOL_D(dkmadrs);
+GEN_RVP_R_ACC_OOL_D(dkmaxds);
+GEN_RVP_R_ACC_OOL_D(dkmsda);
+GEN_RVP_R_ACC_OOL_D(dkmsxda);
+GEN_RVP_R_ACC_OOL_D(dsmaqa);
+GEN_RVP_R_ACC_OOL_D(dsmaqasu);
+GEN_RVP_R_ACC_OOL_D(dumaqa);
+GEN_RVP_R_ACC_OOL_D(dkmda32);
+GEN_RVP_R_ACC_OOL_D(dkmxda32);
+GEN_RVP_R_ACC_OOL_D(dkmada32);
+GEN_RVP_R_ACC_OOL_D(dkmaxda32);
+GEN_RVP_R_ACC_OOL_D(dkmads32);
+GEN_RVP_R_ACC_OOL_D(dkmadrs32);
+GEN_RVP_R_ACC_OOL_D(dkmaxds32);
+GEN_RVP_R_ACC_OOL_D(dkmsda32);
+GEN_RVP_R_ACC_OOL_D(dkmsxda32);
+GEN_RVP_R_ACC_OOL_D(dsmds32);
+GEN_RVP_R_ACC_OOL_D(dsmdrs32);
+GEN_RVP_R_ACC_OOL_D(dsmxds32);
+GEN_RVP_R_ACC_OOL_D(dsmalda);
+GEN_RVP_R_ACC_OOL_D(dsmalxda);
+GEN_RVP_R_ACC_OOL_D(dsmalds);
+GEN_RVP_R_ACC_OOL_D(dsmaldrs);
+GEN_RVP_R_ACC_OOL_D(dsmalxds);
+GEN_RVP_R_ACC_OOL_D(dsmslda);
+GEN_RVP_R_ACC_OOL_D(dsmslxda);
+GEN_RVP_R_ACC_OOL_D(ddsmaqa);
+GEN_RVP_R_ACC_OOL_D(ddsmaqasu);
+GEN_RVP_R_ACC_OOL_D(ddumaqa);
+
 /* Signed 16-bit Multiply with 64-bit Add/Subtract Instructions */
 static bool
 r_d64_s64_ool(DisasContext *ctx, arg_r *a,
