@@ -105,6 +105,7 @@
 #define RVF RV('F')
 #define RVD RV('D')
 #define RVV RV('V')
+#define RVP RV('P')
 #define RVC RV('C')
 #define RVS RV('S')
 #define RVU RV('U')
@@ -136,6 +137,7 @@ enum {
 };
 
 #define VEXT_VERSION_1_00_0 0x00010000
+#define PEXT_VERSION_0_09_4 0x00000904
 
 enum {
     TRANSLATE_SUCCESS,
@@ -211,6 +213,7 @@ struct CPUArchState {
     target_ulong priv_ver;
     target_ulong bext_ver;
     target_ulong vext_ver;
+    target_ulong pext_ver;
 
     /* RISCVMXL, but uint32_t for vmstate migration */
     uint32_t misa_mxl;      /* current mxl */
@@ -511,6 +514,8 @@ struct RISCVCPUConfig {
     bool ext_h;
     bool ext_j;
     bool ext_v;
+    bool ext_p;
+    bool ext_psfoperand;
     bool ext_zba;
     bool ext_zbb;
     bool ext_zbc;
@@ -562,6 +567,7 @@ struct RISCVCPUConfig {
     char *user_spec;
     char *bext_spec;
     char *vext_spec;
+    char *pext_spec;
     uint16_t vlen;
     uint16_t elen;
     bool mmu;
