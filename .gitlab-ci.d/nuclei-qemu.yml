@@ -1,0 +1,274 @@
+before_script:
+  - uname -a
+  - cat /etc/issue
+
+stages:
+  - build
+  - test
+  - deploy
+
+variables:
+  IMAGE: rego.corp.nucleisys.com/software/sdkbuild
+  IMAGE_TAG: "2022.08"
+
+default:
+  interruptible: true
+
+prepare_tools:
+  stage: build
+  interruptible: true
+  timeout: 3h
+  script:
+    # prepare for docker ssh environment
+    ## https://docs.gitlab.com/ee/ci/ssh_keys/#ssh-keys-when-using-the-docker-executor
+    - apt update
+    - command -v ssh-agent >/dev/null || ( apt-get update -y && apt-get install openssh-client -y )
+    - eval $(ssh-agent -s)
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    # important: need to avoid git ssh asking yes/no when clone
+    # https://serverfault.com/questions/469052/ssh-failing-from-script-working-on-command-line-git
+    - ssh-keyscan gito > ~/.ssh/known_hosts
+    - ssh-keyscan gito.corp.nucleisys.com >> ~/.ssh/known_hosts
+    - ssh -T git@gito
+    - ssh -T git@gito.corp.nucleisys.com
+    - python3 -m pip install --upgrade pip
+    - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+    - mkdir -p $CI_PROJECT_DIR/prebuilt/
+    - cd $CI_PROJECT_DIR/prebuilt/
+    # docs
+    - git clone git@gito.corp.nucleisys.com:software/devtools/qemu.wiki.git
+    # gcc, no need to prepare gcc now, this podman image already has gcc
+    #- mkdir -p $CI_PROJECT_DIR/prebuilt/gcc
+    #- cp $(dirname $(dirname $(which riscv-nuclei-elf-gcc))) gcc/ -r
+    #- export PATH=$CI_PROJECT_DIR/prebuilt/gcc/gcc/bin:$PATH
+    # test sdk
+    - mkdir -p $CI_PROJECT_DIR/prebuilt/sdk
+    - cd $CI_PROJECT_DIR/prebuilt/sdk
+    - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
+    - cd nuclei-sdk
+    - git checkout master
+    - git describe --tags --always --abbrev=10 > build.txt
+    # rm unused .git
+    - rm -rf .git
+    # nmsis
+    - cd $CI_PROJECT_DIR/prebuilt/
+    - git clone git@gito.corp.nucleisys.com:software/library/NMSIS.git
+    # checkout to develop branch for NMSIS
+    - cd NMSIS
+    - git checkout develop
+    - git describe --tags --always --abbrev=10 > build.txt
+    # rm unused .git
+    - rm -rf .git
+    - cd $CI_PROJECT_DIR/prebuilt/NMSIS/NMSIS
+    - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
+    - cd nuclei-sdk
+    - git checkout master
+    - sed -i "s/64K/1M/g" SoC/demosoc/Board/nuclei_fpga_eval/Source/GCC/gcc_demosoc_ilm.ld
+    - git describe --tags --always --abbrev=10 > build.txt
+    # rm unused .git
+    - rm -rf .git
+    - cd $CI_PROJECT_DIR/prebuilt/NMSIS/NMSIS/nuclei-sdk
+    - pip3 install -r tools/scripts/requirements.txt
+    - cd $CI_PROJECT_DIR/prebuilt/NMSIS/
+    - git describe --tags --always --abbrev=10 > build.txt
+    - export NUCLEI_SDK_ROOT=$(readlink -f NMSIS/nuclei_sdk)
+    - export NUCLEI_SDK_NMSIS=$(readlink -f NMSIS)
+    - source NMSIS/env.sh
+    - export SILENT=1
+    - cd NMSIS
+    - make gen
+    - make gen_nnref_lib
+    # clean unused nmsis library folder
+    - make distclean
+    - du -sh $CI_PROJECT_DIR/prebuilt
+  tags:
+    - env::docker
+    - net::outside
+  image: $IMAGE:$IMAGE_TAG
+  allow_failure: true
+  artifacts:
+    when: always
+    paths:
+    - $CI_PROJECT_DIR/prebuilt
+
+
+build_linux_qemu:
+  stage: build
+  interruptible: true
+  tags:
+    - os::linux
+    - env::docker
+  image: rego.corp.nucleisys.com/software/build-linux-qemu:latest
+  script:
+    - cd $CI_PROJECT_DIR
+    - sed -i 's|https://gitlab.com/qemu-project|https://gito.corp.nucleisys.com/software/qemu|g' .gitmodules
+    - git submodule init
+    - git submodule sync
+    - git submodule update --init
+    - git submodule update --remote
+    - sync
+    #build
+    - cd $CI_PROJECT_DIR
+    - mkdir $CI_PROJECT_DIR/build -p
+    - mkdir $CI_PROJECT_DIR/linux_qemu -p
+    - cd build
+    - ../configure --disable-werror --prefix=$CI_PROJECT_DIR/linux_qemu --disable-pa --disable-linux-aio --disable-rbd --disable-vnc --disable-sdl --disable-sdl-image --target-list=riscv32-softmmu,riscv64-softmmu && make -j8 && make install
+  artifacts:
+    paths:
+    - $CI_PROJECT_DIR/linux_qemu
+
+build_windows_qemu:
+  stage: build
+  interruptible: true
+  tags:
+    - os::linux
+    - env::docker
+  image: 
+    name: rego.corp.nucleisys.com/software/build-windows-qemu:latest
+    entrypoint: ["/bin/sh", "-c"]
+  script:
+    - sed -i 's|https://gitlab.com/qemu-project|https://gito.corp.nucleisys.com/software/qemu|g' .gitmodules
+    - git submodule init
+    - git submodule sync
+    - git submodule update --init
+    - git submodule update --remote
+    #- git submodule update --remote
+    - sync
+    # build
+    - mkdir $CI_PROJECT_DIR/build -p
+    - mkdir $CI_PROJECT_DIR/windows_qemu/bin -p
+    - cd build
+    - ../configure --disable-werror --cross-prefix=x86_64-w64-mingw32- --target-list=riscv32-softmmu,riscv64-softmmu --prefix=$CI_PROJECT_DIR/windows_qemu/bin && make -j8 && make install 
+    - cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/* $CI_PROJECT_DIR/windows_qemu/bin
+  artifacts:
+    paths:
+    - $CI_PROJECT_DIR/windows_qemu
+
+test_sdk:
+  stage: test
+  timeout: 2h 30m
+  interruptible: true
+  script:
+    - apt-get -y update --fix-missing 
+    - apt-get install -y --fix-missing git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libpixman-1-dev autoconf automake libtool flex bison make
+    - apt-get install -y python3 python3-pip
+    - apt-get install -y software-properties-common
+    - apt-get install wget openssl libssl-dev -y
+    - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+    - python3 -m pip install --upgrade pip
+    # find qemu and gcc
+    - cd $CI_PROJECT_DIR
+    - export QEMU_PATH_LINUX=$(readlink -f linux_qemu/bin)
+    - export PATH=$QEMU_PATH_LINUX:$PATH
+    #- export PATH=$CI_PROJECT_DIR/prebuilt/gcc/gcc/bin:$PATH
+    - qemu-system-riscv32 -M ?
+    - riscv-nuclei-elf-gcc -v
+    ################################################
+    # - cd $CI_PROJECT_DIR/prebuilt/sdk/nuclei-sdk
+    # - pip3 install -r tools/scripts/requirements.txt
+    # - python3 tools/scripts/nsdk_cli/nsdk_bench.py --appcfg tools/scripts/nsdk_cli/configs/application.json --hwcfg tools/scripts/nsdk_cli/configs/nuclei_fpga_eval_ci_qemu.json --parallel=-j --logdir logs/nuclei_fpga_eval_qemu_ci --run --run_target "qemu"
+  tags:
+    - os::linux
+    - env::docker
+  image: $IMAGE:$IMAGE_TAG
+  allow_failure: true
+  artifacts:
+    name: "qemu_test_sdk_job${CI_JOB_ID}_${CI_COMMIT_SHA::8}"
+    when: always
+    # paths:
+    # - $CI_PROJECT_DIR/prebuilt/sdk/nuclei-sdk/logs/
+
+test_nmsis:
+  stage: test
+  timeout: 4h
+  interruptible: true
+  script:
+    - apt-get -y update --fix-missing 
+    - apt-get install -y --fix-missing git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libpixman-1-dev autoconf automake libtool flex bison make
+    - apt-get install -y python3 python3-pip
+    - apt-get install -y software-properties-common
+    - apt-get install wget openssl libssl-dev -y
+    - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+    - python3 -m pip install --upgrade pip
+    # find qemu and gcc
+    - cd $CI_PROJECT_DIR
+    - export QEMU_PATH_LINUX=$(readlink -f linux_qemu/bin)
+    - export PATH=$QEMU_PATH_LINUX:$PATH
+    #- export PATH=$CI_PROJECT_DIR/prebuilt/gcc/gcc/bin:$PATH
+    - qemu-system-riscv32 -M ?
+    - riscv-nuclei-elf-gcc -v
+    ############################################################
+    # - cd $CI_PROJECT_DIR/prebuilt/NMSIS/NMSIS/nuclei-sdk
+    # - pip3 install -r tools/scripts/requirements.txt
+    # - cd $CI_PROJECT_DIR/prebuilt/NMSIS/
+    # - export NUCLEI_SDK_ROOT=$(readlink -f NMSIS/nuclei-sdk)
+    # - export NUCLEI_SDK_NMSIS=$(readlink -f NMSIS)
+    # - export NMSIS_LOGS=$NUCLEI_SDK_NMSIS/Logs
+    # - mkdir $NMSIS_LOGS
+    # - source NMSIS/env.sh
+    # - cd $CI_PROJECT_DIR/prebuilt/NMSIS/NMSIS
+    # - python3 $NUCLEI_SDK_ROOT/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg Scripts/Runner/nmsis_dsp.json --logdir $NMSIS_LOGS/nmsis_dsp --parallel=-j --run_target qemu --run
+    # - python3 $NUCLEI_SDK_ROOT/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg Scripts/Runner/nmsis_nn.json  --logdir $NMSIS_LOGS/nmsis_nn  --parallel=-j --run_target qemu --run
+  tags:
+    - os::linux
+    - env::docker
+  image: $IMAGE:$IMAGE_TAG
+  allow_failure: true
+  artifacts:
+    when: always
+    name: "qemu_test_nmsis_job${CI_JOB_ID}_${CI_COMMIT_SHA::8}"
+    # paths:
+    # - $CI_PROJECT_DIR/prebuilt/NMSIS/NMSIS/Logs
+
+deploy-qemu:
+  stage: deploy
+  interruptible: true
+  variables:
+      QEMU_VER: "2023.04"
+  script:
+    - echo "This job deploy qemu release ${QEMU_VER} from the $CI_COMMIT_BRANCH branch."
+    - ls -al
+    - apt-get update
+    - apt-get -y install zip
+    - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/nuclei-qemu-版本发布说明.md windows_qemu/readme.md
+    - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/nuclei-qemu-版本发布说明.md linux_qemu/readme.md
+    - mkdir -p windows_qemu_fold
+    - mkdir -p linux_qemu_fold
+    # windows qemu
+    - cd $CI_PROJECT_DIR
+    - cp windows_qemu windows_qemu_fold -r
+    - cd $CI_PROJECT_DIR/windows_qemu_fold
+    - mv windows_qemu qemu
+    - cd qemu 
+    - mkdir doc
+    - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/NUCLEI-QEMU-用户手册.pdf doc/nuclei_qemu_user_guide.pdf
+    - cd ../
+    - zip -r nuclei-qemu-${QEMU_VER}-win32-x64.zip qemu
+    - cp nuclei-qemu-${QEMU_VER}-win32-x64.zip $CI_PROJECT_DIR/
+    # linux qemu
+    - cd $CI_PROJECT_DIR
+    - cp linux_qemu linux_qemu_fold -r
+    - cd $CI_PROJECT_DIR/linux_qemu_fold
+    - mv linux_qemu qemu
+    - cd qemu 
+    - mkdir doc
+    - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/NUCLEI-QEMU-用户手册.pdf doc/nuclei_qemu_user_guide.pdf
+    - cd ../
+    - tar -zcvf nuclei-qemu-${QEMU_VER}-linux-x64.tar.gz qemu
+    - cp nuclei-qemu-${QEMU_VER}-linux-x64.tar.gz $CI_PROJECT_DIR/
+    # docs
+    - mkdir $CI_PROJECT_DIR/Documents
+    - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/*pdf $CI_PROJECT_DIR/Documents -r
+    - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/nuclei-qemu-版本发布说明.md $CI_PROJECT_DIR/Documents -r
+  tags:
+    - env::docker
+    - net::outside
+  image: $IMAGE:$IMAGE_TAG
+  artifacts:
+    name: "${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}_$(date +%Y%m%d)"
+    paths:
+    - $CI_PROJECT_DIR/nuclei-qemu-${QEMU_VER}-win32-x64.zip
+    - $CI_PROJECT_DIR/nuclei-qemu-${QEMU_VER}-linux-x64.tar.gz
+    - $CI_PROJECT_DIR/Documents
