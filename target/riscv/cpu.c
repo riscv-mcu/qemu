@@ -1232,6 +1232,9 @@ static Property riscv_cpu_extensions[] = {
     DEFINE_PROP_BOOL("zksed", RISCVCPU, cfg.ext_zksed, false),
     DEFINE_PROP_BOOL("zksh", RISCVCPU, cfg.ext_zksh, false),
     DEFINE_PROP_BOOL("zkt", RISCVCPU, cfg.ext_zkt, false),
+    DEFINE_PROP_BOOL("nuclein1", RISCVCPU, cfg.ext_nuclein1, false),
+    DEFINE_PROP_BOOL("nuclein2", RISCVCPU, cfg.ext_nuclein2, false),
+    DEFINE_PROP_BOOL("nuclein3", RISCVCPU, cfg.ext_nuclein3, false),
 
     DEFINE_PROP_BOOL("zdinx", RISCVCPU, cfg.ext_zdinx, false),
     DEFINE_PROP_BOOL("zfinx", RISCVCPU, cfg.ext_zfinx, false),

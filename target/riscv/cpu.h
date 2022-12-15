@@ -516,6 +516,9 @@ struct RISCVCPUConfig {
     bool ext_v;
     bool ext_p;
     bool ext_psfoperand;
+    bool ext_nuclein1;
+    bool ext_nuclein2;
+    bool ext_nuclein3;
     bool ext_zba;
     bool ext_zbb;
     bool ext_zbc;
