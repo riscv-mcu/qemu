@@ -54,12 +54,46 @@
 #define TYPE_RISCV_CPU_SIFIVE_U34       RISCV_CPU_TYPE_NAME("sifive-u34")
 #define TYPE_RISCV_CPU_SIFIVE_U54       RISCV_CPU_TYPE_NAME("sifive-u54")
 #define TYPE_RISCV_CPU_HOST             RISCV_CPU_TYPE_NAME("host")
+#define TYPE_RISCV_CPU_NUCLEI_N200      RISCV_CPU_TYPE_NAME("nuclei-n200")
+#define TYPE_RISCV_CPU_NUCLEI_N201      RISCV_CPU_TYPE_NAME("nuclei-n201")
+#define TYPE_RISCV_CPU_NUCLEI_N201E     RISCV_CPU_TYPE_NAME("nuclei-n201e")
+#define TYPE_RISCV_CPU_NUCLEI_N203      RISCV_CPU_TYPE_NAME("nuclei-n203")
+#define TYPE_RISCV_CPU_NUCLEI_N203E     RISCV_CPU_TYPE_NAME("nuclei-n203e")
+#define TYPE_RISCV_CPU_NUCLEI_N205      RISCV_CPU_TYPE_NAME("nuclei-n205")
+#define TYPE_RISCV_CPU_NUCLEI_N205E     RISCV_CPU_TYPE_NAME("nuclei-n205e")
+#define TYPE_RISCV_CPU_NUCLEI_N300      RISCV_CPU_TYPE_NAME("nuclei-n300")
+#define TYPE_RISCV_CPU_NUCLEI_N300F     RISCV_CPU_TYPE_NAME("nuclei-n300f")
+#define TYPE_RISCV_CPU_NUCLEI_N300FD    RISCV_CPU_TYPE_NAME("nuclei-n300fd")
+#define TYPE_RISCV_CPU_NUCLEI_N305      RISCV_CPU_TYPE_NAME("nuclei-n305")
+#define TYPE_RISCV_CPU_NUCLEI_N307      RISCV_CPU_TYPE_NAME("nuclei-n307")
+#define TYPE_RISCV_CPU_NUCLEI_N307FD    RISCV_CPU_TYPE_NAME("nuclei-n307fd")
+#define TYPE_RISCV_CPU_NUCLEI_N600      RISCV_CPU_TYPE_NAME("nuclei-n600")
+#define TYPE_RISCV_CPU_NUCLEI_N600F     RISCV_CPU_TYPE_NAME("nuclei-n600f")
+#define TYPE_RISCV_CPU_NUCLEI_N600FD    RISCV_CPU_TYPE_NAME("nuclei-n600fd")
+#define TYPE_RISCV_CPU_NUCLEI_NX600     RISCV_CPU_TYPE_NAME("nuclei-nx600")
+#define TYPE_RISCV_CPU_NUCLEI_NX600F    RISCV_CPU_TYPE_NAME("nuclei-nx600f")
+#define TYPE_RISCV_CPU_NUCLEI_NX600FD   RISCV_CPU_TYPE_NAME("nuclei-nx600fd")
+#define TYPE_RISCV_CPU_NUCLEI_UX600     RISCV_CPU_TYPE_NAME("nuclei-ux600")
+#define TYPE_RISCV_CPU_NUCLEI_UX600F    RISCV_CPU_TYPE_NAME("nuclei-ux600f")
+#define TYPE_RISCV_CPU_NUCLEI_UX600FD   RISCV_CPU_TYPE_NAME("nuclei-ux600fd")
+#define TYPE_RISCV_CPU_NUCLEI_N900      RISCV_CPU_TYPE_NAME("nuclei-n900")
+#define TYPE_RISCV_CPU_NUCLEI_N900F     RISCV_CPU_TYPE_NAME("nuclei-n900f")
+#define TYPE_RISCV_CPU_NUCLEI_N900FD    RISCV_CPU_TYPE_NAME("nuclei-n900fd")
+#define TYPE_RISCV_CPU_NUCLEI_NX900     RISCV_CPU_TYPE_NAME("nuclei-nx900")
+#define TYPE_RISCV_CPU_NUCLEI_NX900F    RISCV_CPU_TYPE_NAME("nuclei-nx900f")
+#define TYPE_RISCV_CPU_NUCLEI_NX900FD   RISCV_CPU_TYPE_NAME("nuclei-nx900fd")
+#define TYPE_RISCV_CPU_NUCLEI_UX900     RISCV_CPU_TYPE_NAME("nuclei-ux900")
+#define TYPE_RISCV_CPU_NUCLEI_UX900F    RISCV_CPU_TYPE_NAME("nuclei-ux900f")
+#define TYPE_RISCV_CPU_NUCLEI_UX900FD   RISCV_CPU_TYPE_NAME("nuclei-ux900fd")
 
 #if defined(TARGET_RISCV32)
 # define TYPE_RISCV_CPU_BASE            TYPE_RISCV_CPU_BASE32
 #elif defined(TARGET_RISCV64)
 # define TYPE_RISCV_CPU_BASE            TYPE_RISCV_CPU_BASE64
 #endif
+
+#define RV32 ((target_ulong)1 << (TARGET_LONG_BITS - 2))
+#define RV64 ((target_ulong)2 << (TARGET_LONG_BITS - 2))
 
 #define RV(x) ((target_ulong)1 << (x - 'A'))
 
@@ -75,6 +109,9 @@
 #define RVU RV('U')
 #define RVH RV('H')
 #define RVJ RV('J')
+#define RVB RV('B')
+#define RVK RV('K')
+#define RVP RV('P')
 
 /* S extension denotes that Supervisor mode exists, however it is possible
    to have a core that support S mode but does not have an MMU and there
@@ -85,7 +122,9 @@ enum {
     RISCV_FEATURE_PMP,
     RISCV_FEATURE_EPMP,
     RISCV_FEATURE_MISA,
-    RISCV_FEATURE_DEBUG
+    RISCV_FEATURE_AIA,
+    RISCV_FEATURE_DEBUG,
+    RISCV_FEATURE_ECLIC
 };
 
 /* Privileged specification version */
@@ -110,6 +149,8 @@ enum {
 
 typedef struct CPUArchState CPURISCVState;
 
+#define CPU_INTERRUPT_ECLIC CPU_INTERRUPT_TGT_EXT_0
+
 #if !defined(CONFIG_USER_ONLY)
 #include "pmp.h"
 #include "debug.h"
@@ -125,6 +166,7 @@ FIELD(VTYPE, VTA, 6, 1)
 FIELD(VTYPE, VMA, 7, 1)
 FIELD(VTYPE, VEDIV, 8, 2)
 FIELD(VTYPE, RESERVED, 10, sizeof(target_ulong) * 8 - 11)
+FIELD(VTYPE, VILL, sizeof(target_ulong) * 8 - 1, 1)
 
 typedef struct PMUCTRState {
     /* Current value of a counter */
@@ -214,6 +256,9 @@ struct CPUArchState {
     uint64_t mie;
     uint64_t mideleg;
 
+    uint32_t exccode;    /* irq id: 0~11  shv: 12 */
+    uint32_t eclic_flag;
+
     target_ulong satp;   /* since: priv-1.10.0 */
     target_ulong stval;
     target_ulong medeleg;
@@ -223,6 +268,7 @@ struct CPUArchState {
     target_ulong scause;
 
     target_ulong mtvec;
+    target_ulong mtvt;
     target_ulong mepc;
     target_ulong mcause;
     target_ulong mtval;  /* since: priv-1.10.0 */
@@ -234,6 +280,35 @@ struct CPUArchState {
     /* AIA CSRs */
     target_ulong miselect;
     target_ulong siselect;
+
+    target_ulong mnxti;
+    target_ulong mintstatus;
+    target_ulong mscratchcsw;
+    target_ulong mscratchcswl;
+
+    /* NMI  CSR*/
+    target_ulong mnvec;
+    target_ulong msubm;
+    target_ulong mdcause;
+    target_ulong mcache_ctl;
+    target_ulong mmisc_ctl;
+    target_ulong msavestatus;
+    target_ulong msaveepc1;
+    target_ulong msavecause1;
+    target_ulong msaveepc2;
+    target_ulong msavecause2;
+    target_ulong msavedcause1;
+    target_ulong msavedcause2;
+    target_ulong pushmsubm;
+    target_ulong mtvt2;
+    target_ulong jalmnxti;
+    target_ulong pushmcause;
+    target_ulong pushmepc;
+
+    target_ulong wfe;
+    target_ulong sleepvalue;
+    target_ulong txevt;
+    target_ulong msmpcfg_info;
 
     /* Hypervisor CSRs */
     target_ulong hstatus;
@@ -318,6 +393,10 @@ struct CPUArchState {
 
     uint64_t vstimecmp;
 
+    /*nuclei timer comparators */
+    uint64_t mtimecmp;
+    uint64_t timecmp;
+
     /* physical memory protection */
     pmp_table_t pmp_state;
     target_ulong mseccfg;
@@ -378,6 +457,11 @@ struct CPUArchState {
     QEMUTimer *stimer; /* Internal timer for S-mode interrupt */
     QEMUTimer *vstimer; /* Internal timer for VS-mode interrupt */
     bool vstime_irq;
+
+    QEMUTimer *mtimer; /* Nuclei Internal timer */
+    QEMUTimer *timer; /* Nuclei Internal timer */
+    void *eclic;
+    bool irq_pending;
 
     hwaddr kernel_addr;
     hwaddr fdt_addr;

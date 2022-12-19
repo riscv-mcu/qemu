@@ -29,6 +29,7 @@
 #include "qemu/guest-random.h"
 #include "qapi/error.h"
 
+int icount_cnt_flag = 0;
 /* CSR function table public API */
 void riscv_get_csr_ops(int csrno, riscv_csr_operations *ops)
 {
@@ -788,6 +789,118 @@ static int read_scountovf(CPURISCVState *env, int csrno, target_ulong *val)
     return RISCV_EXCP_NONE;
 }
 
+static int read_mcycle(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    #if !defined(CONFIG_USER_ONLY)
+    if (icount_enabled()) {
+        if(icount_cnt_flag == 0)
+        {
+            *val = icount_get();
+        }
+        else
+        {
+            *val = 0;
+        }
+    } else {
+        if( env->mcounteren != 0)
+        {
+            *val = 0;
+        }
+        else
+        {
+            static int cur_val = 0;
+            static int last_val = 0;
+            //enable
+            if(cur_val == muldiv64(qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL), 32768, NANOSECONDS_PER_SECOND))
+            {
+                last_val = last_val + 1;
+            }
+            else
+            {
+                last_val = cur_val;
+            }
+            cur_val = muldiv64(qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL), 32768, NANOSECONDS_PER_SECOND);
+            *val = last_val;
+        }    
+    }
+#else
+    *val = cpu_get_host_ticks();
+#endif
+    return RISCV_EXCP_NONE;
+}
+/* User Timers and Counters */
+static RISCVException read_instret(CPURISCVState *env, int csrno,
+                                   target_ulong *val)
+{
+#if !defined(CONFIG_USER_ONLY)
+    if (icount_enabled()) {
+        if(icount_cnt_flag == 0)
+        {
+            *val = icount_get();
+        }
+        else
+        {
+            *val = 0;
+        }
+    } else {
+        if( env->mcounteren != 0)
+        {
+            *val = 0;
+        }
+        else
+        {
+            static int prev_instret = 0;
+            static int cnt = 1;
+            prev_instret = prev_instret + (cnt++) + (cnt++);
+            *val = prev_instret;
+        }    
+    }
+#else
+    *val = cpu_get_host_ticks();
+#endif
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_instreth(CPURISCVState *env, int csrno,
+                                    target_ulong *val)
+{
+#if !defined(CONFIG_USER_ONLY)
+    if (icount_enabled()) {
+        if(icount_cnt_flag == 0)
+        {
+            *val = icount_get() >> 32;
+        }
+        else
+        {
+            *val = 0;
+        }
+    } else {
+        //*val = cpu_get_host_ticks() >> 32;
+        *val = 0;
+    }
+#else
+    *val = cpu_get_host_ticks() >> 32;
+#endif
+    return RISCV_EXCP_NONE;
+}
+
+#if defined(CONFIG_USER_ONLY)
+static RISCVException read_time(CPURISCVState *env, int csrno,
+                                target_ulong *val)
+{
+    *val = cpu_get_host_ticks();
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_timeh(CPURISCVState *env, int csrno,
+                                 target_ulong *val)
+{
+    *val = cpu_get_host_ticks() >> 32;
+    return RISCV_EXCP_NONE;
+}
+
+#else /* CONFIG_USER_ONLY */
+
 static RISCVException read_time(CPURISCVState *env, int csrno,
                                 target_ulong *val)
 {
@@ -1068,6 +1181,12 @@ static RISCVException read_mimpid(CPURISCVState *env, int csrno,
     RISCVCPU *cpu = RISCV_CPU(cs);
 
     *val = cpu->cfg.mimpid;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_any(CPURISCVState *env, int csrno,
+                                target_ulong val)
+{
     return RISCV_EXCP_NONE;
 }
 
@@ -1635,6 +1754,37 @@ done:
     return RISCV_EXCP_NONE;
 }
 
+static RISCVException read_mideleg(CPURISCVState *env, int csrno,
+                                   target_ulong *val)
+{
+    *val = env->mideleg;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_mideleg(CPURISCVState *env, int csrno,
+                                    target_ulong val)
+{
+    env->mideleg = (env->mideleg & ~delegable_ints) | (val & delegable_ints);
+    if (riscv_has_ext(env, RVH)) {
+        env->mideleg |= VS_MODE_INTERRUPTS;
+    }
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_mie(CPURISCVState *env, int csrno,
+                               target_ulong *val)
+{
+    *val = env->mie;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_mie(CPURISCVState *env, int csrno,
+                                target_ulong val)
+{
+    env->mie = (env->mie & ~all_ints) | (val & all_ints);
+    return RISCV_EXCP_NONE;
+}
+
 static RISCVException read_mtvec(CPURISCVState *env, int csrno,
                                  target_ulong *val)
 {
@@ -1657,6 +1807,9 @@ static RISCVException write_mtvec(CPURISCVState *env, int csrno,
 static RISCVException read_mcountinhibit(CPURISCVState *env, int csrno,
                                          target_ulong *val)
 {
+    if (env->priv_ver < PRIV_VERSION_1_11_0) {
+        return RISCV_EXCP_ILLEGAL_INST;
+    }
     *val = env->mcountinhibit;
     return RISCV_EXCP_NONE;
 }
@@ -1664,6 +1817,7 @@ static RISCVException read_mcountinhibit(CPURISCVState *env, int csrno,
 static RISCVException write_mcountinhibit(CPURISCVState *env, int csrno,
                                           target_ulong val)
 {
+    printf("write_mcountinhibit\n");
     int cidx;
     PMUCTRState *counter;
 
@@ -3486,6 +3640,562 @@ static inline RISCVException riscv_csrrw_check(CPURISCVState *env,
     return RISCV_EXCP_NONE;
 }
 
+static int read_mtvt(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mtvt;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mtvt(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mtvt = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mnxti(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mnxti;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mnxti(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mnxti = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int rmw_mnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                target_ulong new_value, target_ulong write_mask)
+{
+    env->mstatus |= (new_value & write_mask) & 0b11111;
+    if (ret_value) {
+        *ret_value = 0;
+    }
+
+    return RISCV_EXCP_NONE;
+}
+static int read_msmpcfg_info(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->msmpcfg_info;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mintstatus(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mintstatus;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mintstatus(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mintstatus = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mscratchcsw(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mscratchcsw;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mscratchcsw(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mscratchcsw = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int rmw_mscratchcsw(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                target_ulong new_value, target_ulong write_mask)
+{
+#if 0
+    target_ulong t;
+    if(get_field(env->mcause, MCAUSE_MPP)  !=  PRV_M)
+    {
+        t = new_value;
+        *ret_value = env->mscratch;
+        env->mscratch = t;
+    }else{
+        *ret_value =  new_value;
+    }
+#endif
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mscratchcswl(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mscratchcswl;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mscratchcswl(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mscratchcswl = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int rmw_mscratchcswl(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                target_ulong new_value, target_ulong write_mask)
+{
+#if 0
+    target_ulong t;
+    if( (get_field(env->mcause, MCAUSE_MPIL) == 0) 
+        != (get_field(env->mintstatus, MINTSTATUS_MIL) == 0))
+    {
+        t = new_value;
+        *ret_value = env->mscratch;
+        env->mscratch = t;
+    }else{
+        *ret_value =  new_value;
+    }
+#endif
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mnvec(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mnvec;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mnvec(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mnvec = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_msubm(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->msubm;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_msubm(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->msubm = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mdcause(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mdcause;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mdcause(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mdcause = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mcache_ctl(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mcache_ctl;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mcache_ctl(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mcache_ctl = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mmisc_ctl(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mmisc_ctl;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mmisc_ctl(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mmisc_ctl = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_msavestatus(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->msavestatus;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_msavestatus(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->msavestatus = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_msaveepc1(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->msaveepc1;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_msaveepc1(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->msaveepc1 = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_msavecause1(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->msavecause1;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_msavecause1(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->msavecause1 = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_msaveepc2(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->msaveepc2;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_msaveepc2(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->msaveepc2 = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_msavecause2(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->msavecause2;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_msavecause2(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->msavecause2 = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_msavedcause1(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->msavedcause1;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_msavedcause1(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->msavedcause1 = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_msavedcause2(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->msavedcause2;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_msavedcause2(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->msavedcause2 = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int rmw_pushmsubm(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                target_ulong new_value, target_ulong write_mask)
+{
+#if 0
+    uint64_t notify_addr = 0;
+    uint32_t riscv_addr_size = 4; 
+    if (!riscv_cpu_is_32bit(env))
+    {
+        riscv_addr_size = 8;
+    }
+
+    notify_addr = new_value * riscv_addr_size + env->gpr[2];
+
+    cpu_physical_memory_rw(notify_addr, &env->msubm,  riscv_addr_size, 1);
+#endif
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mtvt2(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    int low_bit = 0;
+    if(env->mtvt2 & 0x01)
+    {
+        low_bit = 1;
+    }
+    *val = ((env->mtvt2 & (target_ulong)(~0x3)) | low_bit);    
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mtvt2(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mtvt2 = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int rmw_jalmnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                target_ulong new_value, target_ulong write_mask)
+{
+#if 0
+    target_ulong addr;
+
+    uint32_t riscv_addr_size = 4; 
+    if (!riscv_cpu_is_32bit(env))
+    {
+        riscv_addr_size = 8;
+    }
+
+    if (env->irq_pending) {
+        uint64_t vec_addr = (env->mcause & 0x3FF) *riscv_addr_size + env->mtvt;
+        cpu_physical_memory_rw(vec_addr, &addr,  riscv_addr_size, 0);
+        env->gpr[1] = env->pc + riscv_addr_size;  //ret use
+        env->gpr[5] = env->pc + riscv_addr_size;  //link reg
+        *ret_value = addr;
+        env->mstatus = set_field(env->mstatus, MSTATUS_MIE, 1);
+        riscv_cpu_eclic_int_handler_start(env->eclic, env->mcause & 0x3ff);
+    } else
+        *ret_value = env->pc + riscv_addr_size;
+#endif
+    return RISCV_EXCP_NONE;
+}
+
+static int rmw_pushmcause(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                target_ulong new_value, target_ulong write_mask)
+{
+#if 0
+    uint64_t notify_addr = 0;
+    uint32_t riscv_addr_size = 4; 
+    if (!riscv_cpu_is_32bit(env))
+    {
+        riscv_addr_size = 8;
+    }
+    
+    notify_addr = new_value * riscv_addr_size + env->gpr[2];
+
+    cpu_physical_memory_rw(notify_addr, &env->mcause,  riscv_addr_size, 1);
+#endif
+    return RISCV_EXCP_NONE;
+}
+
+static int rmw_pushmepc(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                target_ulong new_value, target_ulong write_mask)
+{
+#if 0
+    uint64_t notify_addr = 0;
+    uint32_t riscv_addr_size = 4; 
+    if (!riscv_cpu_is_32bit(env))
+    {
+        riscv_addr_size = 8;
+    }
+
+    notify_addr = new_value * riscv_addr_size + env->gpr[2];
+    cpu_physical_memory_rw(notify_addr, &env->mepc, riscv_addr_size, 1);
+#endif
+    return RISCV_EXCP_NONE;
+}
+
+static int read_wfe(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->wfe;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_wfe(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->wfe = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_sleepvalue(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->sleepvalue;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_sleepvalue(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->sleepvalue = val;
+    riscv_cpu_eclic_int_handler_start(env->eclic, env->mcause & val);
+    return RISCV_EXCP_NONE;
+}
+
+static int read_txevt(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->txevt;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_txevt(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->txevt = val;
+    return RISCV_EXCP_NONE;
+}
+
+/* This regiser is replaced with CSR_MCOUNTINHIBIT in 1.11.0 */
+static int read_mscounteren(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    if (env->priv_ver < PRIV_VERSION_1_11_0) {
+        return -RISCV_EXCP_ILLEGAL_INST;
+    }
+    *val = env->mcounteren;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mucounteren(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mcounteren;
+    return RISCV_EXCP_NONE;
+}
+
+int icount_flag = 0;
+int first_run_flag = 0;
+static int write_mucounteren(CPURISCVState *env, int csrno, target_ulong val)
+{
+    extern int use_icount;
+    extern int icount_shift_flag;
+    val = val & 0xffffffff;
+    if(first_run_flag == 0)
+    {
+        if(use_icount)
+        {
+            icount_flag = 1;
+        }
+        first_run_flag = 1;
+    }
+
+    if(icount_flag)
+    {
+        if(val > 0)
+        {
+            if(!icount_shift_flag)
+            {
+                use_icount = 0;
+            }
+            icount_cnt_flag = 1;
+        }
+        else
+        {
+            icount_cnt_flag = 0;
+            use_icount = 1;
+        }
+    }
+
+    env->mcounteren = val;
+    return RISCV_EXCP_NONE;
+}
+
+
+/* This regiser is replaced with CSR_MCOUNTINHIBIT in 1.11.0 */
+static int write_mscounteren(CPURISCVState *env, int csrno, target_ulong val)
+{
+    if (env->priv_ver < PRIV_VERSION_1_11_0) {
+        return -RISCV_EXCP_ILLEGAL_INST;
+    }
+    env->mcounteren = val;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_vsie(CPURISCVState *env, int csrno,
+                                target_ulong *val)
+{
+    /* Shift the VS bits to their S bit location in vsie */
+    *val = (env->mie & env->hideleg & VS_MODE_INTERRUPTS) >> 1;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_sie(CPURISCVState *env, int csrno,
+                               target_ulong *val)
+{
+    if (riscv_cpu_virt_enabled(env)) {
+        read_vsie(env, CSR_VSIE, val);
+    } else {
+        *val = env->mie & env->mideleg;
+    }
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_vsie(CPURISCVState *env, int csrno,
+                                 target_ulong val)
+{
+    /* Shift the S bits to their VS bit location in mie */
+    target_ulong newval = (env->mie & ~VS_MODE_INTERRUPTS) |
+                          ((val << 1) & env->hideleg & VS_MODE_INTERRUPTS);
+    return write_mie(env, CSR_MIE, newval);
+}
+
+static int write_sie(CPURISCVState *env, int csrno, target_ulong val)
+{
+    if (riscv_cpu_virt_enabled(env)) {
+        write_vsie(env, CSR_VSIE, val);
+    } else {
+        target_ulong newval = (env->mie & ~S_MODE_INTERRUPTS) |
+                              (val & S_MODE_INTERRUPTS);
+        write_mie(env, CSR_MIE, newval);
+    }
+
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_hideleg(CPURISCVState *env, int csrno,
+                                   target_ulong *val)
+{
+    *val = env->hideleg;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_hideleg(CPURISCVState *env, int csrno,
+                                    target_ulong val)
+{
+    env->hideleg = val;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_hie(CPURISCVState *env, int csrno,
+                               target_ulong *val)
+{
+    *val = env->mie & VS_MODE_INTERRUPTS;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_hie(CPURISCVState *env, int csrno,
+                                target_ulong val)
+{
+    target_ulong newval = (env->mie & ~VS_MODE_INTERRUPTS) | (val & VS_MODE_INTERRUPTS);
+    return write_mie(env, CSR_MIE, newval);
+}
+
+/* Crypto Extension */
+static int read_sentropy(CPURISCVState *env, int csrno, target_ulong *val)
+{
+#if 0
+    *val = 0;
+    uint32_t return_status =  K_EXT_OPST_ES16;
+    *val = (*val) | return_status;
+    if(return_status == K_EXT_OPST_ES16) {
+        uint16_t random_number;
+        Error *err = NULL;
+        if (qemu_guest_getrandom(&random_number, sizeof(random_number), &err) < 0) {
+            qemu_log_mask(LOG_UNIMP, "darn: Crypto failure: %s",
+                          error_get_pretty(err));
+            error_free(err);
+            return -1;
+        }
+        *val = (*val) | random_number;
+    } else if(return_status == K_EXT_OPST_BIST) {
+        // Do nothing
+    } else if(return_status == K_EXT_OPST_WAIT) {
+        // Do nothing
+    } else if(return_status == K_EXT_OPST_DEAD) {
+        // Do nothing
+    }
+#endif
+    return 0;
+}
+
+static RISCVException write_sentropy(CPURISCVState *env, int csrno,
+                                    target_ulong val)
+{
+    return RISCV_EXCP_NONE;
+}
+#endif
+
 static RISCVException riscv_csrrw_do64(CPURISCVState *env, int csrno,
                                        target_ulong *ret_value,
                                        target_ulong new_value,
@@ -3655,12 +4365,75 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
                        .min_priv_ver = PRIV_VERSION_1_12_0            },
     [CSR_VLENB]    = { "vlenb",    vs,     read_vlenb,
                        .min_priv_ver = PRIV_VERSION_1_12_0            },
+    /* nuclei custom tee csr */
+    [CSR_SPMPCFG0]    = { "spmpcfg0",    any,   read_zero, write_any},
+    [CSR_SPMPCFG1]    = { "spmpcfg1",    any,   read_zero, write_any},
+    [CSR_SPMPCFG2]    = { "spmpcfg2",    any,   read_zero, write_any},
+    [CSR_SPMPCFG3]    = { "spmpcfg3",    any,   read_zero, write_any},
+
+    [CSR_SPMPADDR0]    = { "spmpaddr0",    any,   read_zero, write_any},
+    [CSR_SPMPADDR1]    = { "spmpaddr1",    any,   read_zero, write_any},
+    [CSR_SPMPADDR2]    = { "spmpaddr2",    any,   read_zero, write_any},
+    [CSR_SPMPADDR3]    = { "spmpaddr3",    any,   read_zero, write_any},
+    [CSR_SPMPADDR4]    = { "spmpaddr4",    any,   read_zero, write_any},
+    [CSR_SPMPADDR5]    = { "spmpaddr5",    any,   read_zero, write_any},
+    [CSR_SPMPADDR6]    = { "spmpaddr6",    any,   read_zero, write_any},
+    [CSR_SPMPADDR7]    = { "spmpaddr7",    any,   read_zero, write_any},
+    [CSR_SPMPADDR8]    = { "spmpaddr8",    any,   read_zero, write_any},
+    [CSR_SPMPADDR9]    = { "spmpaddr9",    any,   read_zero, write_any},
+    [CSR_SPMPADDR10]    = { "spmpaddr10",    any,   read_zero, write_any},
+    [CSR_SPMPADDR11]    = { "spmpaddr11",    any,   read_zero, write_any},
+    [CSR_SPMPADDR12]    = { "spmpaddr12",    any,   read_zero, write_any},
+    [CSR_SPMPADDR13]    = { "spmpaddr13",    any,   read_zero, write_any},
+    [CSR_SPMPADDR14]    = { "spmpaddr14",    any,   read_zero, write_any},
+    [CSR_SPMPADDR15]    = { "spmpaddr15",    any,   read_zero, write_any},
+
+    [CSR_JALSNXTI]      = { "jalsnxti",      any,   read_zero, write_any},
+    [CSR_STVT2]         = { "stvt2",         any,   read_zero, write_any},
+    [CSR_PUSHSCAUSE]    = { "pushscause",    any,   read_zero, write_any},
+    [CSR_PUSHSEPC]      = { "pushsepc",      any,   read_zero, write_any},
+
     /* User Timers and Counters */
     [CSR_CYCLE]    = { "cycle",    ctr,    read_hpmcounter  },
     [CSR_INSTRET]  = { "instret",  ctr,    read_hpmcounter  },
     [CSR_CYCLEH]   = { "cycleh",   ctr32,  read_hpmcounterh },
     [CSR_INSTRETH] = { "instreth", ctr32,  read_hpmcounterh },
 
+    /* P-Extension Registers */
+    [CSR_UCODE]    = { "ucode",    any,    read_zero, write_any},
+    /* === Nuclei custom CSR Registers === */
+    [CSR_MILM_CTL]    = { "milm_ctl",     any,    read_zero, write_any},
+    [CSR_MDLM_CTL]    = { "mdlm_ctl",     any,    read_zero, write_any},
+    [CSR_MECC_CODE]   = { "mecc_code",    any,    read_zero, write_any},
+    [CSR_MTLB_CTL]    = { "mtlb_ctl",     any,    read_zero, write_any},
+    [CSR_MECC_LOCK]   = { "mecc_lock",    any,    read_zero, write_any},
+    [CSR_MFP16MODE]   = { "mfp16mode",    any,    read_zero, write_any},
+    [CSR_LSTEPFORC]   = { "lstepforc",    any,    read_zero, write_any},
+    [CSR_MPPICFG_INFO]   = { "mppicfg_info",    any,    read_zero, write_any},
+    [CSR_MFIOCFG_INFO]   = { "mfiocfg_info",    any,    read_zero, write_any},
+    [CSR_MSMPCFG_INFO]   = { "msmpcfg_info",    any,    read_msmpcfg_info, write_any},
+    [CSR_MICFG_INFO]     = { "micfg_info",      any,    read_zero, write_any},
+    [CSR_MDCFG_INFO]     = { "mdcfg_info",      any,    read_zero, write_any},
+    [CSR_MCFG_INFO]      = { "mcfg_info",       any,    read_zero, write_any},
+    [CSR_MTLBCFG_INFO]      = { "mtlbcfg_info", any,    read_zero, write_any},
+
+    /* === Nuclei CCM Registers === */
+    [CSR_CCM_MBEGINADDR]      = { "ccm_mbeginaddr", any,    read_zero, write_any},
+    [CSR_CCM_MCOMMAND]        = { "ccm_mcommand",   any,    read_zero, write_any},
+    [CSR_CCM_MDATA]           = { "ccm_mdata",      any,    read_zero, write_any},
+    [CSR_CCM_SUEN]            = { "ccm_suen",       any,    read_zero, write_any},
+    [CSR_CCM_SBEGINADDR]      = { "ccm_sbeginaddr", any,    read_zero, write_any},
+    [CSR_CCM_SCOMMAND]        = { "ccm_scommand",   any,    read_zero, write_any},
+    [CSR_CCM_SDATA]           = { "ccm_sdata",      any,    read_zero, write_any},
+    [CSR_CCM_UBEGINADDR]      = { "ccm_ubeginaddr", any,    read_zero, write_any},
+    [CSR_CCM_UCOMMAND]        = { "ccm_ucommand",   any,    read_zero, write_any},
+    [CSR_CCM_UDATA]           = { "ccm_udata",      any,    read_zero, write_any},
+    [CSR_CCM_FPIPE]           = { "ccm_fpipe",      any,    read_zero, write_any},
+
+    [CSR_MDEVB]           = { "mdevb",      any,    read_zero, write_any},
+    [CSR_MDEVM]           = { "mdevm",      any,    read_zero, write_any},
+    [CSR_MNOCB]           = { "mnocb",      any,    read_zero, write_any},
+    [CSR_MNOCM]           = { "mnocm",      any,    read_zero, write_any},
     /*
      * In privileged mode, the monitor will have to emulate TIME CSRs only if
      * rdtime callback is not provided by machine/platform emulation.
@@ -3704,6 +4477,35 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
 
     [CSR_MSTATUSH]    = { "mstatush",   any32, read_mstatush,
                           write_mstatush                                   },
+    [CSR_MTVT] =                { "mtvt", any,  read_mtvt,        write_mtvt        },
+    [CSR_MNXTI] =               { "mnxti", any,  read_mnxti,       write_mnxti, rmw_mnxti},
+    [CSR_MINTSTATUS] =          {"mintstatus", any,  read_mintstatus,  write_mintstatus  },
+    [CSR_MSCRATCHCSW] =         {"mscratchcsw", any,  read_mscratchcsw, write_mscratchcsw, rmw_mscratchcsw},
+    [CSR_MSCRATCHCSWL] =        { "mscratchcswl", any,  read_mscratchcswl, write_mscratchcswl,  rmw_mscratchcswl},
+    [CSR_MCLICBASE] =           { "mclicbase", any,  read_zero},
+    [CSR_MNVEC] =               { "mnvec", any,  read_mnvec,       write_mnvec       },
+    [CSR_MSUBM] =               { "msubm", any,  read_msubm,       write_msubm       },
+    [CSR_MDCAUSE] =             { "mdcause", any,  read_mdcause,     write_mdcause     },
+    [CSR_MCACHE_CTL] =          {"mcache_ctl", any,  read_mcache_ctl,  write_mcache_ctl  },
+    [CSR_MMISC_CTL] =           { "mmisc_ctl", any,  read_mmisc_ctl,   write_mmisc_ctl   },
+    [CSR_MSAVESTATUS] =         { "msavestatus", any,  read_msavestatus, write_msavestatus },
+    [CSR_MSAVEEPC1] =           { "msaveepc1", any,  read_msaveepc1,   write_msaveepc1   },
+    [CSR_MSAVECAUSE1] =         { "msavecause1", any,  read_msavecause1, write_msavecause1 },
+    [CSR_MSAVEEPC2] =           { "msaveepc2", any,  read_msaveepc2,   write_msaveepc2   },
+    [CSR_MSAVECAUSE2] =         { "msavecause2", any,  read_msavecause2, write_msavecause2 },
+    [CSR_MSAVEDCAUSE1] =        { "msavedcause1", any,  read_msavedcause1, write_msavedcause1 },
+    [CSR_MSAVEDCAUSE2] =        { "msavedcause2", any,  read_msavedcause2, write_msavedcause2 },
+    [CSR_PUSHMSUBM] =           { "pushmsubm", any,  NULL,   NULL, rmw_pushmsubm },
+    [CSR_MTVT2] =               { "mtvt2", any,  read_mtvt2,       write_mtvt2       },
+    [CSR_JALMNXTI] =            { "jalmnxti", any,  NULL,    NULL,  rmw_jalmnxti },
+    [CSR_PUSHMCAUSE] =          { "pushmcause", any,  NULL,  NULL , rmw_pushmcause },
+    [CSR_PUSHMEPC] =            { "pushmepc", any,  NULL,    NULL,  rmw_pushmepc },
+    [CSR_WFE] =                 { "wfe", any,  read_wfe,         write_wfe         },
+    [CSR_SLEEPVALUE] =          { "sleepvalue", any,  read_sleepvalue,  write_sleepvalue  },
+    [CSR_TXEVT] =               { "txevt", any,  read_txevt,       write_txevt       },
+
+    [CSR_MUCOUNTEREN] =         { "mucounteren", any,  read_mucounteren, write_mucounteren },
+    [CSR_MSCOUNTEREN] = { "msounteren", any,   read_mscounteren, write_mscounteren },
 
     /* Machine Trap Handling */
     [CSR_MSCRATCH] = { "mscratch", any,  read_mscratch, write_mscratch,

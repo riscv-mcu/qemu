@@ -102,3 +102,10 @@ config LOONGARCH_PCH_MSI
 
 config LOONGARCH_EXTIOI
     bool
+
+config NUCLEI_ECLIC
+    bool
+
+config NUCLEI_SYSTIMER
+    bool
+

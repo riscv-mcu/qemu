@@ -85,3 +85,23 @@ config SPIKE
     select MSI_NONBROKEN
     select RISCV_ACLINT
     select SIFIVE_PLIC
+    
+config NUCLEI_N
+    bool
+    select MSI_NONBROKEN
+    select NUCLEI_RCU
+    select NUCLEI_SYSTIMER
+    select NUCLEI_ECLIC
+    select SIFIVE_GPIO
+    select NUCLEI_UART
+    select UNIMP
+    
+config NUCLEI_U
+    bool
+    select MSI_NONBROKEN
+    select NUCLEI_SYSTIMER
+    select SIFIVE_GPIO
+    select SIFIVE_PLIC
+    select SIFIVE_UART
+    select SIFIVE_SPI
+    select SSI_M25P80
