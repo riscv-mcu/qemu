@@ -299,6 +299,10 @@
 #define CSR_MENVCFG         0x30A
 #define CSR_MENVCFGH        0x31A
 
+/* Common defines for all smstateen */
+#define SMSTATEEN_MAX_COUNT 4
+#define SMSTATEEN0_JVT      (1ULL << 2)
+
 /* Enhanced Physical Memory Protection (ePMP) */
 #define CSR_MSECCFG         0x747
 #define CSR_MSECCFGH        0x757
@@ -592,6 +596,9 @@
 
 /* Crypto Extension */
 #define CSR_SEED            0x015
+
+/* Zcmt Extension */
+#define CSR_JVT             0x017
 
 /* mstatus CSR bits */
 #define MSTATUS_UIE         0x00000001
@@ -991,4 +998,7 @@ typedef enum RISCVException {
 #define MHPMEVENT_IDX_MASK                 0xFFFFF
 #define MHPMEVENT_SSCOF_RESVD              16
 
+/* JVT CSR bits */
+#define JVT_MODE                           0x3F
+#define JVT_BASE                           (~0x3F)
 #endif
