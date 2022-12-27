@@ -675,9 +675,9 @@ GEN_RVP_R_ACC_OOL(kmsda);
 GEN_RVP_R_ACC_OOL(kmsxda);
 
 static inline bool r_acc_ool_d(DisasContext *ctx, arg_r *a,
-                             void (* fn)(TCGv, TCGv_ptr, TCGv, TCGv, TCGv))
+                             void (* fn)(TCGv_i64, TCGv_ptr, TCGv_i64, TCGv_i64, TCGv_i64))
 {
-    TCGv src1, src2, src3, dst;
+    TCGv_i64 src1, src2, src3, dst;
     REQUIRE_P(ctx);
 
     src1 = tcg_temp_new_i64();
@@ -694,8 +694,8 @@ static inline bool r_acc_ool_d(DisasContext *ctx, arg_r *a,
     t1 = get_gpr(ctx, a->rs2 + 1, EXT_ZERO);
     tcg_gen_concat_tl_i64(src2, t0, t1);
 
-    t0 = get_gpr(ctx, a->rd, EXT_ZERO);
-    t1 = get_gpr(ctx, a->rd + 1, EXT_ZERO);
+    t0 = dest_gpr(ctx, a->rd);
+    t1 = dest_gpr(ctx, a->rd + 1);
     tcg_gen_concat_tl_i64(src3, t0, t1);
     fn(dst, cpu_env, src1, src2, src3);
     set_pair_regs(ctx, dst, a->rd);
