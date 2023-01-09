@@ -105,3 +105,30 @@ config NUCLEI_U
     select SIFIVE_UART
     select SIFIVE_SPI
     select SSI_M25P80
+
+config NUCLEI_DEMOSOC
+    bool
+    select MSI_NONBROKEN
+    select RISCV_ACLINT
+    select SIFIVE_GPIO
+    select SIFIVE_PLIC
+    select SIFIVE_UART
+    select SIFIVE_E_PRCI
+    select UNIMP
+
+config NUCLEI_EVALSOC
+    bool
+    select CADENCE
+    select MSI_NONBROKEN
+    select RISCV_ACLINT
+    select SIFIVE_GPIO
+    select SIFIVE_PDMA
+    select SIFIVE_PLIC
+    select SIFIVE_SPI
+    select SIFIVE_UART
+    select SIFIVE_U_OTP
+    select SIFIVE_U_PRCI
+    select SIFIVE_PWM
+    select SSI_M25P80
+    select SSI_SD
+    select UNIMP
