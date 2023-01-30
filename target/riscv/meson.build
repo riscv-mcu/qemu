@@ -4,6 +4,7 @@ gen = [
   decodetree.process('insn32.decode', extra_args: '--static-decode=decode_insn32'),
   decodetree.process('XVentanaCondOps.decode', extra_args: '--static-decode=decode_XVentanaCodeOps'),
   decodetree.process('NucleiCustom.decode', extra_args: '--static-decode=decode_NucleiCustom'),
+  decodetree.process('Xxlcz.decode', extra_args: '--static-decode=decode_Xxlcz'),
 ]
 
 riscv_ss = ss.source_set()
@@ -21,7 +22,8 @@ riscv_ss.add(files(
   'translate.c',
   'm128_helper.c',
   'crypto_helper.c',
-  'zce_helper.c'
+  'zce_helper.c',
+  'xxlcz_helper.c'
 ))
 riscv_ss.add(when: 'CONFIG_KVM', if_true: files('kvm.c'), if_false: files('kvm-stub.c'))
 
