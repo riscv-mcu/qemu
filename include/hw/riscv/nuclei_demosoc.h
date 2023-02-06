@@ -46,7 +46,6 @@
 #include "hw/dma/sifive_pdma.h"
 
 #define DEMOSOC_CLIC_INTCTLBITS 3
-//#define NUCLEI_U_ECLIC_INTCTLBITS 3
 
 #define TYPE_DEMOSOC_SOC "riscv.demosoc.soc"
 //#define TYPE_NUCLEI_SYSTIMER "riscv.nuclei.systimer"

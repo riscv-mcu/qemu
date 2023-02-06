@@ -212,6 +212,9 @@
 #define CSR_SCAUSE          0x142
 #define CSR_STVAL           0x143
 #define CSR_SIP             0x144
+#define CSR_SNXTI           0x145 /* clic-spec-draft */
+#define CSR_SINTSTATUS      0x146 /* clic-spec-draft */
+#define CSR_SINTTHRESH      0x147 /* clic-spec-draft */
 
 /* Sstc supervisor CSRs */
 #define CSR_STIMECMP        0x14D
@@ -442,6 +445,10 @@
 #define CSR_NUCLEI_MINTSTATUS          0x346
 #define CSR_NUCLEI_MSCRATCHCSW         0x348
 #define CSR_NUCLEI_MSCRATCHCSWL        0x349
+
+#define CSR_MINTSTATUS          0x346
+#define CSR_MINTTHRESH          0x347 /* clic-spec-draft */
+#define CSR_STVT                0x107 /* clic-spec-draft */
 
 /* === P-Extension Registers === */
 #define CSR_NUCLEI_UCODE               0x801
@@ -927,14 +934,6 @@ typedef enum RISCVException {
 #define SCAUSE_SPIE                        0x08000000 /* spie */
 #define SCAUSE_SPIL                        0x00ff0000 /* spil[7:0] */
 #define SCAUSE_EXCCODE                     0x00000fff /* exccode[11:0] */
-
-/* MIE masks */
-#define MIE_SEIE                           (1 << IRQ_S_EXT)
-#define MIE_UEIE                           (1 << IRQ_U_EXT)
-#define MIE_STIE                           (1 << IRQ_S_TIMER)
-#define MIE_UTIE                           (1 << IRQ_U_TIMER)
-#define MIE_SSIE                           (1 << IRQ_S_SOFT)
-#define MIE_USIE                           (1 << IRQ_U_SOFT)
 
 /* MIE masks */
 #define MIE_SEIE                           (1 << IRQ_S_EXT)

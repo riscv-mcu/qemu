@@ -34,10 +34,11 @@
 
 int hart_numbers = 0;
 
-static uint64_t cpu_riscv_read_rtc(void *opaque)
+static uint64_t nuclei_cpu_riscv_read_rtc(void *opaque)
 {
     
     uint64_t timebase_freq = *(uint64_t*)opaque;
+    //printf("timebase_freq is %08x\n", (int)timebase_freq);
     return muldiv64(qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL),
         timebase_freq, NANOSECONDS_PER_SECOND);
 }
@@ -83,7 +84,9 @@ static void sifive_clint_write_timecmp(RISCVCPU *cpu, uint64_t value,
     uint64_t next;
     uint64_t diff;
 
-    uint64_t rtc_r = cpu_riscv_read_rtc(&timebase_freq);
+    uint64_t w_timebase_freq = timebase_freq;
+
+    uint64_t rtc_r = nuclei_cpu_riscv_read_rtc(&w_timebase_freq);
 
     cpu->env.timecmp = value;
     if (cpu->env.timecmp <= rtc_r) {
@@ -155,11 +158,11 @@ static uint64_t nuclei_clint_read(void *opaque, hwaddr addr, unsigned size)
     } else if (addr == clint->time_base) {
         /* time_lo */
         timebase_f = clint->timebase_freq;
-        return cpu_riscv_read_rtc(&timebase_f) & 0xFFFFFFFF;
+        return nuclei_cpu_riscv_read_rtc(&timebase_f) & 0xFFFFFFFF;
     } else if (addr == clint->time_base + 4) {
         /* time_hi */
-        timebase_f = (clint->timebase_freq) >> 32;
-        return (cpu_riscv_read_rtc(&(timebase_f))) & 0xFFFFFFFF;
+        timebase_f = (clint->timebase_freq);
+        return (nuclei_cpu_riscv_read_rtc(&(timebase_f))>> 32) & 0xFFFFFFFF;
     }
 
     error_report("clint: invalid read: %08x", (uint32_t)addr);
@@ -266,7 +269,7 @@ static uint64_t nuclei_timer_read(void *opaque, hwaddr offset,
         else
         {
             timebase_f = s->timebase_freq;
-            value = cpu_riscv_read_rtc(&timebase_f);
+            value = nuclei_cpu_riscv_read_rtc(&timebase_f);
             s->mtime_lo = value & 0xffffffff;
             s->mtime_hi = (value >> 32) & 0xffffffff;
             value = s->mtime_lo;
@@ -479,7 +482,7 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_ba
             if (!env) {
                 continue;
             }
-            riscv_cpu_set_rdtime_fn(env, cpu_riscv_read_rtc, &(s->timebase_freq));
+            riscv_cpu_set_rdtime_fn(env, nuclei_cpu_riscv_read_rtc, &(s->timebase_freq));
             env->timer = timer_new_ns(QEMU_CLOCK_VIRTUAL,
                                     &sifive_clint_timer_cb, cpu);
             env->timecmp = 0;

@@ -74,6 +74,9 @@ config RISCV_APLIC
     bool
     select MSI_NONBROKEN
 
+config RISCV_CLIC
+    bool
+
 config RISCV_IMSIC
     bool
     select MSI_NONBROKEN

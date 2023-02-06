@@ -149,7 +149,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
 
     if (ms->dtb)
     {
-        fdt = s->fdt = load_device_tree(ms->dtb, &s->fdt_size);
+        fdt = ms->fdt = s->fdt = load_device_tree(ms->dtb, &s->fdt_size);
         if (!fdt)
         {
             error_report("load_device_tree() failed");
@@ -159,7 +159,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     }
     else
     {
-        fdt = s->fdt = create_device_tree(&s->fdt_size);
+        fdt = ms->fdt = s->fdt = create_device_tree(&s->fdt_size);
         if (!fdt)
         {
             error_report("create_device_tree() failed");
@@ -508,8 +508,16 @@ static void evalsoc_machine_init(MachineState *machine)
         s->soc.cpus.harts[i].env.mcfg_info = 1 << 16;
         s->soc.cpus.harts[i].env.mirgb_info = (IREGION_BASE & ~(1<<10)) | 0xF;;
     }
-    /* create device tree */
-    create_fdt(s, memmap, machine->ram_size, machine->kernel_cmdline);
+    /* load/create device tree */
+    if (machine->dtb) {
+        machine->fdt = load_device_tree(machine->dtb, &s->fdt_size);
+        if (!machine->fdt) {
+            error_report("load_device_tree() failed");
+            exit(1);
+        }
+    } else {
+        create_fdt(s, memmap, machine->ram_size, machine->kernel_cmdline);
+    }
 
     if (s->download == NULL) {
         start_addr = memmap[EVALSOC_XIP].base;
@@ -790,7 +798,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                         serial_hd(1), qdev_get_gpio_in(DEVICE(s->plic), EVALSOC_UART1_IRQ));
 
         nuclei_systimer_create(memmap[EVALSOC_TIMER].base,
-                memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, s->eclic, EVALSOC_TIMEBASE_FREQ);
+                memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, NULL, EVALSOC_TIMEBASE_FREQ);
     }
 
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->timer), errp))

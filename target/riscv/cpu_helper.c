@@ -32,6 +32,10 @@
 #include "debug.h"
 #include "hw/intc/nuclei_eclic.h"
 
+#if !defined(CONFIG_USER_ONLY)
+#include "hw/intc/riscv_clic.h"
+#endif
+
 int riscv_cpu_mmu_index(CPURISCVState *env, bool ifetch)
 {
 #ifdef CONFIG_USER_ONLY
@@ -1638,7 +1642,7 @@ static target_ulong riscv_intr_pc(CPURISCVState *env, target_ulong tvec,
                                   int cause, int mode)
 {
     int mode1 = tvec & 0b11, mode2 = tvec & 0b111111;
-    //CPUState *cs = env_cpu(env);
+    CPUState *cs = env_cpu(env);
 
     if (!(async || clic)) {
         return tvec & ~0b11;
@@ -1652,12 +1656,11 @@ static target_ulong riscv_intr_pc(CPURISCVState *env, target_ulong tvec,
     default:
         if (env->clic && (mode2 == 0b000011)) {
             /* Non-vectored, clicintattr[i].shv = 0 || cliccfg.nvbits = 0 */
-            // if (!riscv_clic_shv_interrupt(env->clic, mode, cs->cpu_index,
-            //                               cause)) {
-            //     /* NBASE = mtvec[XLEN-1:6]<<6 */
-            //     return tvec & ~0b111111;
-            // } else {
-            {
+            if (!riscv_clic_shv_interrupt(env->clic, mode, cs->cpu_index,
+                                          cause)) {
+                /* NBASE = mtvec[XLEN-1:6]<<6 */
+                return tvec & ~0b111111;
+            } else {
                 /*
                  * pc := M[TBASE + XLEN/8 * exccode)] & ~1,
                  * TBASE = mtvt[XLEN-1:6]<<6
@@ -1862,6 +1865,37 @@ void riscv_cpu_do_interrupt(CPUState *cs)
 
         riscv_cpu_set_mode(env, PRV_S);
     } else {
+
+        /* handle the trap in M-mode */
+         if(eclic_flag) {
+            uint32_t riscv_addr_size = 4; 
+            // if (!riscv_cpu_is_32bit(env))
+            // {
+            //     riscv_addr_size = 8;
+            // }
+             if (riscv_cpu_mxl(env) == MXL_RV64)
+             {
+                riscv_addr_size = 8;
+             }
+
+            if(mode)
+            {
+                uint64_t vec_addr = (cause & 0x3FF) *riscv_addr_size + env->mtvt;
+                cpu_physical_memory_rw(vec_addr, &newpc,  riscv_addr_size, 0);
+            }else{
+                if ((env->mtvt2 & 0x1) == 0) {
+                    newpc = env->mtvec & 0xfffffffc;
+                } else if ((env->mtvt2 & 0x1) == 1) {
+                    newpc = env->mtvt2 & 0xfffffffc;
+                }
+            }
+
+        } else {
+            newpc = (env->mtvec >> 2 << 2) +
+                ((async && (env->mtvec & 3) == 1) ? cause * 4 : 0);
+        }
+
+
         /* handle the trap in M-mode */
         if(eclic_flag) {
             uint32_t riscv_addr_size = 4; 
