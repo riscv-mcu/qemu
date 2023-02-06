@@ -174,9 +174,12 @@ static void riscv_nuclei_n_soc_realize(DeviceState *dev, Error **errp)
         memmap[NUCLEI_N_DEV_ROM].base, &s->internal_rom);
 
     /* MMIO */
-    s->eclic = nuclei_eclic_create(memmap[NUCLEI_N_DEV_ECLIC].base,
-        memmap[NUCLEI_N_DEV_ECLIC].size, NUCLEI_N_INT_MAX);
-
+    s->eclic = nuclei_eclic_create(memmap[NUCLEI_N_DEV_ECLIC].base, 
+                                    memmap[NUCLEI_N_DEV_ECLIC].size, 
+                                    false, false, true,
+                                    ms->smp.cpus,
+                                    NUCLEI_N_INT_MAX,
+                                    NUCLEI_N_ECLIC_INTCTLBITS);
     s->timer = nuclei_systimer_create(memmap[NUCLEI_N_DEV_TIMER].base,
                 memmap[NUCLEI_N_DEV_TIMER].size, 0, ms->smp.cpus,
                  s->eclic,

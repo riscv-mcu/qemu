@@ -106,6 +106,15 @@ static uint64_t nuclei_eclic_read(void *opaque, hwaddr offset, unsigned size)
     return value;
 }
 
+//eclic
+
+// 0x0000 cliccfg   全局配置寄存器， [4:1] 指定 clicintctl[i]的Level参数
+// 0x0004 clicinfo
+// 0x000b mth       设置中断的阈值
+// 0x1000+4*i clicintip[i] 中断源的等待标志寄存器 IP 0：等待标志
+// 0x1001+4*i clicintie[i] 中断源的使能寄存器 IE 0: 使能标志
+// 0x1002+4*i clicintattr[i] 中断源的属性寄存器 [2:1] trig 中断边沿寄存器  0 shv 向量模式与非向量模式
+// 0x1003+4*i clicintctl[i]  中断源控制寄存器 
 static void nuclei_eclic_write(void *opaque, hwaddr offset, uint64_t value,
                                unsigned size)
 {
@@ -113,7 +122,6 @@ static void nuclei_eclic_write(void *opaque, hwaddr offset, uint64_t value,
     uint32_t id = 0;
     if (offset >= NUCLEI_ECLIC_REG_CLICINTIP_BASE)
     {
-
         if ((offset - 0x1000) % 4 == 0)
         {
             id = (offset - 0x1000) / 4;
@@ -130,6 +138,7 @@ static void nuclei_eclic_write(void *opaque, hwaddr offset, uint64_t value,
         {
             id = (offset - 0x1003) / 4;
         }
+        //返回寄存器列表
         offset = offset - 4 * id;
     }
     switch (offset)
@@ -185,8 +194,15 @@ static const MemoryRegionOps nuclei_eclic_ops = {
 };
 
 static Property nuclei_eclic_properties[] = {
+    DEFINE_PROP_BOOL("prv-s", NucLeiECLICState, prv_s, false),
+    DEFINE_PROP_BOOL("prv-u", NucLeiECLICState, prv_u, false),
+    DEFINE_PROP_BOOL("vector", NucLeiECLICState, nvbits, false),
+    DEFINE_PROP_UINT32("num-harts", NucLeiECLICState, num_harts, 0),
+    //DEFINE_PROP_UINT32("num-sources", NucLeiECLICState, num_sources, 0),
+    DEFINE_PROP_UINT32("eclicintctlbits", NucLeiECLICState, eclicintctlbits, 0),
     DEFINE_PROP_UINT32("aperture-size", NucLeiECLICState, aperture_size, 0),
     DEFINE_PROP_UINT32("num-sources", NucLeiECLICState, num_sources, 0),
+    DEFINE_PROP_UINT64("mclicbase", NucLeiECLICState, mclicbase, 0),
     DEFINE_PROP_END_OF_LIST(),
 };
 
@@ -223,14 +239,15 @@ static void nuclei_eclic_next_interrupt(void *eclic_ptr)
     NucLeiECLICState *eclic = (NucLeiECLICState *)eclic_ptr;
     ECLICPendingInterrupt *active;
     int shv;
+    int mode = PRV_M;
 
     QLIST_FOREACH(active, &eclic->pending_list, next)
     {
         if (active->enable)
         {
             if (active->level >= eclic->mth)
-            {
-
+            {                  
+                eclic->exccode[0] = active->irq | mode << 12 | active->level << 14; 
                 shv = eclic->clicintattr[active->irq] & 0x1;
                 eclic->active_count++;
                 riscv_cpu_eclic_interrupt(cpu, (active->irq & 0xFFF) | (shv << 12) | (active->level << 13));
@@ -388,18 +405,30 @@ static void nuclei_eclic_update_intctl(NucLeiECLICState *eclic, int irq, int new
 static void nuclei_eclic_realize(DeviceState *dev, Error **errp)
 {
     NucLeiECLICState *eclic = NUCLEI_ECLIC(dev);
+
+    size_t harts_x_sources = eclic->num_harts * eclic->num_sources;
     int id;
+    int irqs, i;
+  
+    if (eclic->prv_s && eclic->prv_u) {
+        irqs = 3 * harts_x_sources;
+    } else if (eclic->prv_s || eclic->prv_u) {
+        irqs = 2 * harts_x_sources;
+    } else {
+        irqs = harts_x_sources;
+    }
 
     memory_region_init_io(&eclic->mmio, OBJECT(dev), &nuclei_eclic_ops, eclic,
                           TYPE_NUCLEI_ECLIC, eclic->aperture_size);
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &eclic->mmio);
 
-    eclic->clicintip = g_new0(uint8_t, eclic->num_sources);
-    eclic->clicintlist = g_new0(ECLICPendingInterrupt, eclic->num_sources);
-    eclic->clicintie = g_new0(uint8_t, eclic->num_sources);
-    eclic->clicintattr = g_new0(uint8_t, eclic->num_sources);
-    eclic->clicintctl = g_new0(uint8_t, eclic->num_sources);
-    eclic->irqs = g_new0(qemu_irq, eclic->num_sources);
+    eclic->clicintip = g_new0(uint8_t, irqs);
+    eclic->clicintlist = g_new0(ECLICPendingInterrupt, irqs);
+    eclic->clicintie = g_new0(uint8_t, irqs);
+    eclic->clicintattr = g_new0(uint8_t, irqs);
+    eclic->clicintctl = g_new0(uint8_t, irqs);
+    eclic->irqs = g_new0(qemu_irq, irqs);
+    eclic->exccode = g_new0(uint32_t, eclic->num_harts);
     QLIST_INIT(&eclic->pending_list);
     for (id = 0; id < eclic->num_sources; id++)
     {
@@ -432,6 +461,7 @@ static void nuclei_eclic_class_init(ObjectClass *klass, void *data)
 
     device_class_set_props(dc, nuclei_eclic_properties);
     dc->realize = nuclei_eclic_realize;
+    dc->desc = "nuclei type: eclic";
 }
 
 static const TypeInfo nuclei_eclic_info = {
@@ -461,13 +491,26 @@ void nuclei_eclic_systimer_cb(DeviceState *dev)
     nuclei_eclic_irq_request(eclic, Internal_SysTimer_IRQn, 1);
 }
 
-DeviceState *nuclei_eclic_create(hwaddr addr, uint32_t aperture_size, uint32_t num_sources)
+DeviceState *nuclei_eclic_create(hwaddr addr, uint32_t aperture_size, bool prv_s, bool prv_u,bool vector,
+                               uint32_t num_harts, uint32_t num_sources,
+                               uint8_t clicintctlbits)
 {
     DeviceState *dev = qdev_new(TYPE_NUCLEI_ECLIC);
-    qdev_prop_set_uint32(dev, "aperture-size", aperture_size);
+
+    assert(num_sources <= 4096);
+    assert(num_harts <= 1024);
+    assert(clicintctlbits <= 8);
+
+    qdev_prop_set_bit(dev, "prv-s", prv_s);
+    qdev_prop_set_bit(dev, "prv-u", prv_u);
+    qdev_prop_set_bit(dev, "vector", vector);
+    qdev_prop_set_uint32(dev, "num-harts", num_harts);
     qdev_prop_set_uint32(dev, "num-sources", num_sources);
+    qdev_prop_set_uint32(dev, "eclicintctlbits", clicintctlbits);
+    qdev_prop_set_uint64(dev, "mclicbase", addr);
+    qdev_prop_set_uint32(dev, "aperture-size", aperture_size);
+
     sysbus_realize_and_unref(SYS_BUS_DEVICE(dev), &error_fatal);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, addr);
-
     return dev;
 }

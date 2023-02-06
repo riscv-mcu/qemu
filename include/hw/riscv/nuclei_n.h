@@ -27,6 +27,8 @@
 #include "hw/intc/nuclei_eclic.h"
 #include "hw/sysbus.h"
 
+#define NUCLEI_N_ECLIC_INTCTLBITS 3
+
 #define TYPE_NUCLEI_N_SOC "riscv.nuclei.n.soc"
 #define RISCV_NUCLEI_N_SOC(obj) \
     OBJECT_CHECK(NucleiNSoCState, (obj), TYPE_NUCLEI_N_SOC)

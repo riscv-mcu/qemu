@@ -210,6 +210,9 @@
 #define CSR_SCAUSE          0x142
 #define CSR_STVAL           0x143
 #define CSR_SIP             0x144
+#define CSR_SNXTI           0x145 /* clic-spec-draft */
+#define CSR_SINTSTATUS      0x146 /* clic-spec-draft */
+#define CSR_SINTTHRESH      0x147 /* clic-spec-draft */
 
 /* Sstc supervisor CSRs */
 #define CSR_STIMECMP        0x14D
@@ -364,9 +367,12 @@
 #define CSR_MTVT                0x307
 #define CSR_MNXTI               0x345
 #define CSR_MINTSTATUS          0x346
+#define CSR_MINTTHRESH          0x347 /* clic-spec-draft */
 #define CSR_MSCRATCHCSW         0x348
 #define CSR_MSCRATCHCSWL        0x349
 #define CSR_MCLICBASE           0x350
+
+#define CSR_STVT                0x107 /* clic-spec-draft */
 
 /* === P-Extension Registers === */
 #define CSR_UCODE               0x801
@@ -743,6 +749,7 @@ typedef enum RISCVException {
     RISCV_EXCP_STORE_GUEST_AMO_ACCESS_FAULT = 0x17,
 } RISCVException;
 
+#define RISCV_EXCP_INT_CLIC                0x40000000
 #define RISCV_EXCP_INT_ECLIC               0x40000000
 #define RISCV_EXCP_INT_FLAG                0x80000000
 #define RISCV_EXCP_INT_MASK                0x7fffffff
@@ -786,6 +793,29 @@ typedef enum RISCVException {
 #define SIP_STIP                           MIP_STIP
 #define SIP_SEIP                           MIP_SEIP
 #define SIP_LCOFIP                         MIP_LCOFIP
+
+/* mintstatus */
+#define MINTSTATUS_MIL                     0xff000000 /* mil[7:0] */
+#define MINTSTATUS_SIL                     0x0000ff00 /* sil[7:0] */
+#define MINTSTATUS_UIL                     0x000000ff /* uil[7:0] */
+
+/* mcause */
+#define MCAUSE_MINHV                       0x40000000 /* minhv */
+#define MCAUSE_MPP                         0x30000000 /* mpp[1:0] */
+#define MCAUSE_MPIE                        0x08000000 /* mpie */
+#define MCAUSE_MPIL                        0x00ff0000 /* mpil[7:0] */
+#define MCAUSE_EXCCODE                     0x00000fff /* exccode[11:0] */
+
+/* sintstatus */
+#define SINTSTATUS_SIL                     0x0000ff00 /* sil[7:0] */
+#define SINTSTATUS_UIL                     0x000000ff /* uil[7:0] */
+
+/* scause */
+#define SCAUSE_SINHV                       0x40000000 /* sinhv */
+#define SCAUSE_SPP                         0x10000000 /* spp */
+#define SCAUSE_SPIE                        0x08000000 /* spie */
+#define SCAUSE_SPIL                        0x00ff0000 /* spil[7:0] */
+#define SCAUSE_EXCCODE                     0x00000fff /* exccode[11:0] */
 
 /* MIE masks */
 #define MIE_SEIE                           (1 << IRQ_S_EXT)

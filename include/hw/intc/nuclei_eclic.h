@@ -61,11 +61,18 @@ typedef struct NucLeiECLICState
     /*< private >*/
     SysBusDevice parent_obj;
 
+    bool prv_s;
+    bool prv_u;
+    bool nvbits;
+
     /*< public >*/
     MemoryRegion mmio;
 
+    uint32_t num_harts;
     uint32_t num_sources; /* 4-1024 */
-
+    uint32_t eclicintctlbits;
+    uint32_t eclic_mmode_base;
+    uint64_t mclicbase;
     /* config */
     uint32_t sources_id;
     uint8_t cliccfg;   /*  nlbits(1~4) */
@@ -76,6 +83,7 @@ typedef struct NucLeiECLICState
     uint8_t *clicintattr; /* shv(0) trig(1~2)*/
     uint8_t *clicintctl;  /*  level (cliccfg.nlbits) priority( (CLICINTCTLBITS - cliccfg.nlbits)*/
     ECLICPendingInterrupt *clicintlist;
+    uint32_t *exccode;
     uint32_t aperture_size;
 
     QLIST_HEAD(, ECLICPendingInterrupt)
@@ -111,7 +119,9 @@ enum
     Internal_Reserved_Max_IRQn = 19, /*!<  Internal reserved  Max */
 };
 
-DeviceState *nuclei_eclic_create(hwaddr addr, uint32_t aperture_size, uint32_t num_sources);
+DeviceState *nuclei_eclic_create(hwaddr addr, uint32_t aperture_size, bool prv_s, bool prv_u, bool vector,
+                               uint32_t num_harts, uint32_t num_sources,
+                               uint8_t clicintctlbits);
 qemu_irq nuclei_eclic_get_irq(DeviceState *dev, int irq);
 void nuclei_eclic_systimer_cb(DeviceState *dev);
 

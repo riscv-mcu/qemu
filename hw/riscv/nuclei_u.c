@@ -737,8 +737,12 @@ static void nuclei_u_soc_realize(DeviceState *dev, Error **errp)
 
 
     /* MMIO */
-    s->eclic = nuclei_eclic_create(memmap[NUCLEI_U_DEV_ECLIC].base,
-        memmap[NUCLEI_U_DEV_ECLIC].size, NUCLEI_U_INT_MAX);
+    s->eclic = nuclei_eclic_create(memmap[NUCLEI_U_DEV_ECLIC].base, 
+                                    memmap[NUCLEI_U_DEV_ECLIC].size, 
+                                    false, false, true,
+                                    ms->smp.cpus,
+                                    NUCLEI_U_INT_MAX,
+                                    NUCLEI_U_ECLIC_INTCTLBITS);
 
     nuclei_systimer_create(memmap[NUCLEI_U_DEV_TIMER].base,
                 memmap[NUCLEI_U_DEV_TIMER].size, 0, ms->smp.cpus, NULL, NUCLEI_U_TIMEBASE_FREQ);

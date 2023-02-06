@@ -30,6 +30,8 @@
 #include "hw/sd/sd.h"
 #include "hw/ssi/sifive_spi.h"
 
+#define NUCLEI_U_ECLIC_INTCTLBITS 3
+
 #define TYPE_RISCV_NUCLEI_U_SOC "riscv.nuclei.u.soc"
 #define RISCV_NUCLEI_U_SOC(obj) \
     OBJECT_CHECK(NucleiUSoCState, (obj), TYPE_RISCV_NUCLEI_U_SOC)

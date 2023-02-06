@@ -223,9 +223,12 @@ static void riscv_demosoc_soc_realize(DeviceState *dev, Error **errp)
     memory_region_add_subregion(sys_mem,
         memmap[DEMOSOC_MROM].base, &s->internal_rom);
 
-    /* MMIO */
-    s->eclic = nuclei_eclic_create(memmap[DEMOSOC_ECLIC].base,
-        memmap[DEMOSOC_ECLIC].size, DEMOSOC_INT_MAX);
+    s->eclic = nuclei_eclic_create(memmap[DEMOSOC_ECLIC].base, 
+                                    memmap[DEMOSOC_ECLIC].size, 
+                                    false, false, true,
+                                    ms->smp.cpus,
+                                    DEMOSOC_INT_MAX,
+                                    DEMOSOC_CLIC_INTCTLBITS);
 
     s->timer = nuclei_systimer_create(memmap[DEMOSOC_TIMER].base,
                 memmap[DEMOSOC_TIMER].size, 0, ms->smp.cpus,

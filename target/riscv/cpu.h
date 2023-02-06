@@ -41,6 +41,7 @@
 #define RISCV_CPU_TYPE_SUFFIX "-" TYPE_RISCV_CPU
 #define RISCV_CPU_TYPE_NAME(name) (name RISCV_CPU_TYPE_SUFFIX)
 #define CPU_RESOLVING_TYPE TYPE_RISCV_CPU
+#define CPU_INTERRUPT_CLIC CPU_INTERRUPT_TGT_EXT_0
 
 #define TYPE_RISCV_CPU_ANY              RISCV_CPU_TYPE_NAME("any")
 #define TYPE_RISCV_CPU_BASE32           RISCV_CPU_TYPE_NAME("rv32")
@@ -264,8 +265,10 @@ struct CPUArchState {
     target_ulong medeleg;
 
     target_ulong stvec;
+    target_ulong stvt; /* clic-spec */
     target_ulong sepc;
     target_ulong scause;
+    target_ulong sintthresh; /* clic-spec */
 
     target_ulong mtvec;
     target_ulong mtvt;
@@ -283,6 +286,8 @@ struct CPUArchState {
 
     target_ulong mnxti;
     target_ulong mintstatus;
+    target_ulong mintthresh; /* clic-spec */
+    target_ulong mclicbase; /* clic-spec */
     target_ulong mscratchcsw;
     target_ulong mscratchcswl;
 
@@ -461,6 +466,7 @@ struct CPUArchState {
     QEMUTimer *mtimer; /* Nuclei Internal timer */
     QEMUTimer *timer; /* Nuclei Internal timer */
     void *eclic;
+    void *clic;       /* clic interrupt controller */
     bool irq_pending;
 
     hwaddr kernel_addr;

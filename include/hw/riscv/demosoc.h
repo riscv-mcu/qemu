@@ -27,6 +27,8 @@
 #include "hw/intc/nuclei_eclic.h"
 #include "hw/sysbus.h"
 
+#define DEMOSOC_CLIC_INTCTLBITS 3
+
 #define TYPE_DEMOSOC_SOC "riscv.demosoc.soc"
 #define RISCV_DEMOSOC_SOC(obj) \
     OBJECT_CHECK(DemoSoCSoCState, (obj), TYPE_DEMOSOC_SOC)

@@ -325,6 +325,25 @@ static RISCVException pmp(CPURISCVState *env, int csrno)
     return RISCV_EXCP_ILLEGAL_INST;
 }
 
+static int clic(CPURISCVState *env, int csrno)
+{
+    if(!!env->clic)
+    {
+        return RISCV_EXCP_NONE;
+    }
+    else
+    {
+        return RISCV_EXCP_NONE;
+    }
+}
+
+static int read_sintstatus(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    target_ulong mask = SINTSTATUS_SIL | SINTSTATUS_UIL;
+    *val = env->mintstatus & mask;
+    return RISCV_EXCP_NONE;
+}
+
 static RISCVException epmp(CPURISCVState *env, int csrno)
 {
     if (env->priv == PRV_M && riscv_feature(env, RISCV_FEATURE_EPMP)) {
@@ -1774,20 +1793,29 @@ static RISCVException write_mideleg(CPURISCVState *env, int csrno,
 static RISCVException read_mie(CPURISCVState *env, int csrno,
                                target_ulong *val)
 {
-    *val = env->mie;
+    /* The xie CSR appears hardwired to zero in CLIC mode, (Section 4.3) */
+    *val = riscv_clic_is_clic_mode(env) ? 0 : env->mie;
     return RISCV_EXCP_NONE;
 }
 
 static RISCVException write_mie(CPURISCVState *env, int csrno,
                                 target_ulong val)
 {
-    env->mie = (env->mie & ~all_ints) | (val & all_ints);
+    /* Writes to xie will be ignored and will not trap. (Section 4.3) */
+    if (!riscv_clic_is_clic_mode(env)) {
+        env->mie = (env->mie & ~all_ints) | (val & all_ints);
+    }
+
     return RISCV_EXCP_NONE;
 }
 
 static RISCVException read_mtvec(CPURISCVState *env, int csrno,
                                  target_ulong *val)
 {
+    /*
+     * bits [1:0] encode mode; 0 = direct, 1 = vectored, 3 = CLIC,
+     * others reserved
+    */
     *val = env->mtvec;
     return RISCV_EXCP_NONE;
 }
@@ -1795,9 +1823,18 @@ static RISCVException read_mtvec(CPURISCVState *env, int csrno,
 static RISCVException write_mtvec(CPURISCVState *env, int csrno,
                                   target_ulong val)
 {
-    /* bits [1:0] encode mode; 0 = direct, 1 = vectored, 2 >= reserved */
+    /*
+     * bits [1:0] encode mode; 0 = direct, 1 = vectored, 3 = CLIC,
+     * others reserved
+    */
     if ((val & 3) < 2) {
         env->mtvec = val;
+    } else if ((val & 1) && env->clic) {
+        /*
+         * If only CLIC mode is supported, writes to bit 1 are also ignored and
+         * it is always set to one. CLIC mode hardwires xtvec bits 2-5 to zero.
+         */
+        env->mtvec = ((val & ~0x3f) << 6) | (0b000011);
     } else {
         qemu_log_mask(LOG_UNIMP, "CSR_MTVEC: reserved mode not supported\n");
     }
@@ -1817,7 +1854,7 @@ static RISCVException read_mcountinhibit(CPURISCVState *env, int csrno,
 static RISCVException write_mcountinhibit(CPURISCVState *env, int csrno,
                                           target_ulong val)
 {
-    printf("write_mcountinhibit\n");
+    //printf("write_mcountinhibit\n");
     int cidx;
     PMUCTRState *counter;
 
@@ -2060,12 +2097,92 @@ static RISCVException rmw_mip(CPURISCVState *env, int csrno,
     uint64_t rval;
     RISCVException ret;
 
+     /* The xip CSR appears hardwired to zero in CLIC mode. (Section 4.3) */
+    if (riscv_clic_is_clic_mode(env)) {
+        *ret_val = 0;
+        return RISCV_EXCP_NONE;
+    }
+
     ret = rmw_mip64(env, csrno, &rval, new_val, wr_mask);
     if (ret_val) {
         *ret_val = rval;
     }
 
     return ret;
+}
+
+static bool get_xnxti_status(CPURISCVState *env)
+{
+    CPUState *cs = env_cpu(env);
+    int clic_irq, clic_priv, clic_il, pil;
+
+    if (!env->exccode) { /* No interrupt */
+        return false;
+    }
+    /* The system is not in a CLIC mode */
+    if (!riscv_clic_is_clic_mode(env)) {
+        return false;
+    } else {
+        riscv_clic_decode_exccode(env->exccode, &clic_priv, &clic_il,
+                                  &clic_irq);
+
+        if (env->priv == PRV_M) {
+            pil = MAX(get_field(env->mcause, MCAUSE_MPIL), env->mintthresh);
+        } else if (env->priv == PRV_S) {
+            pil = MAX(get_field(env->scause, SCAUSE_SPIL), env->sintthresh);
+        } else {
+            qemu_log_mask(LOG_GUEST_ERROR,
+                          "CSR: rmw xnxti with unsupported mode\n");
+            exit(1);
+        }
+
+        if ((clic_priv != env->priv) || /* No horizontal interrupt */
+            (clic_il <= pil) || /* No higher level interrupt */
+            (riscv_clic_shv_interrupt(env->clic, clic_priv, cs->cpu_index,
+                                      clic_irq))) { /* CLIC vector mode */
+            return false;
+        } else {
+            return true;
+        }
+    }
+}
+
+static int rmw_mnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                     target_ulong new_value, target_ulong write_mask)
+{
+    int clic_priv, clic_il, clic_irq;
+    bool ready;
+    CPUState *cs = env_cpu(env);
+    if (write_mask) {
+        env->mstatus |= new_value & (write_mask & 0b11111);
+    }
+
+    qemu_mutex_lock_iothread();
+    ready = get_xnxti_status(env);
+    if (ready) {
+        riscv_clic_decode_exccode(env->exccode, &clic_priv, &clic_il,
+                                  &clic_irq);
+        if (write_mask) {
+            bool edge = riscv_clic_edge_triggered(env->clic, clic_priv,
+                                                  cs->cpu_index, clic_irq);
+            if (edge) {
+                riscv_clic_clean_pending(env->clic, clic_priv,
+                                         cs->cpu_index, clic_irq);
+            }
+            env->mintstatus = set_field(env->mintstatus,
+                                        MINTSTATUS_MIL, clic_il);
+            env->mcause = set_field(env->mcause, MCAUSE_EXCCODE, clic_irq);
+        }
+        if (ret_value) {
+            *ret_value = (env->mtvt & ~0x3f) + sizeof(target_ulong) * clic_irq;
+        }
+    } else {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+    }
+    qemu_mutex_unlock_iothread();
+    return RISCV_EXCP_NONE;
 }
 
 static RISCVException rmw_miph(CPURISCVState *env, int csrno,
@@ -2122,6 +2239,18 @@ static RISCVException write_sstatus(CPURISCVState *env, int csrno,
     }
     target_ulong newval = (env->mstatus & ~mask) | (val & mask);
     return write_mstatus(env, CSR_MSTATUS, newval);
+}
+
+static int read_sintthresh(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->sintthresh;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_sintthresh(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->sintthresh = val;
+    return RISCV_EXCP_NONE;
 }
 
 static RISCVException rmw_vsie64(CPURISCVState *env, int csrno,
@@ -2245,9 +2374,18 @@ static RISCVException read_stvec(CPURISCVState *env, int csrno,
 static RISCVException write_stvec(CPURISCVState *env, int csrno,
                                   target_ulong val)
 {
-    /* bits [1:0] encode mode; 0 = direct, 1 = vectored, 2 >= reserved */
+    /*
+     * bits [1:0] encode mode; 0 = direct, 1 = vectored, 3 = CLIC,
+     * others reserved
+     */
     if ((val & 3) < 2) {
         env->stvec = val;
+    } else if ((val & 1) && env->clic) {
+        /*
+         * If only CLIC mode is supported, writes to bit 1 are also ignored and
+         * it is always set to one. CLIC mode hardwires xtvec bits 2-5 to zero.
+         */
+        env->stvec = ((val & ~0x3f) << 6) | (0b000011);
     } else {
         qemu_log_mask(LOG_UNIMP, "CSR_STVEC: reserved mode not supported\n");
     }
@@ -2427,12 +2565,56 @@ static RISCVException rmw_sip(CPURISCVState *env, int csrno,
     uint64_t rval;
     RISCVException ret;
 
+    /* The xip CSR appears hardwired to zero in CLIC mode. (Section 4.3) */
+    if (riscv_clic_is_clic_mode(env)) {
+        *ret_val = 0;
+        return RISCV_EXCP_NONE;
+    }
+
     ret = rmw_sip64(env, csrno, &rval, new_val, wr_mask);
     if (ret_val) {
         *ret_val = rval;
     }
 
     return ret;
+}
+
+static int rmw_snxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                     target_ulong new_value, target_ulong write_mask)
+{
+    int clic_priv, clic_il, clic_irq;
+    bool ready;
+    CPUState *cs = env_cpu(env);
+    if (write_mask) {
+        env->mstatus |= new_value & (write_mask & 0b11111);
+    }
+
+    qemu_mutex_lock_iothread();
+    ready = get_xnxti_status(env);
+    if (ready) {
+        riscv_clic_decode_exccode(env->exccode, &clic_priv, &clic_il,
+                                  &clic_irq);
+        if (write_mask) {
+            bool edge = riscv_clic_edge_triggered(env->clic, clic_priv,
+                                                  cs->cpu_index, clic_irq);
+            if (edge) {
+                riscv_clic_clean_pending(env->clic, clic_priv,
+                                         cs->cpu_index, clic_irq);
+            }
+            env->mintstatus = set_field(env->mintstatus,
+                                        MINTSTATUS_SIL, clic_il);
+            env->scause = set_field(env->scause, SCAUSE_EXCCODE, clic_irq);
+        }
+        if (ret_value) {
+            *ret_value = (env->stvt & ~0x3f) + sizeof(target_ulong) * clic_irq;
+        }
+    } else {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+    }
+    qemu_mutex_unlock_iothread();
+    return RISCV_EXCP_NONE;
 }
 
 static RISCVException rmw_siph(CPURISCVState *env, int csrno,
@@ -3658,20 +3840,21 @@ static int read_mnxti(CPURISCVState *env, int csrno, target_ulong *val)
     return RISCV_EXCP_NONE;
 }
 
-static int write_mnxti(CPURISCVState *env, int csrno, target_ulong val)
+static int read_stvt(CPURISCVState *env, int csrno, target_ulong *val)
 {
-    env->mnxti = val;
+    *val = env->stvt;
     return RISCV_EXCP_NONE;
 }
 
-static int rmw_mnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
-                target_ulong new_value, target_ulong write_mask)
+static int write_stvt(CPURISCVState *env, int csrno, target_ulong val)
 {
-    env->mstatus |= (new_value & write_mask) & 0b11111;
-    if (ret_value) {
-        *ret_value = 0;
-    }
+    env->stvt = val & ~((1ULL << 6) - 1);
+    return RISCV_EXCP_NONE;
+}
 
+static int write_mnxti(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mnxti = val;
     return RISCV_EXCP_NONE;
 }
 static int read_msmpcfg_info(CPURISCVState *env, int csrno, target_ulong *val)
@@ -3689,6 +3872,18 @@ static int read_mintstatus(CPURISCVState *env, int csrno, target_ulong *val)
 static int write_mintstatus(CPURISCVState *env, int csrno, target_ulong val)
 {
     env->mintstatus = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mintthresh(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mintthresh;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mintthresh(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mintthresh = val;
     return RISCV_EXCP_NONE;
 }
 
@@ -4106,7 +4301,9 @@ static RISCVException read_sie(CPURISCVState *env, int csrno,
     if (riscv_cpu_virt_enabled(env)) {
         read_vsie(env, CSR_VSIE, val);
     } else {
-        *val = env->mie & env->mideleg;
+        //*val = env->mie & env->mideleg;
+        /* The xie CSR appears hardwired to zero in CLIC mode. (Section 4.3) */
+        *val = riscv_clic_is_clic_mode(env) ? 0 : env->mie & env->mideleg;
     }
     return RISCV_EXCP_NONE;
 }
@@ -4127,6 +4324,11 @@ static int write_sie(CPURISCVState *env, int csrno, target_ulong val)
     } else {
         target_ulong newval = (env->mie & ~S_MODE_INTERRUPTS) |
                               (val & S_MODE_INTERRUPTS);
+
+        /* Writes to xie will be ignored and will not trap. (Section 4.3) */
+        if (riscv_clic_is_clic_mode(env)) {
+            return RISCV_EXCP_NONE;
+        }
         write_mie(env, CSR_MIE, newval);
     }
 
@@ -4479,7 +4681,7 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
                           write_mstatush                                   },
     [CSR_MTVT] =                { "mtvt", any,  read_mtvt,        write_mtvt        },
     [CSR_MNXTI] =               { "mnxti", any,  read_mnxti,       write_mnxti, rmw_mnxti},
-    [CSR_MINTSTATUS] =          {"mintstatus", any,  read_mintstatus,  write_mintstatus  },
+    //[CSR_MINTSTATUS] =          {"mintstatus", any,  read_mintstatus,  write_mintstatus  },
     [CSR_MSCRATCHCSW] =         {"mscratchcsw", any,  read_mscratchcsw, write_mscratchcsw, rmw_mscratchcsw},
     [CSR_MSCRATCHCSWL] =        { "mscratchcswl", any,  read_mscratchcswl, write_mscratchcswl,  rmw_mscratchcswl},
     [CSR_MCLICBASE] =           { "mclicbase", any,  read_zero},
@@ -5060,5 +5262,12 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_SCOUNTOVF]      = { "scountovf", sscofpmf,  read_scountovf,
                              .min_priv_ver = PRIV_VERSION_1_12_0 },
 
+    /* Machine Mode Core Level Interrupt Controller */
+    [CSR_MINTSTATUS] =          {"mintstatus", any,  read_mintstatus,  write_mintthresh   },
+    /* Supervisor Mode Core Level Interrupt Controller */
+    [CSR_SINTSTATUS] =          {"sintstatus", any,  read_sintstatus,  write_sintthresh   },
+    /* Supervisor Mode Core Level Interrupt Controller */
+    [CSR_STVT] = { "stvt", any,  read_stvt, write_stvt       },
+    [CSR_SNXTI] = { "snxti", any,   NULL,  rmw_snxti   },
 #endif /* !CONFIG_USER_ONLY */
 };
