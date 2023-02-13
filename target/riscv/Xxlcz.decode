@@ -24,15 +24,15 @@
 %imm_i    20:s12
 %imm_s    25:s7 7:5
 %imm_b    31:s1 7:1 25:6 8:4     !function=ex_shift_1
-%imm_lgp16  14:16
-%imm_lgp15  15:15 
-%imm_sgp16  25:5 14:6 7:5
-%imm_sgp15  25:5 15:5 7:5
-%imm_mac    20:10
+%imm_lgp16  14:s16
+%imm_lgp15  15:s15
+%imm_sgp16  25:s5 14:6 7:5
+%imm_sgp15  25:s5 15:5 7:5
+%imm_mac    20:s10
 %imm_bitop1 25:5
 %imm_bitop2 20:5
-%imm_bri    24:8
-%ofst_bri   20:4 7:5
+%imm_bri    24:s8
+%ofst_bri   20:s4 7:5
 %imm_bitrev 20:7
 
 # Argument sets

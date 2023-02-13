@@ -20,6 +20,7 @@
 #include "cpu.h"
 #include "exec/exec-all.h"
 #include "exec/helper-proto.h"
+#include "exec/cpu_ldst.h"
 
 target_ulong HELPER(xl_extract)(target_ulong a, target_ulong b, target_ulong c)
 {
@@ -29,7 +30,7 @@ target_ulong HELPER(xl_extract)(target_ulong a, target_ulong b, target_ulong c)
     int32_t ret;
 
     msb = msb > 31 ? 31 : msb;
-    ret = ((int32_t)a << (31 - msb)) >> (31 + is2 - msb);
+    ret = ((int32_t)a << (32 - msb)) >> (32 - is3);
     return  ret;
 }
 
@@ -41,7 +42,7 @@ target_ulong HELPER(xl_extractr)(target_ulong a, target_ulong b)
     int32_t ret;
 
     msb = msb > 31 ? 31 : msb;
-    ret = ((int32_t)a << (31 - msb)) >> (31 + is2 - msb);
+    ret = ((int32_t)a << (32 - msb)) >> (32 - is3);
     return  ret;
 }
 
@@ -53,7 +54,7 @@ target_ulong HELPER(xl_extractu)(target_ulong a, target_ulong b, target_ulong c)
     uint32_t ret;
 
     msb = msb > 31 ? 31 : msb;
-    ret = ((uint32_t)a << (31 - msb)) >> (31 + is2 - msb);
+    ret = ((uint32_t)a << (32 - msb)) >> (32 - is3);
     return  ret;
 }
 
@@ -65,7 +66,7 @@ target_ulong HELPER(xl_extractur)(target_ulong a, target_ulong b)
     uint32_t ret;
 
     msb = msb > 31 ? 31 : msb;
-    ret = ((uint32_t)a << (31 - msb)) >> (31 + is2 - msb);
+    ret = ((uint32_t)a << (32 - msb)) >> (32 - is3);
     return  ret;
 }
 
@@ -94,6 +95,7 @@ target_ulong HELPER(xl_bclr)(target_ulong a, target_ulong b, target_ulong c)
     uint32_t is2 = c & 0x1F;
     uint32_t is3 = b & 0x1F;
     uint32_t mask = (~(0xfffffffe << is3)) << is2;
+
     return a & ~mask;
 }
 
@@ -135,8 +137,24 @@ static target_ulong do_clz(target_ulong a)
 
 target_ulong HELPER(xl_clb)(target_ulong a)
 {
-    target_ulong  t = a & (1 << 31) ? ~a : a;
-    return a == 0 ? 0 : do_clz(t) - 1;
+    uint8_t header = a & 0x80000000;
+    target_ulong tmp1 = a;
+    target_ulong tmp2;
+    uint8_t cnt = 0;
+
+    if (a == 0)
+        return 0;
+    for(uint8_t i = 0; i < 32; i++)
+    {
+        cnt++;
+        tmp2 = tmp1 << 1;
+        if ((tmp1 & 0x80000000) ^ (tmp2 & 0x80000000))
+            break;
+        else
+            tmp1 = tmp2;
+    }
+
+    return cnt;
 }
 
 target_ulong HELPER(xl_fl1)(target_ulong a)
@@ -229,55 +247,72 @@ target_ulong HELPER(xl_bitrev)(target_ulong a, target_ulong b)
     return res;
 }
 
-target_ulong HELPER(xl_addrchk)(target_ulong a, target_ulong b)
+target_ulong HELPER(xl_addrchk)(target_ulong a, target_ulong b, uint32_t index, uint32_t pc)
 {
+    target_ulong ret = 0;
+    target_ulong val = pc;
+
     if((a | b) & 0x3)
-        return 1;
+        val += index;
     else
-        return 0;
+        val += 4;
+    return val;
 }
 
-target_ulong HELPER(xl_bnezm)(target_ulong a, target_ulong b)
+target_ulong HELPER(xl_bnezm)(target_ulong a, target_ulong b, uint32_t index, uint32_t pc)
 {
     uint8_t *p = &a;
     uint8_t i = 0;
+    target_ulong val = pc;
 
     if(a != b)
-        return 0;
+    {
+        return val + 4;
+    }
+
     while(i < sizeof(target_ulong))
     {
         if(p[i] == 0)
-            return 0;
+        {
+            return val + 4;
+        }
         i++;
     }
-    return 1;
+    return val + index;
 }
 
-target_ulong HELPER(xl_nzmsk)(target_ulong a, target_ulong b)
+target_ulong HELPER(xl_nzmsk)(target_ulong a)
 {
-    uint8_t *p = &a, *q = &b;
-    uint8_t i = 1;
-    p[0] = 0xff;
-    while(i < 3)
-    {
-        p[i] = (q[i-1] == 0? 0 : 0xff) & p[i-1];
-        i++;
-    }
-    return a;
-}
-
-target_ulong HELPER(xl_ffnz)(target_ulong a, target_ulong b)
-{
-    uint8_t *p = &b;
+    uint8_t *q = &a;
     uint8_t i = 0;
+
+    while(i < 4)
+    {
+        if(q[i] == 0)
+        {
+            q[i] = 0xff;
+            break;
+        }
+        q[i] = 0xff;
+        i++;
+    }
+    return *(target_ulong*)q;
+}
+
+target_ulong HELPER(xl_ffnz)(target_ulong a)
+{
+    uint8_t *p = &a;
+    uint8_t i = 0;
+    target_ulong b = 0;
+
     while(i < 4)
     {
         if(p[i] != 0)
         {
-            a = (uint32_t)p[i];
+            b = (target_ulong)p[i];
             break;
         }
         i++;
     }
-    return a;
+    return b;
 }

@@ -220,11 +220,11 @@ static bool gen_bimm(DisasContext *ctx, arg_xl_brib *a, TCGCond cond)
 
     gen_set_label(l); /* branch taken */
 
-    if (!has_ext(ctx, RVC) && ((ctx->base.pc_next + a->ofst) & 0x3)) {
+    if (!has_ext(ctx, RVC) && ((ctx->base.pc_next + a->ofst << 1) & 0x3)) {
         /* misaligned */
         gen_exception_inst_addr_mis(ctx);
     } else {
-        gen_goto_tb(ctx, 0, ctx->base.pc_next + a->ofst);
+        gen_goto_tb(ctx, 0, ctx->base.pc_next + a->ofst << 1);
     }
     ctx->base.is_jmp = DISAS_NORETURN;
     return true;
@@ -429,13 +429,10 @@ static bool trans_xl_addrchk(DisasContext *ctx, arg_xl_addrchk *a)
     REQUIRE_XXLCZ(ctx);
     TCGv source1 = get_gpr(ctx, a->rs1, EXT_NONE);
     TCGv source2 = get_gpr(ctx, a->rs2, EXT_NONE);
-    target_long cond;
 
-    gen_helper_xl_addrchk(cond, source1, source2);
-    if(cond != 0)
-        gen_goto_tb(ctx, 0, (ctx->base.pc_next + a->imm << 1));
-    else
-        gen_goto_tb(ctx, 0, ctx->base.pc_next);
+    gen_helper_xl_addrchk(cpu_pc, source1, source2, tcg_constant_i32(a->imm), tcg_constant_i32(ctx->base.pc_next));
+    tcg_gen_lookup_and_goto_ptr();
+
     return true;
 }
 
@@ -443,27 +440,26 @@ static bool trans_xl_bnezm(DisasContext *ctx, arg_xl_bnezm *a)
 {
     REQUIRE_XXLCZ(ctx);
     TCGv result = dest_gpr(ctx, 3);
-    target_long cond;
     TCGv source1 = get_gpr(ctx, a->rs1, EXT_NONE);
     TCGv source2 = get_gpr(ctx, a->rs2, EXT_NONE);
 
-    gen_helper_xl_bnezm(cond, source1, source2);
-    if(cond != 0)
-        gen_goto_tb(ctx, 0, (ctx->base.pc_next + a->imm << 1));
-    else
-        gen_goto_tb(ctx, 0, ctx->base.pc_next);
-    
+    tcg_gen_sub_tl(result, source1, source2);
+    gen_set_gpr(ctx, 3, result);
+    gen_helper_xl_bnezm(cpu_pc, source1, source2, tcg_constant_i32(a->imm), tcg_constant_i32(ctx->base.pc_next));
+
+    tcg_gen_lookup_and_goto_ptr();
+
     return true;
 }
 
 static bool trans_xl_nzmsk(DisasContext *ctx, arg_xl_nzmsk *a)
 {
     REQUIRE_XXLCZ(ctx);
-    gen_unary(ctx, a, EXT_NONE, gen_helper_xl_nzmsk);
+    return gen_unary(ctx, a, EXT_NONE, gen_helper_xl_nzmsk);
 }
 
 static bool trans_xl_ffnz(DisasContext *ctx, arg_xl_ffnz *a)
 {
     REQUIRE_XXLCZ(ctx);
-    gen_unary(ctx, a, EXT_NONE, gen_helper_xl_ffnz);
+    return gen_unary(ctx, a, EXT_NONE, gen_helper_xl_ffnz);
 }
