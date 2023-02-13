@@ -3902,7 +3902,7 @@ static int write_mscratchcsw(CPURISCVState *env, int csrno, target_ulong val)
 static int rmw_mscratchcsw(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
-#if 0
+#if 1
     target_ulong t;
     if(get_field(env->mcause, MCAUSE_MPP)  !=  PRV_M)
     {
@@ -3931,7 +3931,7 @@ static int write_mscratchcswl(CPURISCVState *env, int csrno, target_ulong val)
 static int rmw_mscratchcswl(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
-#if 0
+#if 1
     target_ulong t;
     if( (get_field(env->mcause, MCAUSE_MPIL) == 0) 
         != (get_field(env->mintstatus, MINTSTATUS_MIL) == 0))
@@ -4093,10 +4093,13 @@ static int write_msavedcause2(CPURISCVState *env, int csrno, target_ulong val)
 static int rmw_pushmsubm(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
-#if 0
+#if 1
     uint64_t notify_addr = 0;
     uint32_t riscv_addr_size = 4; 
-    if (!riscv_cpu_is_32bit(env))
+    if (riscv_cpu_mxl(env) == MXL_RV32) 
+    {
+    }
+    else
     {
         riscv_addr_size = 8;
     }
@@ -4128,11 +4131,14 @@ static int write_mtvt2(CPURISCVState *env, int csrno, target_ulong val)
 static int rmw_jalmnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
-#if 0
+#if 1
     target_ulong addr;
 
     uint32_t riscv_addr_size = 4; 
-    if (!riscv_cpu_is_32bit(env))
+    if (riscv_cpu_mxl(env) == MXL_RV32) 
+    {
+    }
+    else
     {
         riscv_addr_size = 8;
     }
@@ -4154,10 +4160,13 @@ static int rmw_jalmnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
 static int rmw_pushmcause(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
-#if 0
+#if 1
     uint64_t notify_addr = 0;
     uint32_t riscv_addr_size = 4; 
-    if (!riscv_cpu_is_32bit(env))
+    if (riscv_cpu_mxl(env) == MXL_RV32) 
+    {
+    }
+    else
     {
         riscv_addr_size = 8;
     }
@@ -4172,10 +4181,14 @@ static int rmw_pushmcause(CPURISCVState *env, int csrno, target_ulong *ret_value
 static int rmw_pushmepc(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
-#if 0
+#if 1
     uint64_t notify_addr = 0;
     uint32_t riscv_addr_size = 4; 
-    if (!riscv_cpu_is_32bit(env))
+
+    if (riscv_cpu_mxl(env) == MXL_RV32) 
+    {
+    }
+    else
     {
         riscv_addr_size = 8;
     }
