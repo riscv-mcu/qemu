@@ -290,7 +290,8 @@ static void rv64imacu_nuclei_cpu_init(Object *obj)
     RISCVCPU *cpu = RISCV_CPU(obj);
 
     set_misa(env, MXL_RV64, RVI | RVM | RVA | RVC | RVU);
-    set_priv_version(env, PRIV_VERSION_1_11_0);
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
 }
 
@@ -300,7 +301,8 @@ static void rv64imafcu_nuclei_cpu_init(Object *obj)
     RISCVCPU *cpu = RISCV_CPU(obj);
 
     set_misa(env, MXL_RV64, RVI | RVM | RVA | RVC | RVU);
-    set_priv_version(env, PRIV_VERSION_1_11_0);
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
 }
 
@@ -310,7 +312,8 @@ static void rv64imafdcu_nuclei_cpu_init(Object *obj)
     RISCVCPU *cpu = RISCV_CPU(obj);
 
     set_misa(env, MXL_RV64, RVI | RVM | RVA | RVF | RVD | RVC | RVU);
-    set_priv_version(env, PRIV_VERSION_1_11_0);
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
 }
 
@@ -320,7 +323,8 @@ static void rv64imacu_nuclei_u_cpu_init(Object *obj)
     RISCVCPU *cpu = RISCV_CPU(obj);
 
     set_misa(env, MXL_RV64, RVI | RVM | RVA | RVC | RVS | RVU);
-    set_priv_version(env, PRIV_VERSION_1_11_0);
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
 }
 
@@ -330,7 +334,8 @@ static void rv64imafcu_nuclei_u_cpu_init(Object *obj)
     RISCVCPU *cpu = RISCV_CPU(obj);
 
     set_misa(env, MXL_RV64, RVI | RVM | RVA | RVF | RVC | RVS | RVU);
-    set_priv_version(env, PRIV_VERSION_1_11_0);
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
 }
 
@@ -341,7 +346,8 @@ static void rv64imafdcu_nuclei_u_cpu_init(Object *obj)
 
 
     set_misa(env, MXL_RV64, RVI | RVM | RVA | RVF | RVD | RVC | RVS | RVU);
-    set_priv_version(env, PRIV_VERSION_1_11_0);
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
 }
 
@@ -360,7 +366,8 @@ static void rv32_sifive_u_cpu_init(Object *obj)
 {
     CPURISCVState *env = &RISCV_CPU(obj)->env;
     set_misa(env, MXL_RV32, RVI | RVM | RVA | RVF | RVD | RVC | RVS | RVU);
-    set_priv_version(env, PRIV_VERSION_1_10_0);
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
 }
 
 static void rv32_sifive_e_cpu_init(Object *obj)
@@ -369,7 +376,8 @@ static void rv32_sifive_e_cpu_init(Object *obj)
     RISCVCPU *cpu = RISCV_CPU(obj);
 
     set_misa(env, MXL_RV32, RVI | RVM | RVA | RVC | RVU);
-    set_priv_version(env, PRIV_VERSION_1_10_0);
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
 }
 
@@ -379,7 +387,8 @@ static void rv32_ibex_cpu_init(Object *obj)
     RISCVCPU *cpu = RISCV_CPU(obj);
 
     set_misa(env, MXL_RV32, RVI | RVM | RVC | RVU);
-    set_priv_version(env, PRIV_VERSION_1_11_0);
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
     cpu->cfg.epmp = true;
 }
@@ -390,7 +399,8 @@ static void rv32_imafcu_nommu_cpu_init(Object *obj)
     RISCVCPU *cpu = RISCV_CPU(obj);
 
     set_misa(env, MXL_RV32, RVI | RVM | RVA | RVF | RVC | RVU);
-    set_priv_version(env, PRIV_VERSION_1_10_0);
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
 }
 
@@ -400,7 +410,8 @@ static void rv32iacu_nuclei_cpu_init(Object *obj)
     RISCVCPU *cpu = RISCV_CPU(obj);
 
     set_misa(env, MXL_RV32, RVI | RVA | RVC | RVU);
-    set_priv_version(env, PRIV_VERSION_1_11_0);
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
 }
 
@@ -410,7 +421,8 @@ static void rv32eacu_nuclei_cpu_init(Object *obj)
     RISCVCPU *cpu = RISCV_CPU(obj);
 
     set_misa(env, MXL_RV32, RVE | RVA | RVC | RVU);
-    set_priv_version(env, PRIV_VERSION_1_11_0);
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
 }
 
@@ -420,7 +432,8 @@ static void rv32imcu_nuclei_cpu_init(Object *obj)
     RISCVCPU *cpu = RISCV_CPU(obj);
 
     set_misa(env, MXL_RV32, RVI | RVM | RVC | RVU);
-    set_priv_version(env, PRIV_VERSION_1_11_0);
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
 }
 
@@ -430,7 +443,8 @@ static void rv32imacu_nuclei_cpu_init(Object *obj)
     RISCVCPU *cpu = RISCV_CPU(obj);
 
     set_misa(env, MXL_RV32, RVI | RVM | RVA | RVC | RVU);
-    set_priv_version(env, PRIV_VERSION_1_11_0);
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
 }
 
@@ -440,7 +454,8 @@ static void rv32emacu_nuclei_cpu_init(Object *obj)
     RISCVCPU *cpu = RISCV_CPU(obj);
 
     set_misa(env, MXL_RV32, RVE | RVM | RVA | RVC | RVU);
-    set_priv_version(env, PRIV_VERSION_1_11_0);
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
 }
 
@@ -450,7 +465,9 @@ static void rv32imafcu_nuclei_cpu_init(Object *obj)
     RISCVCPU *cpu = RISCV_CPU(obj);
 
     set_misa(env, MXL_RV32, RVI | RVM | RVA | RVF | RVC | RVU);
-    set_priv_version(env, PRIV_VERSION_1_11_0);
+
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
 }
 
@@ -460,7 +477,9 @@ static void rv32imafdcu_nuclei_cpu_init(Object *obj)
     RISCVCPU *cpu = RISCV_CPU(obj);
 
     set_misa(env, MXL_RV32, RVI | RVM | RVA | RVF | RVD | RVC | RVU);
-    set_priv_version(env, PRIV_VERSION_1_11_0);
+
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
 }
 #endif
