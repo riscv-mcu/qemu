@@ -344,7 +344,6 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
         if ((s->msip & 0x1) == 1) {
             qemu_set_irq(*(s->soft_irq), 1);
         }else{
-            env->mstatus = env->mstatus | MSTATUS_MIE;
             qemu_set_irq(*(s->soft_irq), 0);
         }
 
@@ -430,7 +429,6 @@ type_init(nuclei_timer_register_types);
 static void nuclei_mtimecmp_cb(void *opaque) {
     RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(0));
     CPURISCVState *env = &cpu->env;
-    env->mstatus = env->mstatus | MSTATUS_MIE; 
     // NucLeiSYSTIMERState *s = NUCLEI_SYSTIMER(opaque);
     nuclei_eclic_systimer_cb(((RISCVCPU *)cpu)->env.eclic);
     timer_del(env->mtimer);

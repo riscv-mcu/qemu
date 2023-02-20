@@ -679,6 +679,7 @@ typedef enum {
 
 /* Virtulisation Register Fields */
 #define VIRT_ONOFF          1
+#define FORCE_HS_EXCEP      2
 
 /* RV32 satp CSR field masks */
 #define SATP32_MODE         0x80000000
@@ -800,6 +801,7 @@ typedef enum RISCVException {
 #define MINTSTATUS_UIL                     0x000000ff /* uil[7:0] */
 
 /* mcause */
+#define MCAUSE_INTERRUPT                   0x80000000 /* INTERRUPT  31*/
 #define MCAUSE_MINHV                       0x40000000 /* minhv */
 #define MCAUSE_MPP                         0x30000000 /* mpp[1:0] */
 #define MCAUSE_MPIE                        0x08000000 /* mpie */

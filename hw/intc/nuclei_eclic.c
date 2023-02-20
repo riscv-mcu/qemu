@@ -246,8 +246,7 @@ static void nuclei_eclic_next_interrupt(void *eclic_ptr)
         if (active->enable)
         {
             if (active->level >= eclic->mth)
-            {                  
-                eclic->exccode[0] = active->irq | mode << 12 | active->level << 14; 
+            {
                 shv = eclic->clicintattr[active->irq] & 0x1;
                 eclic->active_count++;
                 riscv_cpu_eclic_interrupt(cpu, (active->irq & 0xFFF) | (shv << 12) | (active->level << 13));

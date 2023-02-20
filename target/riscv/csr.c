@@ -1261,6 +1261,9 @@ static RISCVException write_mstatus(CPURISCVState *env, int csrno,
     uint64_t mask = 0;
     RISCVMXL xl = riscv_cpu_mxl(env);
 
+    //printf("write_mstatus is %08x\n", val);
+    //printf("write_mstatus is %d\n", val & MSTATUS_MIE);
+
     /* flush tlb on mstatus fields that affect VM */
     if ((val ^ mstatus) & (MSTATUS_MXR | MSTATUS_MPP | MSTATUS_MPV |
             MSTATUS_MPRV | MSTATUS_SUM)) {
@@ -1823,20 +1826,21 @@ static RISCVException read_mtvec(CPURISCVState *env, int csrno,
 static RISCVException write_mtvec(CPURISCVState *env, int csrno,
                                   target_ulong val)
 {
-    /*
-     * bits [1:0] encode mode; 0 = direct, 1 = vectored, 3 = CLIC,
-     * others reserved
-    */
-    if ((val & 3) < 2) {
+    int mode1 = val & 0b11, mode2 = val & 0b111111;
+    /* bits [1:0] encode mode; 0 = direct, 1 = vectored, 2 >= reserved */
+   if (mode1 < 2) {
         env->mtvec = val;
-    } else if ((val & 1) && env->clic) {
-        /*
-         * If only CLIC mode is supported, writes to bit 1 are also ignored and
-         * it is always set to one. CLIC mode hardwires xtvec bits 2-5 to zero.
-         */
-        env->mtvec = ((val & ~0x3f) << 6) | (0b000011);
+        env->mnvec = val;
     } else {
-        qemu_log_mask(LOG_UNIMP, "CSR_MTVEC: reserved mode not supported\n");
+         /* bits [5:0] encode extended modes currently used by the ECLIC */
+        switch (mode2) {
+        case 0b000011: /* ECLIC  mode */
+            env->mtvec = val;
+            env->mnvec = val;
+            break;
+        default:
+                qemu_log_mask(LOG_UNIMP, "CSR_MTVEC: reserved mode not supported\n");
+        }
     }
     return RISCV_EXCP_NONE;
 }
@@ -4131,6 +4135,7 @@ static int write_mtvt2(CPURISCVState *env, int csrno, target_ulong val)
 static int rmw_jalmnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
+    //printf("rmw_jalmnxti\n");
 #if 1
     target_ulong addr;
 
