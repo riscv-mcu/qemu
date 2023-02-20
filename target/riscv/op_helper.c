@@ -127,6 +127,35 @@ target_ulong helper_csrrw_i128(CPURISCVState *env, int csr,
     return int128_getlo(rv);
 }
 
+target_ulong nice_buf[3] = {0};
+void HELPER(lbuf)(target_ulong rs1)
+{
+    cpu_physical_memory_rw(rs1, &nice_buf[0], 4, 0);
+    cpu_physical_memory_rw(rs1 + 4, &nice_buf[1], 4, 0);
+    cpu_physical_memory_rw(rs1 + 8,  &nice_buf[2], 4, 0);
+}
+
+void HELPER(sbuf)(target_ulong rs1)
+{
+    cpu_physical_memory_rw(rs1, &nice_buf[0], 4, 1);
+    cpu_physical_memory_rw(rs1 + 4, &nice_buf[1], 4, 1);
+    cpu_physical_memory_rw(rs1 + 8,  &nice_buf[2], 4, 1);
+}
+
+target_ulong HELPER(rowsum)(target_ulong rs1)
+{
+    target_ulong temp_buf[3] = {0};
+
+    cpu_physical_memory_rw(rs1, &temp_buf[0], 4, 0);
+    nice_buf[0] = nice_buf[0] + temp_buf[0];
+    cpu_physical_memory_rw(rs1 + 4, &temp_buf[1], 4, 0);
+    nice_buf[1] = nice_buf[1] + temp_buf[1];
+    cpu_physical_memory_rw(rs1 + 8,  &temp_buf[2], 4, 0);
+    nice_buf[2] = nice_buf[2] + temp_buf[2];
+
+    return temp_buf[0] + temp_buf[1] + temp_buf[2];
+}
+
 #ifndef CONFIG_USER_ONLY
 
 target_ulong helper_sret(CPURISCVState *env)
