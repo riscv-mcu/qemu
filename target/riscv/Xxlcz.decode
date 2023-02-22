@@ -34,6 +34,7 @@
 %imm_bri    24:s8
 %ofst_bri   20:s4 7:5
 %imm_bitrev 20:7
+%imm_dec    15:s5 7:5
 
 # Argument sets
 &i    imm rs1 rd   !extern
@@ -46,6 +47,7 @@
 &xl_mac       imm rs1 rd
 &xl_bitop     imm1 imm2 rs1 rd
 &xl_brib      imm ofst rs1 rd
+&xl_dec       imm
 
 # Formats
 @i         ............   ..... ... .....  ....... &i      imm=%imm_i      %rs1 %rd
@@ -62,6 +64,7 @@
 @xl_bitop   ..  ..... ..... ..... ... .....  ....... &xl_bitop  imm1=%imm_bitop1 imm2=%imm_bitop2 %rs1 %rd
 @xl_brib    ........ .... .....  ...  .....  ....... &xl_brib   imm=%imm_bri ofst=%ofst_bri %rs1 %rd
 @xl_bitrev  ..... .. ..... ..... ...  .....  ....... &i imm=%imm_bitrev %rs1 %rd
+@xl_dec     ....... ..... .....  ...  .....  ....... &xl_dec    imm=%imm_dec
 
 #XLCZ
 xl_lb           ............     ..... 000 ..... 1011011 @i
@@ -113,10 +116,11 @@ xl_ff0          0000110 00000 .....  000  .....  0110011 @r2
 
 xl_beqi         ........ .... .....  010  .....  1100011 @xl_brib
 xl_bnei         ........ .... .....  011  .....  1100011 @xl_brib
+xl_decbnez      1111101 00000 .....  000  .....  1111011 @xl_dec
 
 xl_bitrev       00010 .. ..... ..... 000  .....  0110011 @xl_bitrev
 
 xl_addrchk      ....... ..... .....  001  .....  1111011 @b
-xl_bnezm        ....... ..... .....  010  .....  1111011 @b
+xl_bezm         ....... ..... .....  010  .....  1111011 @b
 xl_nzmsk        1111111 00000 .....  000  .....  1111011 @r2
 xl_ffnz         1111110	00000 .....  000  .....  1111011 @r2

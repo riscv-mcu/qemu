@@ -246,14 +246,28 @@ static bool trans_c_decbnez(DisasContext *ctx, arg_c_decbnez *a)
 {
     REQUIRE_XXLCZ(ctx);
     TCGv t0 = get_gpr(ctx, 5, EXT_ZERO);
-    TCGv cond = tcg_temp_new();
+    TCGv t1 = tcg_temp_new();
 
-    tcg_gen_sub_tl(cond, t0, 1);
-    if(cond != 0)
-        gen_goto_tb(ctx, 0, ctx->base.pc_next + a->imm);
-    else
-        gen_goto_tb(ctx, 0, ctx->base.pc_next + 2);
-    gen_set_gpr(ctx, 5, cond);
+    gen_helper_c_decbnez(cpu_pc, t0, tcg_constant_i32(a->imm << 1), tcg_constant_i32(ctx->base.pc_next));
+    tcg_gen_lookup_and_goto_ptr();
+
+    tcg_gen_sub_tl(t1, t0, 1);
+    gen_set_gpr(ctx, 5, t1);
+    return true;
+}
+
+static bool trans_xl_decbnez(DisasContext *ctx, arg_xl_decbnez *a)
+{
+    REQUIRE_XXLCZ(ctx);
+    TCGv t0 = get_gpr(ctx, 5, EXT_ZERO);
+    TCGv t1 = tcg_temp_new();
+
+    gen_helper_xl_decbnez(cpu_pc, t0, tcg_constant_i32(a->imm << 1), tcg_constant_i32(ctx->base.pc_next));
+    tcg_gen_lookup_and_goto_ptr();
+
+    tcg_gen_sub_tl(t1, t0, 1);
+    gen_set_gpr(ctx, 5, t1);
+    return true;
 }
 
 static bool gen_slet(DisasContext *ctx, arg_r *a, TCGCond cond)
@@ -436,16 +450,16 @@ static bool trans_xl_addrchk(DisasContext *ctx, arg_xl_addrchk *a)
     return true;
 }
 
-static bool trans_xl_bnezm(DisasContext *ctx, arg_xl_bnezm *a)
+static bool trans_xl_bezm(DisasContext *ctx, arg_xl_bezm *a)
 {
     REQUIRE_XXLCZ(ctx);
-    TCGv result = dest_gpr(ctx, 3);
+    TCGv result = dest_gpr(ctx, 31);
     TCGv source1 = get_gpr(ctx, a->rs1, EXT_NONE);
     TCGv source2 = get_gpr(ctx, a->rs2, EXT_NONE);
 
     tcg_gen_sub_tl(result, source1, source2);
-    gen_set_gpr(ctx, 3, result);
-    gen_helper_xl_bnezm(cpu_pc, source1, source2, tcg_constant_i32(a->imm), tcg_constant_i32(ctx->base.pc_next));
+    gen_set_gpr(ctx, 31, result);
+    gen_helper_xl_bezm(cpu_pc, source1, source2, tcg_constant_i32(a->imm), tcg_constant_i32(ctx->base.pc_next));
 
     tcg_gen_lookup_and_goto_ptr();
 

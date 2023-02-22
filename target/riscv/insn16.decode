@@ -51,7 +51,7 @@
 %zcmp_rlist  4:4
 %zcmt_index  2:8
 
-%xlcz_decimm    9:2 6:1 7:1 2:1 11:1 3:3
+%c_decimm    9:2 6:1 7:1 2:1 11:1 3:3
 
 # Argument sets imported from insn32.decode:
 &empty                  !extern
@@ -64,7 +64,7 @@
 &shift     shamt rs1 rd !extern
 &r2        rd rs1       !extern
 &r2_s      rs1 rs2      !extern
-&xlcz_dec  imm
+&c_dec     imm
 
 &zcmp      zcmp_rlist zcmp_spimm
 &zcmt      zcmt_index
@@ -113,7 +113,7 @@
 @cm_mv        ... ...  ... .. ... ..  &r2_s  rs2=%sreg2    rs1=%sreg1
 @zcmt_jt      ... ...  ........   ..  &zcmt  %zcmt_index
 
-@xlcz_dec     ... . .... ...... ..    &xlcz_dec imm=%xlcz_decimm
+@c_dec        ... . .... ...... ..    &c_dec imm=%c_decimm
 
 # *** RV32/64C Standard Extension (Quadrant 0) ***
 {
@@ -206,7 +206,7 @@ slli              000 .  .....  ..... 10 @c_shift2
     cm_jalt         101  000   ........ 10 @zcmt_jt
   ]
   # *** Xxlcz Extension ***
-  c_decbnez       101  1 ... 1 ...... 10 @xlcz_dec
+  c_decbnez       101  1 ... 1 ...... 10 @c_dec
 }
 sw                110 .  .....  ..... 10 @c_swsp
 

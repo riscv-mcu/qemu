@@ -247,9 +247,30 @@ target_ulong HELPER(xl_bitrev)(target_ulong a, target_ulong b)
     return res;
 }
 
+target_ulong HELPER(c_decbnez)(target_ulong a, uint32_t index, uint32_t pc)
+{
+    target_ulong val = pc;
+
+    if(a != 1)
+        val += index;
+    else
+        val += 2;
+    return val;
+}
+
+target_ulong HELPER(xl_decbnez)(target_ulong a, uint32_t index, uint32_t pc)
+{
+    target_ulong val = pc;
+
+    if(a != 1)
+        val += index;
+    else
+        val += 4;
+    return val;
+}
+
 target_ulong HELPER(xl_addrchk)(target_ulong a, target_ulong b, uint32_t index, uint32_t pc)
 {
-    target_ulong ret = 0;
     target_ulong val = pc;
 
     if((a | b) & 0x3)
@@ -259,7 +280,7 @@ target_ulong HELPER(xl_addrchk)(target_ulong a, target_ulong b, uint32_t index, 
     return val;
 }
 
-target_ulong HELPER(xl_bnezm)(target_ulong a, target_ulong b, uint32_t index, uint32_t pc)
+target_ulong HELPER(xl_bezm)(target_ulong a, target_ulong b, uint32_t index, uint32_t pc)
 {
     uint8_t *p = &a;
     uint8_t i = 0;
@@ -267,18 +288,18 @@ target_ulong HELPER(xl_bnezm)(target_ulong a, target_ulong b, uint32_t index, ui
 
     if(a != b)
     {
-        return val + 4;
+        return val + index;
     }
 
     while(i < sizeof(target_ulong))
     {
         if(p[i] == 0)
         {
-            return val + 4;
+            return val + index;
         }
         i++;
     }
-    return val + index;
+    return val + 4;
 }
 
 target_ulong HELPER(xl_nzmsk)(target_ulong a)
