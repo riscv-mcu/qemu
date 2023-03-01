@@ -1,0 +1,38 @@
+# Fields:
+%rs2    20:5
+%rs1    15:5
+%rd     7:5
+
+# immediates:
+%imm_i    20:s12
+%imm_b    31:s1 7:1 25:6 8:4     !function=ex_shift_1
+%imm_z_b  15:5
+%imm_z_lw 15:s5 20:2 22:7
+%imm_z_sw 15:s5 7:2 25:4 9:3
+%imm_z_ld 22:s1 15:5 20:2 23:6
+%imm_z_sd 9:s1 15:5 7:2 25:4 10:2
+
+# Argument sets:
+&i         imm  rs1 rd      !extern
+&z_b       imm  ofst rs2
+&z_lgp     imm  rd
+&z_sgp     imm  rs2
+
+# Formats
+@i         ............   ..... ... ..... ....... &i      imm=%imm_i     %rs1 %rd
+@z_b       ....... .....  ..... ... ..... ....... &z_b    imm=%imm_z_b ofst=%imm_b %rs2
+@z_lw      ... .........  ..... ... ..... ....... &z_lgp  imm=%imm_z_lw   %rd
+@z_sw      ... .... ..... ..... ... ..... ....... &z_sgp  imm=%imm_z_sw   %rs2
+@z_ld      ... ......... .....  ... ..... ....... &z_lgp  imm=%imm_z_ld   %rd
+@z_sd      ... .... ..... ..... ... ..... ....... &z_sgp  imm=%imm_z_sd   %rs2
+
+
+# *** Zce instructions ***
+beqi      ....... ..... ..... 010 .....  1100011 @z_b
+bnei      ....... ..... ..... 011 .....  1100011 @z_b
+muli      ............  ..... 001 .....  0001011 @i
+
+lwgp      000 .........  ..... 011 .....  0000111 @z_lw
+swgp      000 .... ..... ..... 011 .....  0100111 @z_sw
+ldgp      010 ......... .....  011 .....  0000111 @z_ld
+sdgp      010 .... ..... ..... 011 .....  0100111 @z_sd

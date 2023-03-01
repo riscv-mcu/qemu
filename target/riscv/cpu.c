@@ -86,6 +86,7 @@ static const struct isa_ext_data isa_edata_arr[] = {
     ISA_EXT_DATA_ENTRY(zcd, true, PRIV_VERSION_1_12_0, ext_zcd),
     ISA_EXT_DATA_ENTRY(zcmp, true, PRIV_VERSION_1_12_0, ext_zcmp),
     ISA_EXT_DATA_ENTRY(zcmt, true, PRIV_VERSION_1_12_0, ext_zcmt),
+    ISA_EXT_DATA_ENTRY(zcea, true, PRIV_VERSION_1_12_0, ext_zcea),
     ISA_EXT_DATA_ENTRY(zba, true, PRIV_VERSION_1_12_0, ext_zba),
     ISA_EXT_DATA_ENTRY(zbb, true, PRIV_VERSION_1_12_0, ext_zbb),
     ISA_EXT_DATA_ENTRY(zbc, true, PRIV_VERSION_1_12_0, ext_zbc),
@@ -1305,6 +1306,7 @@ static Property riscv_cpu_extensions[] = {
     DEFINE_PROP_BOOL("x-zcf", RISCVCPU, cfg.ext_zcf, false),
     DEFINE_PROP_BOOL("x-zcmp", RISCVCPU, cfg.ext_zcmp, false),
     DEFINE_PROP_BOOL("x-zcmt", RISCVCPU, cfg.ext_zcmt, false),
+    DEFINE_PROP_BOOL("x-zcea", RISCVCPU, cfg.ext_zcea, false),
 
     /* Nuclei custom xxclz extension */
     DEFINE_PROP_BOOL("x-xxlcz", RISCVCPU, cfg.ext_xxlcz, false),

@@ -247,12 +247,12 @@ target_ulong HELPER(xl_bitrev)(target_ulong a, target_ulong b)
     return res;
 }
 
-target_ulong HELPER(c_decbnez)(target_ulong a, uint32_t index, uint32_t pc)
+target_ulong HELPER(c_decbnez)(target_ulong a, uint32_t scale, uint32_t index, uint32_t pc)
 {
     target_ulong val = pc;
 
-    if(a != 1)
-        val += index;
+    if(a != scale)
+        val -= index;
     else
         val += 2;
     return val;

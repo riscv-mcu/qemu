@@ -242,20 +242,6 @@ static bool trans_xl_bnei(DisasContext *ctx, arg_xl_bnei *a)
     return gen_bimm(ctx, a, TCG_COND_NE);
 }
 
-static bool trans_c_decbnez(DisasContext *ctx, arg_c_decbnez *a)
-{
-    REQUIRE_XXLCZ(ctx);
-    TCGv t0 = get_gpr(ctx, 5, EXT_ZERO);
-    TCGv t1 = tcg_temp_new();
-
-    gen_helper_c_decbnez(cpu_pc, t0, tcg_constant_i32(a->imm << 1), tcg_constant_i32(ctx->base.pc_next));
-    tcg_gen_lookup_and_goto_ptr();
-
-    tcg_gen_sub_tl(t1, t0, 1);
-    gen_set_gpr(ctx, 5, t1);
-    return true;
-}
-
 static bool trans_xl_decbnez(DisasContext *ctx, arg_xl_decbnez *a)
 {
     REQUIRE_XXLCZ(ctx);

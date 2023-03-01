@@ -138,6 +138,7 @@ static bool always_true_p(DisasContext *ctx  __attribute__((__unused__)))
 MATERIALISE_EXT_PREDICATE(XVentanaCondOps);
 MATERIALISE_EXT_PREDICATE(p);
 MATERIALISE_EXT_PREDICATE(xxlcz);
+MATERIALISE_EXT_PREDICATE(zcea);
 
 #ifdef TARGET_RISCV32
 #define get_xl(ctx)    MXL_RV32
@@ -1061,6 +1062,9 @@ static uint32_t opcode_at(DisasContextBase *dcbase, target_ulong pc)
 #include "decode-Xxlcz.c.inc"
 #include "insn_trans/trans_xxlcz.c.inc"
 
+#include "decode-zcea.c.inc"
+#include "insn_trans/trans_zcea.c.inc"
+
 /* The specification allows for longer insns, but not supported by qemu. */
 #define MAX_INSN_LEN  4
 
@@ -1083,6 +1087,7 @@ static void decode_opc(CPURISCVState *env, DisasContext *ctx, uint16_t opcode)
         { has_XVentanaCondOps_p,  decode_XVentanaCodeOps },
         { has_p_p,  decode_NucleiCustom },
         { has_xxlcz_p,  decode_Xxlcz },
+        { has_zcea_p,  decode_zcea },
     };
 
     /* Check for compressed insn */
