@@ -230,17 +230,17 @@ static bool gen_bimm(DisasContext *ctx, arg_xl_brib *a, TCGCond cond)
     return true;
 }
 
-static bool trans_xl_beqi(DisasContext *ctx, arg_xl_beqi *a)
-{
-    REQUIRE_XXLCZ(ctx);
-    return gen_bimm(ctx, a, TCG_COND_EQ);
-}
+// static bool trans_xl_beqi(DisasContext *ctx, arg_xl_beqi *a)
+// {
+//     REQUIRE_XXLCZ(ctx);
+//     return gen_bimm(ctx, a, TCG_COND_EQ);
+// }
 
-static bool trans_xl_bnei(DisasContext *ctx, arg_xl_bnei *a)
-{
-    REQUIRE_XXLCZ(ctx);
-    return gen_bimm(ctx, a, TCG_COND_NE);
-}
+// static bool trans_xl_bnei(DisasContext *ctx, arg_xl_bnei *a)
+// {
+//     REQUIRE_XXLCZ(ctx);
+//     return gen_bimm(ctx, a, TCG_COND_NE);
+// }
 
 static bool trans_xl_decbnez(DisasContext *ctx, arg_xl_decbnez *a)
 {

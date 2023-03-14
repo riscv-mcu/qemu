@@ -14,11 +14,11 @@ static bool gen_bimm_z(DisasContext *ctx, arg_z_b *a, TCGCond cond)
 
     gen_set_label(l); /* branch taken */
 
-    if (!has_ext(ctx, RVC) && ((ctx->base.pc_next + a->ofst << 1) & 0x3)) {
+    if (!has_ext(ctx, RVC) && ((ctx->base.pc_next + a->ofst) & 0x1)) {
         /* misaligned */
         gen_exception_inst_addr_mis(ctx);
     } else {
-        gen_goto_tb(ctx, 0, ctx->base.pc_next + a->ofst << 1);
+        gen_goto_tb(ctx, 0, ctx->base.pc_next + (a->ofst));
     }
     ctx->base.is_jmp = DISAS_NORETURN;
     return true;
