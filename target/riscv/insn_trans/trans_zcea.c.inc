@@ -24,17 +24,17 @@ static bool gen_bimm_z(DisasContext *ctx, arg_z_b *a, TCGCond cond)
     return true;
 }
 
-static bool trans_beqi(DisasContext *ctx, arg_beqi *a)
-{
-    REQUIRE_ZCEA(ctx);
-    return gen_bimm_z(ctx, a, TCG_COND_EQ);
-}
-
-static bool trans_bnei(DisasContext *ctx, arg_bnei *a)
-{
-    REQUIRE_ZCEA(ctx);
-    return gen_bimm_z(ctx, a, TCG_COND_NE);
-}
+// static bool trans_beqi(DisasContext *ctx, arg_beqi *a)
+// {
+//     REQUIRE_ZCEA(ctx);
+//     return gen_bimm_z(ctx, a, TCG_COND_EQ);
+// }
+// 
+// static bool trans_bnei(DisasContext *ctx, arg_bnei *a)
+// {
+//     REQUIRE_ZCEA(ctx);
+//     return gen_bimm_z(ctx, a, TCG_COND_NE);
+// }
 
 static bool trans_muli(DisasContext *ctx, arg_muli *a)
 {

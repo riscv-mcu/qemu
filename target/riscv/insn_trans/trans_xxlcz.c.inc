@@ -212,7 +212,7 @@ static bool trans_xl_abs(DisasContext *ctx, arg_xl_abs *a)
 static bool gen_bimm(DisasContext *ctx, arg_xl_brib *a, TCGCond cond)
 {
     TCGLabel *l = gen_new_label();
-    TCGv src1 = get_gpr(ctx, a->rs1,EXT_ZERO);
+    TCGv src1 = get_gpr(ctx, a->rs1, EXT_ZERO);
     TCGv src2 = tcg_constant_tl(a->imm);
 
     tcg_gen_brcond_tl(cond, src1, src2, l);
@@ -220,27 +220,26 @@ static bool gen_bimm(DisasContext *ctx, arg_xl_brib *a, TCGCond cond)
 
     gen_set_label(l); /* branch taken */
 
-    if (!has_ext(ctx, RVC) && ((ctx->base.pc_next + a->ofst << 1) & 0x3)) {
+    if (!has_ext(ctx, RVC) && ((ctx->base.pc_next + a->ofst) & 0x1)) {
         /* misaligned */
         gen_exception_inst_addr_mis(ctx);
     } else {
-        gen_goto_tb(ctx, 0, ctx->base.pc_next + a->ofst << 1);
+        gen_goto_tb(ctx, 0, ctx->base.pc_next + (a->ofst));
     }
     ctx->base.is_jmp = DISAS_NORETURN;
     return true;
 }
 
-// static bool trans_xl_beqi(DisasContext *ctx, arg_xl_beqi *a)
-// {
-//     REQUIRE_XXLCZ(ctx);
-//     return gen_bimm(ctx, a, TCG_COND_EQ);
-// }
-
-// static bool trans_xl_bnei(DisasContext *ctx, arg_xl_bnei *a)
-// {
-//     REQUIRE_XXLCZ(ctx);
-//     return gen_bimm(ctx, a, TCG_COND_NE);
-// }
+static bool trans_xl_beqi(DisasContext *ctx, arg_xl_beqi *a)
+{
+    REQUIRE_XXLCZ(ctx);
+    return gen_bimm(ctx, a, TCG_COND_EQ);
+}
+static bool trans_xl_bnei(DisasContext *ctx, arg_xl_bnei *a)
+{
+    REQUIRE_XXLCZ(ctx);
+    return gen_bimm(ctx, a, TCG_COND_NE);
+}
 
 static bool trans_xl_decbnez(DisasContext *ctx, arg_xl_decbnez *a)
 {
