@@ -1635,7 +1635,8 @@ DEF_HELPER_1(xl_fl0, tl, tl)
 
 DEF_HELPER_FLAGS_2(xl_bitrev, TCG_CALL_NO_RWG_SE, tl, tl, tl)
 DEF_HELPER_FLAGS_4(c_decbnez, TCG_CALL_NO_RWG_SE, tl, tl, i32, i32, i32)
-DEF_HELPER_FLAGS_3(xl_decbnez, TCG_CALL_NO_RWG_SE, tl, tl, i32, i32)
+DEF_HELPER_FLAGS_4(xl_decbnez, TCG_CALL_NO_RWG_SE, tl, tl, i32, i32, i32)
+DEF_HELPER_FLAGS_5(xl_addibne, TCG_CALL_NO_RWG_SE, tl, tl, tl, i32, i32, i32)
 
 DEF_HELPER_FLAGS_4(xl_addrchk, TCG_CALL_NO_RWG_SE, tl, tl, tl, i32, i32)
 DEF_HELPER_FLAGS_4(xl_bezm, TCG_CALL_NO_RWG_SE, tl, tl, tl, i32, i32)

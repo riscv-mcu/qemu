@@ -244,15 +244,42 @@ static bool trans_xl_bnei(DisasContext *ctx, arg_xl_bnei *a)
 static bool trans_xl_decbnez(DisasContext *ctx, arg_xl_decbnez *a)
 {
     REQUIRE_XXLCZ(ctx);
-    TCGv t0 = get_gpr(ctx, 5, EXT_ZERO);
-    TCGv t1 = tcg_temp_new();
-
-    gen_helper_xl_decbnez(cpu_pc, t0, tcg_constant_i32(a->imm << 1), tcg_constant_i32(ctx->base.pc_next));
+    TCGv dest = dest_gpr(ctx, a->rd);
+    gen_helper_xl_decbnez(cpu_pc, dest, tcg_constant_i32(a->scale), tcg_constant_i32(a->imm << 1), tcg_constant_i32(ctx->base.pc_next));
     tcg_gen_lookup_and_goto_ptr();
 
-    tcg_gen_sub_tl(t1, t0, 1);
-    gen_set_gpr(ctx, 5, t1);
+    tcg_gen_sub_tl(dest, dest, a->scale);
+    gen_set_gpr(ctx, a->rd, dest);
     return true;
+}
+
+
+static bool trans_xl_addibne(DisasContext *ctx, arg_xl_addibne *a)
+{
+    REQUIRE_XXLCZ(ctx);
+    //get rd
+    TCGv dest = dest_gpr(ctx, a->rd);
+    //get rs1
+    TCGv rs1 = get_gpr(ctx, a->rs1, EXT_ZERO);
+
+    uint32_t scale = a->scale;
+
+    switch (scale)
+    {
+        case 0: scale = 1; break;
+        case 1: scale = 2; break;
+        case 2: scale = 4; break;
+        case 3: scale = 8; break;
+        default:
+        return true;
+    }
+    gen_helper_xl_addibne(cpu_pc, dest, rs1, tcg_constant_i32(scale), tcg_constant_i32(a->imm << 1), tcg_constant_i32(ctx->base.pc_next));
+    tcg_gen_addi_tl(dest, dest, scale);
+    gen_set_gpr(ctx, a->rd, dest);
+   
+    tcg_gen_lookup_and_goto_ptr();
+    return true;
+    
 }
 
 static bool gen_slet(DisasContext *ctx, arg_r *a, TCGCond cond)

@@ -38,6 +38,8 @@
 %imm_bitrev 20:7
 %imm_dec    15:s10
 %imm_scale  25:2
+%imm_addib_scale  29:2
+%imm_addib_imm    20:s9
 
 # Argument sets
 &i    imm rs1 rd   !extern
@@ -51,6 +53,7 @@
 &xl_bitop     imm1 imm2 rs1 rd
 &xl_brib      imm ofst rs1
 &xl_dec       imm scale rd
+&xl_addibr     scale imm rs1 rd
 
 # Formats
 @i         ............   ..... ... .....  ....... &i      imm=%imm_i      %rs1 %rd
@@ -71,6 +74,7 @@
 @xl_brib    ........ .... .....  ...  .....  ....... &xl_brib   imm=%imm_bri ofst=%imm_b %rs1
 @xl_bitrev  ..... .. ..... ..... ...  .....  ....... &i imm=%imm_bitrev %rs1 %rd
 @xl_dec     ....... ..... .....  ...  .....  ....... &xl_dec    imm=%imm_dec scale=%imm_scale %rd
+@xl_addib   .  .. ......... .....  ... ..... ....... &xl_addibr  scale=%imm_addib_scale imm=%imm_addib_imm %rs1 %rd
 
 #XLCZ
 xl_lb           0000  ........   ..... 001 ..... 1111011 @i8
@@ -130,3 +134,5 @@ xl_addrchk      0 ...... .....  .....  011 ..... 1111011 @b12
 xl_bezm         1 ...... .....  .....  011 ..... 1111011 @b12
 xl_nzmsk        1110000  00000  .....  001 ..... 1111011 @r2
 xl_ffnz         1110001	 00000  .....  001 ..... 1111011 @r2
+
+xl_addibne      1  .. ......... .....  111 ..... 1111011 @xl_addib

@@ -258,14 +258,28 @@ target_ulong HELPER(c_decbnez)(target_ulong a, uint32_t scale, uint32_t index, u
     return val;
 }
 
-target_ulong HELPER(xl_decbnez)(target_ulong a, uint32_t index, uint32_t pc)
+target_ulong HELPER(xl_decbnez)(target_ulong rd, uint32_t scale, uint32_t imm, uint32_t pc)
 {
     target_ulong val = pc;
-
-    if(a != 1)
-        val += index;
+    rd = rd - scale;
+    if(rd > 0)
+        val += imm;
     else
         val += 4;
+    return val;
+}
+
+target_ulong HELPER(xl_addibne)(target_ulong rd, target_ulong rs1, uint32_t scale, uint32_t imm, uint32_t pc)
+{
+    target_ulong val = pc;
+    if(rd < (rs1 - 1))
+    {
+        val = pc - imm;
+    }
+    else
+    {
+        val += 4;
+    }
     return val;
 }
 
