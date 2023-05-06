@@ -274,7 +274,14 @@ target_ulong HELPER(xl_addibne)(target_ulong rd, target_ulong rs1, uint32_t scal
     target_ulong val = pc;
     if(rd < (rs1 - 1))
     {
-        val = pc - imm;
+        if(imm <= 1024)
+        {
+            val = pc - imm;
+        }
+        else
+        {
+            val = pc - (int)(imm + 1024);
+        }
     }
     else
     {
