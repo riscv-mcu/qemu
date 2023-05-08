@@ -67,7 +67,7 @@ static const struct MemmapEntry
     [NUCLEI_N_DEV_XIP]   = { 0x20000000,  0x10000000},
     [NUCLEI_N_DEV_ILM]   = { 0x80000000,  0x2000000 },
     [NUCLEI_N_DEV_DLM]   = { 0x90000000,  0x2000000 },
-    [NUCLEI_N_DEV_DDR]   = { 0xA0000000,  0x4000000 },
+    [NUCLEI_N_DEV_DDR]   = { 0xA0000000,  0x10000000 },
 };
 
 static void riscv_nuclei_n_machine_init(MachineState *machine)

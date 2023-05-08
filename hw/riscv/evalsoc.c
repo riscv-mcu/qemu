@@ -62,7 +62,7 @@ static const MemMapEntry evalsoc_memmap[] = {
     [EVALSOC_XIP]   = { 0x20000000,    0x20000000},
     [EVALSOC_ILM]   = { 0x80000000,    0x2000000 },
     [EVALSOC_DLM]   = { 0x90000000,    0x2000000 },
-    [EVALSOC_DDR]   = { 0xA0000000,    0x4000000 },
+    [EVALSOC_DDR]   = { 0xA0000000,    0x10000000 },
 };
 
 static void evalsoc_machine_init(MachineState *machine)
