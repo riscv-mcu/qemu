@@ -32,20 +32,20 @@
     }                                           \
 } while (0)
 
-#define REQUIRE_NUCLEIN1(ctx) do {              \
-    if (!ctx->cfg_ptr->ext_nuclein1) {          \
+#define REQUIRE_XXLDSPN1X(ctx) do {              \
+    if (!ctx->cfg_ptr->ext_xxldspn1x) {          \
         return false;                           \
     }                                           \
 } while (0)
 
-#define REQUIRE_NUCLEIN2(ctx) do {              \
-    if (!ctx->cfg_ptr->ext_nuclein2) {          \
+#define REQUIRE_XXLDSPN2X(ctx) do {              \
+    if (!ctx->cfg_ptr->ext_xxldspn2x) {          \
         return false;                           \
     }                                           \
 } while (0)
 
-#define REQUIRE_NUCLEIN3(ctx) do {              \
-    if (!ctx->cfg_ptr->ext_nuclein3) {          \
+#define REQUIRE_XXLDSPN3X(ctx) do {              \
+    if (!ctx->cfg_ptr->ext_xxldspn3x) {          \
         return false;                           \
     }                                           \
 } while (0)
@@ -110,7 +110,6 @@ static inline bool r_ool_d(DisasContext *ctx, arg_r *a, gen_helper_rvp_r_d *fn)
 #else
     TCGv a0, a1, a2, a3, d0, d1;
     TCGv_i64 src1, src2, dst;
-    REQUIRE_P(ctx);
 
     a0 = get_gpr(ctx, a->rs1, EXT_ZERO);
     a1 = get_gpr(ctx, a->rs1 + 1, EXT_ZERO);
@@ -150,14 +149,14 @@ static bool trans_##NAME(DisasContext *s, arg_r *a)    \
 #define GEN_RVP_R_OOL_D1(NAME)                          \
 static bool trans_##NAME(DisasContext *s, arg_r *a)     \
 {                                                       \
-    REQUIRE_NUCLEIN1(s);                                \
+    REQUIRE_XXLDSPN1X(s);                                \
     return r_ool_d(s, a, gen_helper_##NAME);            \
 }
 
 #define GEN_RVP_R_OOL_D2(NAME)                          \
 static bool trans_##NAME(DisasContext *s, arg_r *a)     \
 {                                                       \
-    REQUIRE_NUCLEIN2(s);                                \
+    REQUIRE_XXLDSPN2X(s);                                \
     return r_ool_d(s, a, gen_helper_##NAME);            \
 }
 
@@ -287,8 +286,7 @@ static bool trans_##NAME(DisasContext *s, arg_shift *a)  \
 #define GEN_RVP_SHIFTI_D(NAME)                           \
 static bool trans_##NAME(DisasContext *s, arg_shift *a)  \
 {                                                        \
-    REQUIRE_P(s);                                        \
-    REQUIRE_NUCLEIN2(s);                                 \
+    REQUIRE_XXLDSPN2X(s);                                 \
     return rvp_shifti_ool_d(s, a, gen_helper_##NAME);    \
 }
 
@@ -434,7 +432,6 @@ r2_ool_d(DisasContext *ctx, arg_r2 *a,
 #else
     TCGv a0, a1, d0, d1;
     TCGv_i64 src,dst;
-    REQUIRE_P(ctx);
 
     a0 = get_gpr(ctx, a->rs1, EXT_ZERO);
     a1 = get_gpr(ctx, a->rs1 + 1, EXT_ZERO);
@@ -469,14 +466,14 @@ static bool trans_##NAME(DisasContext *s, arg_r2 *a)   \
 #define GEN_RVP_R2_OOL_D1(NAME)                         \
 static bool trans_##NAME(DisasContext *s, arg_r2 *a)    \
 {                                                       \
-    REQUIRE_NUCLEIN1(s);                                \
+    REQUIRE_XXLDSPN1X(s);                                \
     return r2_ool_d(s, a, gen_helper_##NAME);           \
 }
 
 #define GEN_RVP_R2_OOL_D2(NAME)                         \
 static bool trans_##NAME(DisasContext *s, arg_r2 *a)    \
 {                                                       \
-    REQUIRE_NUCLEIN2(s);                                \
+    REQUIRE_XXLDSPN2X(s);                                \
     return r2_ool_d(s, a, gen_helper_##NAME);           \
 }
 
@@ -678,7 +675,6 @@ static inline bool r_acc_ool_d(DisasContext *ctx, arg_r *a,
                              void (* fn)(TCGv_i64, TCGv_ptr, TCGv_i64, TCGv_i64, TCGv_i64))
 {
     TCGv_i64 src1, src2, src3, dst;
-    REQUIRE_P(ctx);
 
     src1 = tcg_temp_new_i64();
     src2 = tcg_temp_new_i64();
@@ -710,7 +706,7 @@ static inline bool r_acc_ool_d(DisasContext *ctx, arg_r *a,
 #define GEN_RVP_R_ACC_OOL_D(NAME)                       \
 static bool trans_##NAME(DisasContext *s, arg_r *a)     \
 {                                                       \
-    REQUIRE_NUCLEIN3(s);                                \
+    REQUIRE_XXLDSPN3X(s);                                \
     return r_acc_ool_d(s, a, gen_helper_##NAME);        \
 }
 

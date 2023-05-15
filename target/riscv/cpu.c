@@ -1097,6 +1097,23 @@ static void riscv_cpu_realize(DeviceState *dev, Error **errp)
             }
             set_vext_version(env, vext_version);
         }
+
+
+        if (cpu->cfg.ext_xxldspn3x) {
+            cpu->cfg.ext_xxldspn2x = true;
+            cpu->cfg.ext_xxldspn1x = true;
+            cpu->cfg.ext_p = true;
+        }
+
+        if (cpu->cfg.ext_xxldspn2x) {
+            cpu->cfg.ext_xxldspn1x = true;
+            cpu->cfg.ext_p = true;
+        }
+
+        if (cpu->cfg.ext_xxldspn1x) {
+            cpu->cfg.ext_p = true;
+        }
+
         if (cpu->cfg.ext_p) {
             int pext_version = PEXT_VERSION_0_09_4;
             ext |= RVP;
@@ -1283,9 +1300,9 @@ static Property riscv_cpu_extensions[] = {
     DEFINE_PROP_BOOL("zksed", RISCVCPU, cfg.ext_zksed, false),
     DEFINE_PROP_BOOL("zksh", RISCVCPU, cfg.ext_zksh, false),
     DEFINE_PROP_BOOL("zkt", RISCVCPU, cfg.ext_zkt, false),
-    DEFINE_PROP_BOOL("nuclein1", RISCVCPU, cfg.ext_nuclein1, false),
-    DEFINE_PROP_BOOL("nuclein2", RISCVCPU, cfg.ext_nuclein2, false),
-    DEFINE_PROP_BOOL("nuclein3", RISCVCPU, cfg.ext_nuclein3, false),
+    DEFINE_PROP_BOOL("xxldspn1x", RISCVCPU, cfg.ext_xxldspn1x, false),
+    DEFINE_PROP_BOOL("xxldspn2x", RISCVCPU, cfg.ext_xxldspn2x, false),
+    DEFINE_PROP_BOOL("xxldspn3x", RISCVCPU, cfg.ext_xxldspn3x, false),
 
     DEFINE_PROP_BOOL("zdinx", RISCVCPU, cfg.ext_zdinx, false),
     DEFINE_PROP_BOOL("zfinx", RISCVCPU, cfg.ext_zfinx, false),
