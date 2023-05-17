@@ -109,12 +109,12 @@ config NUCLEI_U
 config NUCLEI_DEMOSOC
     bool
     select MSI_NONBROKEN
-    select RISCV_ACLINT
+    select NUCLEI_SYSTIMER
     select SIFIVE_GPIO
     select SIFIVE_PLIC
     select SIFIVE_UART
-    select SIFIVE_E_PRCI
-    select UNIMP
+    select SIFIVE_SPI
+    select SSI_M25P80
 
 config NUCLEI_EVALSOC
     bool
