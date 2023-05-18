@@ -113,6 +113,12 @@ uart_read(void *opaque, hwaddr offset, unsigned int size)
     case NUCLEI_UART_REG_DIV:
         value = s->div;
         break;
+    case NUCLEI_UART_REG_SETUP:
+        //3'b011 : 8 bits
+        //[6:4] 03
+        // 0011 0000
+        value = 0x30;
+        break;
     default:
         break;
     }
@@ -147,6 +153,9 @@ uart_write(void *opaque, hwaddr offset,
         break;
     case NUCLEI_UART_REG_DIV:
         s->div = value;
+        break;
+    case NUCLEI_UART_REG_SETUP:
+        s->setup = value;
         break;
     default:
         break;

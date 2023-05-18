@@ -31,9 +31,10 @@ OBJECT_DECLARE_SIMPLE_TYPE(NucLeiUARTState, NUCLEI_UART)
 #define NUCLEI_UART_REG_RXDATA 0x004
 #define NUCLEI_UART_REG_TXCTRL 0x008
 #define NUCLEI_UART_REG_RXCTRL 0x00C
-#define NUCLEI_UART_REG_IE 0x010
-#define NUCLEI_UART_REG_IP 0x014
-#define NUCLEI_UART_REG_DIV 0x018
+#define NUCLEI_UART_REG_IE     0x010
+#define NUCLEI_UART_REG_IP     0x014
+#define NUCLEI_UART_REG_DIV    0x018
+#define NUCLEI_UART_REG_SETUP  0x020
 
 #define NUCLEI_UART_GET_TXCNT(txctrl) (txctrl & 0x1)
 #define NUCLEI_UART_GET_RXCNT(rxctrl) (rxctrl & 0x1)
@@ -69,6 +70,7 @@ typedef struct NucLeiUARTState
     uint32_t ie;
     uint32_t ip;
     uint32_t div;
+    uint32_t setup;
 } NucLeiUARTState;
 
 NucLeiUARTState *nuclei_uart_create(MemoryRegion *address_space, hwaddr base, uint64_t size,
