@@ -456,7 +456,7 @@ static bool trans_xl_addrchk(DisasContext *ctx, arg_xl_addrchk *a)
     TCGv source1 = get_gpr(ctx, a->rs1, EXT_NONE);
     TCGv source2 = get_gpr(ctx, a->rs2, EXT_NONE);
 
-    gen_helper_xl_addrchk(cpu_pc, source1, source2, tcg_constant_i32(a->imm), tcg_constant_i32(ctx->base.pc_next));
+    gen_helper_xl_addrchk(cpu_pc, source1, source2, tcg_constant_i32(a->imm << 1), tcg_constant_i32(ctx->base.pc_next));
     tcg_gen_lookup_and_goto_ptr();
 
     return true;
@@ -471,7 +471,7 @@ static bool trans_xl_bezm(DisasContext *ctx, arg_xl_bezm *a)
 
     tcg_gen_sub_tl(result, source1, source2);
     gen_set_gpr(ctx, 31, result);
-    gen_helper_xl_bezm(cpu_pc, source1, source2, tcg_constant_i32(a->imm), tcg_constant_i32(ctx->base.pc_next));
+    gen_helper_xl_bezm(cpu_pc, source1, source2, tcg_constant_i32(a->imm << 1), tcg_constant_i32(ctx->base.pc_next));
 
     tcg_gen_lookup_and_goto_ptr();
 
