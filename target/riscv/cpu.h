@@ -319,6 +319,8 @@ struct CPUArchState {
     target_ulong sleepvalue;
     target_ulong txevt;
     target_ulong msmpcfg_info;
+    target_ulong mirgb_info;
+    target_ulong mcfg_info;
 
     /* Hypervisor CSRs */
     target_ulong hstatus;

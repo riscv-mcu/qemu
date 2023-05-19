@@ -44,7 +44,7 @@
 #include "hw/display/ramfb.h"
 #include "hw/intc/nuclei_eclic.h"
 #include "hw/char/nuclei_uart.h"
-#include "hw/riscv/demosoc.h"
+#include "hw/riscv/nuclei_demosoc.h"
 #include "hw/ssi/ssi.h"
 
 #define OTP_SERIAL 1

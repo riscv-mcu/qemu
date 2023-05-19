@@ -2263,7 +2263,8 @@ static const char *csr_name(int csrno)
     case 0x07ed: return "jalmnxti";
     case 0x07ee: return "pushmcause";
     case 0x07ef: return "pushmepc";
-    case 0x07f7: return "msmpcfg_info";
+    //case 0x07f7: return "msmpcfg_info";
+    case 0x07f7: return "mirgb_info";
     case 0x0801: return "ucode";
     case 0x0810: return "wfe";
     case 0x0811: return "sleepvalue";
@@ -2357,6 +2358,7 @@ static const char *csr_name(int csrno)
     case 0x0f12: return "marchid";
     case 0x0f13: return "mimpid";
     case 0x0f14: return "mhartid";
+    case 0x0fc2: return "mcfg_info";
     default: return NULL;
     }
 }

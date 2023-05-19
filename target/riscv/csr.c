@@ -3914,9 +3914,29 @@ static int write_mnxti(CPURISCVState *env, int csrno, target_ulong val)
     env->mnxti = val;
     return RISCV_EXCP_NONE;
 }
+
 static int read_msmpcfg_info(CPURISCVState *env, int csrno, target_ulong *val)
 {
     *val = env->msmpcfg_info;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mirgb_info(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    if(env->mcfg_info & (1 << 16))
+    {
+        *val = env->mirgb_info;
+    }
+    else
+    {
+        *val = env->msmpcfg_info;
+    }
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mcfg_info(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mcfg_info;
     return RISCV_EXCP_NONE;
 }
 
@@ -4698,10 +4718,11 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_LSTEPFORC]   = { "lstepforc",    any,    read_zero, write_any},
     [CSR_MPPICFG_INFO]   = { "mppicfg_info",    any,    read_zero, write_any},
     [CSR_MFIOCFG_INFO]   = { "mfiocfg_info",    any,    read_zero, write_any},
-    [CSR_MSMPCFG_INFO]   = { "msmpcfg_info",    any,    read_msmpcfg_info, write_any},
+   // [CSR_MSMPCFG_INFO]   = { "msmpcfg_info",    any,    read_msmpcfg_info, write_any},
+    [CSR_MIRGB_INFO]   = { "mirgb_info",    any,    read_mirgb_info, write_any},
     [CSR_MICFG_INFO]     = { "micfg_info",      any,    read_zero, write_any},
     [CSR_MDCFG_INFO]     = { "mdcfg_info",      any,    read_zero, write_any},
-    [CSR_MCFG_INFO]      = { "mcfg_info",       any,    read_zero, write_any},
+    [CSR_MCFG_INFO]      = { "mcfg_info",       any,    read_mcfg_info, write_any},
     [CSR_MTLBCFG_INFO]      = { "mtlbcfg_info", any,    read_zero, write_any},
 
     /* === Nuclei CCM Registers === */

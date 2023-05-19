@@ -409,7 +409,7 @@
 #define CSR_PUSHMEPC            0x7EF
 #define CSR_MPPICFG_INFO        0x7F0
 #define CSR_MFIOCFG_INFO        0x7F1
-#define CSR_MSMPCFG_INFO        0x7F7
+//#define CSR_MSMPCFG_INFO        0x7F7
 #define CSR_SLEEPVALUE          0x811
 #define CSR_TXEVT               0x812
 #define CSR_WFE                 0x810
@@ -430,6 +430,9 @@
 #define CSR_CCM_UCOMMAND        0x4CC
 #define CSR_CCM_UDATA           0x4CD
 #define CSR_CCM_FPIPE           0x4CF
+
+//IREGION
+#define CSR_MIRGB_INFO          0x7F7
 
 //NCDEV
 #define CSR_MDEVB               0x7F3
