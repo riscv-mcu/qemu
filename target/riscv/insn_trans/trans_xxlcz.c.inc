@@ -24,14 +24,14 @@
         return false;             \
 } while (0)
 
-static bool gen_load_pstinc(DisasContext *ctx, arg_lb *a, MemOp memop)
+static bool gen_load_pstinc(DisasContext *ctx, arg_lb *a, MemOp memop, int shift)
 {
     TCGv src1 = get_gpr(ctx, a->rs1, EXT_ZERO);
     TCGv dest = dest_gpr(ctx, a->rd);
     TCGv addr = get_address(ctx, a->rs1, 0);
 
     tcg_gen_qemu_ld_tl(dest, addr, ctx->mem_idx, memop);
-    tcg_gen_addi_tl(src1, src1, a->imm);
+    tcg_gen_addi_tl(src1, src1, a->imm << shift);
     gen_set_gpr(ctx, a->rs1, src1);
     gen_set_gpr(ctx, a->rd, dest);
     return true;
@@ -40,53 +40,53 @@ static bool gen_load_pstinc(DisasContext *ctx, arg_lb *a, MemOp memop)
 static bool trans_xl_lb(DisasContext *ctx, arg_xl_lb *a)
 {
     REQUIRE_XXLCZ(ctx);
-    return gen_load_pstinc(ctx, a, MO_SB);
+    return gen_load_pstinc(ctx, a, MO_SB, 0);
 }
 
 static bool trans_xl_lbu(DisasContext *ctx, arg_xl_lbu *a)
 {
     REQUIRE_XXLCZ(ctx);
-    return gen_load_pstinc(ctx, a, MO_UB);
+    return gen_load_pstinc(ctx, a, MO_UB, 0);
 }
 
 static bool trans_xl_lh(DisasContext *ctx, arg_xl_lh *a)
 {
     REQUIRE_XXLCZ(ctx);
-    return gen_load_pstinc(ctx, a, MO_TESW);
+    return gen_load_pstinc(ctx, a, MO_TESW, 1);
 }
 
 static bool trans_xl_lhu(DisasContext *ctx, arg_xl_lhu *a)
 {
     REQUIRE_XXLCZ(ctx);
-    return gen_load_pstinc(ctx, a, MO_TEUW);
+    return gen_load_pstinc(ctx, a, MO_TEUW, 1);
 }
 
 static bool trans_xl_lw(DisasContext *ctx, arg_xl_lw *a)
 {
     REQUIRE_XXLCZ(ctx);
-    return gen_load_pstinc(ctx, a, MO_TESL);
+    return gen_load_pstinc(ctx, a, MO_TESL, 2);
 }
 //RV64 
 static bool trans_xl_lwu(DisasContext *ctx, arg_xl_lwu *a)
 {
     REQUIRE_XXLCZ(ctx);
-    return gen_load_pstinc(ctx, a, MO_TEUL);
+    return gen_load_pstinc(ctx, a, MO_TEUL, 2);
 }
 //RV64
 static bool trans_xl_ld(DisasContext *ctx, arg_xl_ld *a)
 {
     REQUIRE_XXLCZ(ctx);
-    return gen_load_pstinc(ctx, a, MO_TESQ);
+    return gen_load_pstinc(ctx, a, MO_TESQ, 3);
 }
 
-static bool gen_store_pstinc(DisasContext *ctx, arg_sb *a, MemOp memop)
+static bool gen_store_pstinc(DisasContext *ctx, arg_sb *a, MemOp memop, int shift)
 {
     TCGv data = get_gpr(ctx, a->rs2, EXT_NONE);
     TCGv src1 = get_gpr(ctx, a->rs1, EXT_NONE);
     TCGv addr = get_address(ctx, a->rs1, 0);
 
     tcg_gen_qemu_st_tl(data, addr, ctx->mem_idx, memop);
-    tcg_gen_addi_tl(src1, src1, a->imm);
+    tcg_gen_addi_tl(src1, src1, a->imm << shift);
     gen_set_gpr(ctx, a->rs1, src1);
     return true;
 }
@@ -94,25 +94,25 @@ static bool gen_store_pstinc(DisasContext *ctx, arg_sb *a, MemOp memop)
 static bool trans_xl_sb(DisasContext *ctx, arg_xl_sb *a)
 {
     REQUIRE_XXLCZ(ctx);
-    return gen_store_pstinc(ctx, a, MO_SB);
+    return gen_store_pstinc(ctx, a, MO_SB, 0);
 }
 
 static bool trans_xl_sh(DisasContext *ctx, arg_xl_sh *a)
 {
     REQUIRE_XXLCZ(ctx);
-    return gen_store_pstinc(ctx, a, MO_TESW);
+    return gen_store_pstinc(ctx, a, MO_TESW, 1);
 }
 
 static bool trans_xl_sw(DisasContext *ctx, arg_xl_sw *a)
 {
     REQUIRE_XXLCZ(ctx);
-    return gen_store_pstinc(ctx, a, MO_TESL);
+    return gen_store_pstinc(ctx, a, MO_TESL, 2);
 }
 
 static bool trans_xl_sd(DisasContext *ctx, arg_xl_sd *a)
 {
     REQUIRE_XXLCZ(ctx);
-    return gen_store_pstinc(ctx, a, MO_TESQ);
+    return gen_store_pstinc(ctx, a, MO_TESQ, 3);
 }
 
 static bool gen_load_gp(DisasContext *ctx, arg_xl_lgp *a, int shift, MemOp memop)
