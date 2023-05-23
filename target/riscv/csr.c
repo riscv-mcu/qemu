@@ -4815,7 +4815,7 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_SLEEPVALUE] =          { "sleepvalue", any,  read_sleepvalue,  write_sleepvalue  },
     [CSR_TXEVT] =               { "txevt", any,  read_txevt,       write_txevt       },
 
-    [CSR_MUCOUNTEREN] =         { "mucounteren", any,  read_mucounteren, write_mucounteren },
+    //[CSR_MUCOUNTEREN] =         { "mucounteren", any,  read_mucounteren, write_mucounteren },
     [CSR_MSCOUNTEREN] = { "msounteren", any,   read_mscounteren, write_mscounteren },
 
     /* Machine Trap Handling */

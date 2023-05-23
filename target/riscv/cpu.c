@@ -337,7 +337,6 @@ static void rv64imacu_nuclei_u_cpu_init(Object *obj)
     set_misa(env, MXL_RV64, RVI | RVM | RVA | RVC | RVS | RVU);
     register_cpu_props(DEVICE(obj));
     set_priv_version(env, PRIV_VERSION_1_12_0);
-    cpu->cfg.mmu = false;
 }
 
 static void rv64imafcu_nuclei_u_cpu_init(Object *obj)
@@ -348,7 +347,6 @@ static void rv64imafcu_nuclei_u_cpu_init(Object *obj)
     set_misa(env, MXL_RV64, RVI | RVM | RVA | RVF | RVC | RVS | RVU);
     register_cpu_props(DEVICE(obj));
     set_priv_version(env, PRIV_VERSION_1_12_0);
-    cpu->cfg.mmu = false;
 }
 
 static void rv64imafdcu_nuclei_u_cpu_init(Object *obj)
@@ -356,11 +354,9 @@ static void rv64imafdcu_nuclei_u_cpu_init(Object *obj)
     CPURISCVState *env = &RISCV_CPU(obj)->env;
     RISCVCPU *cpu = RISCV_CPU(obj);
 
-
     set_misa(env, MXL_RV64, RVI | RVM | RVA | RVF | RVD | RVC | RVS | RVU);
     register_cpu_props(DEVICE(obj));
     set_priv_version(env, PRIV_VERSION_1_12_0);
-    cpu->cfg.mmu = false;
 }
 
 #else

@@ -743,16 +743,10 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     sifive_uart_create(sys_mem, memmap[EVALSOC_UART1].base,
                        serial_hd(1), qdev_get_gpio_in(DEVICE(s->plic), EVALSOC_UART1_IRQ));
 
-    // s->eclic = nuclei_eclic_create(memmap[EVALSOC_ECLIC].base, 
-    //                                 memmap[EVALSOC_ECLIC].size, 
-    //                                 false, false, true,
-    //                                 ms->smp.cpus,
-    //                                 EVALSOC_INT_MAX,
-    //                                 EVALSOC_CLIC_INTCTLBITS);
 
-    // nuclei_systimer_create(memmap[EVALSOC_TIMER].base,
-    //             memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, NULL, EVALSOC_TIMEBASE_FREQ);
-
+    nuclei_systimer_create(memmap[EVALSOC_TIMER].base,
+                memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, NULL, EVALSOC_TIMEBASE_FREQ);
+#if 0
     riscv_aclint_swi_create(memmap[EVALSOC_TIMER].base + 0x1000, 0,
         ms->smp.cpus, false);
     riscv_aclint_mtimer_create(memmap[EVALSOC_TIMER].base + 0x1000 +
@@ -760,7 +754,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         RISCV_ACLINT_DEFAULT_MTIMER_SIZE, 0, ms->smp.cpus,
         RISCV_ACLINT_DEFAULT_MTIMECMP, RISCV_ACLINT_DEFAULT_MTIME,
         CLINT_TIMEBASE_FREQ, false);
-
+#endif
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->timer), errp))
     {
         return;
