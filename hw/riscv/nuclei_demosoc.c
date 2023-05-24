@@ -717,12 +717,6 @@ static void riscv_demosoc_soc_realize(DeviceState *dev, Error **errp)
                                  memmap[DEMOSOC_PLIC].size);
     g_free(plic_hart_config);
 
-    sifive_uart_create(sys_mem, memmap[DEMOSOC_UART0].base,
-                       serial_hd(0), qdev_get_gpio_in(DEVICE(s->plic), DEMOSOC_UART0_IRQ));
-
-    sifive_uart_create(sys_mem, memmap[DEMOSOC_UART1].base,
-                       serial_hd(1), qdev_get_gpio_in(DEVICE(s->plic), DEMOSOC_UART1_IRQ));
-
     s->eclic = nuclei_eclic_create(memmap[DEMOSOC_ECLIC].base, 
                                     memmap[DEMOSOC_ECLIC].size, 
                                     false, false, true,
@@ -730,8 +724,30 @@ static void riscv_demosoc_soc_realize(DeviceState *dev, Error **errp)
                                     DEMOSOC_INT_MAX,
                                     DEMOSOC_CLIC_INTCTLBITS);
 
-    nuclei_systimer_create(memmap[DEMOSOC_TIMER].base,
+    if(ms->kernel_filename)
+    {
+        /* Create and connect UART interrupts to the ECLIC */
+        nuclei_uart_create(sys_mem,
+                        memmap[DEMOSOC_UART0].base,
+                        memmap[DEMOSOC_UART0].size,
+                        serial_hd(0),
+                        nuclei_eclic_get_irq(DEVICE(s->eclic),
+                        DEMOSOC_INT22_IRQn));
+
+        nuclei_systimer_create(memmap[DEMOSOC_TIMER].base,
+                memmap[DEMOSOC_TIMER].size, 0, ms->smp.cpus, s->eclic, DEMOSOC_TIMEBASE_FREQ);
+    }
+    else
+    {
+        sifive_uart_create(sys_mem, memmap[DEMOSOC_UART0].base,
+                       serial_hd(0), qdev_get_gpio_in(DEVICE(s->plic), DEMOSOC_UART0_IRQ));
+
+        sifive_uart_create(sys_mem, memmap[DEMOSOC_UART1].base,
+                        serial_hd(1), qdev_get_gpio_in(DEVICE(s->plic), DEMOSOC_UART1_IRQ));
+
+        nuclei_systimer_create(memmap[DEMOSOC_TIMER].base,
                 memmap[DEMOSOC_TIMER].size, 0, ms->smp.cpus, NULL, DEMOSOC_TIMEBASE_FREQ);
+    }
 
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->timer), errp))
     {
