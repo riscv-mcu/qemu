@@ -105,7 +105,7 @@ static inline float16 check_nanbox_h(CPURISCVState *env, uint64_t f)
  * Note that vector data is stored in host-endian 64-bit chunks,
  * so addressing units smaller than that needs a host-endian fixup.
  */
-#ifdef HOST_BIG_ENDIAN
+#if HOST_BIG_ENDIAN
 #define H1(x)   ((x) ^ 7)
 #define H1_2(x) ((x) ^ 6)
 #define H1_4(x) ((x) ^ 4)
