@@ -1124,8 +1124,8 @@ static void riscv_cpu_realize(DeviceState *dev, Error **errp)
                     return;
                 }
             } else {
-                qemu_log("packed verison is not specified, "
-                         "use the default value v0.9.4\n");
+                // qemu_log("packed verison is not specified, "
+                //          "use the default value v0.9.4\n");
             }
             if (env->misa_ext == RV64) {
                 if (!cpu->cfg.ext_psfoperand) {
