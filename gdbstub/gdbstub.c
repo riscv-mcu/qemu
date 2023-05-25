@@ -3440,6 +3440,7 @@ int gdbserver_start(const char *device)
     Chardev *chr = NULL;
     Chardev *mon_chr;
 
+    printf("GDB Server listening on: '%s'...\n", device);
     if (!first_cpu) {
         error_report("gdbstub: meaningless to attach gdb to a "
                      "machine without any CPU.");
