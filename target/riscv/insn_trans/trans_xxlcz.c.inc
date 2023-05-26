@@ -417,13 +417,13 @@ static bool trans_xl_clb(DisasContext *ctx, arg_xl_clb *a)
 static bool trans_xl_fl1(DisasContext *ctx, arg_xl_fl1 *a)
 {
     REQUIRE_XXLCZ(ctx);
-    return gen_unary(ctx, a, EXT_NONE, gen_helper_xl_fl1);
+    return gen_unary(ctx, a, EXT_NONE, gen_ctz);
 }
 
 static bool trans_xl_ff1(DisasContext *ctx, arg_xl_ff1 *a)
 {
     REQUIRE_XXLCZ(ctx);
-    return gen_unary(ctx, a, EXT_NONE, gen_ctz);
+    return gen_unary(ctx, a, EXT_NONE, gen_helper_xl_ff1);
 }
 
 static bool trans_xl_ff0(DisasContext *ctx, arg_xl_ff0 *a)

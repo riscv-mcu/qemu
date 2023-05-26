@@ -1629,7 +1629,7 @@ DEF_HELPER_2(xl_bclrr, tl, tl, tl)
 DEF_HELPER_3(xl_bset, tl, tl, tl, tl)
 DEF_HELPER_2(xl_bsetr, tl, tl, tl)
 DEF_HELPER_1(xl_clb, tl, tl)
-DEF_HELPER_1(xl_fl1, tl, tl)
+DEF_HELPER_1(xl_ff1, tl, tl)
 DEF_HELPER_1(xl_ff0, tl, tl)
 DEF_HELPER_1(xl_fl0, tl, tl)
 

@@ -157,13 +157,13 @@ target_ulong HELPER(xl_clb)(target_ulong a)
     return cnt;
 }
 
-target_ulong HELPER(xl_fl1)(target_ulong a)
+target_ulong HELPER(xl_ff1)(target_ulong a)
 {
     target_ulong t = do_clz(a);
     return t == 32 ? 32 : 31 - t;
 }
 
-target_ulong HELPER(xl_fl0)(target_ulong a)
+target_ulong HELPER(xl_ff0)(target_ulong a)
 {
     int i;
     target_ulong  t = 32 ? 32 : 31 - do_clz(a);
@@ -176,7 +176,7 @@ target_ulong HELPER(xl_fl0)(target_ulong a)
     return t-i;
 }
 
-target_ulong HELPER(xl_ff0)(target_ulong a)
+target_ulong HELPER(xl_fl0)(target_ulong a)
 {
     int i;
 
