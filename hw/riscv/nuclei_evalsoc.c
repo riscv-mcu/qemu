@@ -55,7 +55,9 @@
 #define BIOS_FILENAME "opensbi-riscv64-generic-fw_dynamic.bin"
 #endif
 
-#define IREGION_BASE 0x18000000
+#define IREGION_BASE         0x18000000
+
+#define EVALSOC_DDR_ADDR     0xa0000000
 
 /* IREGION Offsets */
 #define IREGION_IINFO_OFS           (0x0)
@@ -87,9 +89,7 @@ static const struct MemmapEntry
     [EVALSOC_QSPI2] = { 0x10034000,    0x1000 },
     [EVALSOC_SMP]   = { IREGION_BASE + IREGION_SMP_OFS,           0x00001000 },
     [EVALSOC_XIP]   = { 0x20000000,    0x20000000},
-    [EVALSOC_ILM]   = { 0x80000000,    0x2000000 },
-    [EVALSOC_DLM]   = { 0x90000000,    0x2000000 },
-    [EVALSOC_DDR]   = { 0xA0000000,    0x10000000 },
+    [EVALSOC_DDR]   = { 0x80000000,    0x80000000 },
 };
 
 static void create_fdt(DemoSoCState *s, const struct MemmapEntry *memmap,
@@ -151,10 +151,10 @@ static void create_fdt(DemoSoCState *s, const struct MemmapEntry *memmap,
     g_free(nodename);
 
     nodename = g_strdup_printf("/memory@%lx",
-                               (long)memmap[EVALSOC_DDR].base);
+                               (long)EVALSOC_DDR_ADDR);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           memmap[EVALSOC_DDR].base >> 32, memmap[EVALSOC_DDR].base,
+                           EVALSOC_DDR_ADDR >> 32, EVALSOC_DDR_ADDR,
                            mem_size >> 32, mem_size);
     qemu_fdt_setprop_string(fdt, nodename, "device_type", "memory");
     g_free(nodename);
@@ -441,20 +441,9 @@ static void evalsoc_machine_init(MachineState *machine)
     qdev_realize(DEVICE(&s->soc), NULL, &error_abort);
 
     memory_region_init_ram(&s->soc.ddr, NULL, "riscv.evalsoc.ram.ddr",
-                           machine->ram_size, &error_fatal);
+                           memmap[EVALSOC_DDR].size, &error_fatal);
     memory_region_add_subregion(system_memory, memmap[EVALSOC_DDR].base,
                                 &s->soc.ddr);
-
-    memory_region_init_ram(&s->soc.ilm, NULL, "riscv.evalsoc.ram.ilm",
-        memmap[EVALSOC_ILM].size, &error_fatal);
-    memory_region_add_subregion(system_memory, 
-        memmap[EVALSOC_ILM].base, &s->soc.ilm);
-
-    memory_region_init_ram(&s->soc.dlm, NULL, "riscv.evalsoc.ram.dlm",
-        memmap[EVALSOC_DLM].size, &error_fatal);
-    memory_region_add_subregion(system_memory, 
-        memmap[EVALSOC_DLM].base, &s->soc.dlm);
-
 
     memory_region_init_ram(&s->soc.smp, NULL, "riscv.evalsoc.ram.smp",
         memmap[EVALSOC_SMP].size, &error_fatal);
@@ -478,7 +467,7 @@ static void evalsoc_machine_init(MachineState *machine)
     /* create device tree */
     create_fdt(s, memmap, machine->ram_size, machine->kernel_cmdline);
 
-    start_addr = memmap[EVALSOC_ILM].base;
+    start_addr = memmap[EVALSOC_DDR].base;
 
     if(s->download == NULL)
     {
@@ -491,7 +480,7 @@ static void evalsoc_machine_init(MachineState *machine)
         start_addr = memmap[EVALSOC_XIP].base;
     }else if(!strcmp(s->download, "ddr"))
     {
-        start_addr = memmap[EVALSOC_DDR].base;
+        start_addr = EVALSOC_DDR_ADDR;//memmap[EVALSOC_DDR].base;
     }
 
     if (machine->firmware) {
@@ -534,7 +523,7 @@ static void evalsoc_machine_init(MachineState *machine)
         kernel_entry = 0;
     }
     /* Compute the fdt load address in dram */
-    fdt_load_addr = riscv_load_fdt(memmap[EVALSOC_DDR].base,
+    fdt_load_addr = riscv_load_fdt(EVALSOC_DDR_ADDR,
                                    machine->ram_size, s->fdt);
 
 #if defined(TARGET_RISCV64)
