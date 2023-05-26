@@ -74,7 +74,7 @@ typedef struct NucLeiSYSTIMERState
 #define  NUCLEI_N_TIMEBASE_FREQ     (32768)
 #define  NUCLEI_U_TIMEBASE_FREQ     (32768)
 #define  DEMOSOC_TIMEBASE_FREQ      (32768)
-#define  EVALSOC_TIMEBASE_FREQ      (1000000)//(32768)
+#define  EVALSOC_TIMEBASE_FREQ      (32768)
 
 enum {
     NUCLEI_SIP_BASE     = 0x1000,
