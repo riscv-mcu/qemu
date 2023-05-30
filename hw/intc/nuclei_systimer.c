@@ -441,7 +441,6 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_ba
     RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(0));
     CPURISCVState *env = &cpu->env;
     hart_numbers = num_harts;
-    
     int i = 0;
 
     DeviceState *dev = qdev_new(TYPE_NUCLEI_SYSTIMER);
@@ -473,6 +472,7 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_ba
             if (!env) {
                 continue;
             }
+            riscv_cpu_set_rdtime_fn(env, cpu_riscv_read_rtc, dev);
             env->timer = timer_new_ns(QEMU_CLOCK_VIRTUAL,
                                     &sifive_clint_timer_cb, cpu);
             env->timecmp = 0;
