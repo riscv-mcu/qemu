@@ -459,17 +459,18 @@ static void demosoc_machine_init(MachineState *machine)
     /* create device tree */
     create_fdt(s, memmap, machine->ram_size, machine->kernel_cmdline);
 
-    start_addr = memmap[DEMOSOC_ILM].base;
 
     if(s->download == NULL){
-    } else if (!strcmp(s->download, "flash")) {
         start_addr = memmap[DEMOSOC_XIP].base;
-    } else if (!strcmp(s->download, "flashxip")) {
-        start_addr = memmap[DEMOSOC_XIP].base;
+    } else if (!strcmp(s->download, "ilm")) {
+        start_addr = memmap[DEMOSOC_ILM].base;
     } else if (!strcmp(s->download, "ddr")) {
         start_addr = memmap[DEMOSOC_DDR].base;
     } else if (!strcmp(s->download, "sram")) {
+        // sram mode use ddr mode base address
         start_addr = memmap[DEMOSOC_DDR].base;
+    } else {
+        start_addr = memmap[DEMOSOC_XIP].base;
     }
 
     if (machine->firmware) {
@@ -615,13 +616,13 @@ static void demosoc_machine_class_init(ObjectClass *oc, void *data)
                                    demosoc_machine_set_download);
     object_class_property_set_description(oc, "download",
                                           "Set on to tell QEMU's ROM to jump to "
-                                          "download modes. Otherwise QEMU will jump to ilm base address, aka download=ilm"
+                                          "download modes. Otherwise QEMU will jump to flash base address, aka download=flashxip"
                                           "nuclei support these download modes(flashxip,flash,ilm,ddr,sram)");
 
 }
 
 static const TypeInfo demosoc_machine_typeinfo = {
-    .name       = MACHINE_TYPE_NAME("demosoc"),
+    .name       = MACHINE_TYPE_NAME("nuclei-demosoc"),
     .parent     = TYPE_MACHINE,
     .class_init = demosoc_machine_class_init,
     .instance_init = demosoc_machine_instance_init,

@@ -472,20 +472,18 @@ static void evalsoc_machine_init(MachineState *machine)
     /* create device tree */
     create_fdt(s, memmap, machine->ram_size, machine->kernel_cmdline);
 
-    start_addr = EVALSOC_ILM_ADDR;
-
     if (s->download == NULL) {
+        start_addr = memmap[EVALSOC_XIP].base;
+    } else if (!strcmp(s->download, "ilm")) {
         start_addr = EVALSOC_ILM_ADDR;
-    } else if (!strcmp(s->download, "flash")) {
-        start_addr = memmap[EVALSOC_XIP].base;
-    } else if (!strcmp(s->download, "flashxip")) {
-        start_addr = memmap[EVALSOC_XIP].base;
     } else if(!strcmp(s->download, "ddr")) {
         // For cpu release after 2023.06, the DDR base changed from 0xA0000000 to 0x80000000
         // But we want to keep DOWNLOAD=ddr still use old 0xA0000000 base
         start_addr = EVALSOC_DDR_MODE_ADDR;
     } else if (!strcmp(s->download, "sram")) { // sram mode = ddr mode base address
         start_addr = EVALSOC_DDR_MODE_ADDR;
+    } else {
+        start_addr = memmap[EVALSOC_XIP].base;
     }
 
     if (machine->firmware) {
@@ -631,13 +629,13 @@ static void evalsoc_machine_class_init(ObjectClass *oc, void *data)
                                    evalsoc_machine_set_download);
     object_class_property_set_description(oc, "download",
                                           "Set on to tell QEMU's ROM to jump to "
-                                          "download mode. Otherwise QEMU will jump to ilm base address, aka download=ilm"
+                                          "download mode. Otherwise QEMU will jump to flash base address, aka download=flashxip"
                                           "nuclei support these download modes(flashxip,flash,ilm,ddr,sram)");
 
 }
 
 static const TypeInfo evalsoc_machine_typeinfo = {
-    .name       = MACHINE_TYPE_NAME("evalsoc"),
+    .name       = MACHINE_TYPE_NAME("nuclei-evalsoc"),
     .parent     = TYPE_MACHINE,
     .class_init = evalsoc_machine_class_init,
     .instance_init = evalsoc_machine_instance_init,
