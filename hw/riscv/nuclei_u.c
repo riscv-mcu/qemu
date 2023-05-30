@@ -482,19 +482,12 @@ static void nuclei_u_machine_init(MachineState *machine)
 
     start_addr = memmap[NUCLEI_U_DEV_ILM].base;
 
-    if (s->download == NULL)
-    {
-    }
-    else if (!strcmp(s->download, "flash"))
-    {
+    if (s->download == NULL) {
+    } else if (!strcmp(s->download, "flash")) {
         start_addr = memmap[NUCLEI_U_DEV_FLASH0].base;
-    }
-    else if (!strcmp(s->download, "flashxip"))
-    {
+    } else if (!strcmp(s->download, "flashxip")) {
         start_addr = memmap[NUCLEI_U_DEV_FLASH0].base;
-    }
-    else if (!strcmp(s->download, "ddr"))
-    {
+    } else if (!strcmp(s->download, "ddr")) {
         start_addr = memmap[NUCLEI_U_DEV_DRAM].base;
     }
 
@@ -502,12 +495,12 @@ static void nuclei_u_machine_init(MachineState *machine)
         firmware_end_addr = riscv_find_and_load_firmware(machine, BIOS_FILENAME,
                                                      start_addr, NULL);
     } else {
-        firmware_end_addr = 0xFFFFFFFFF;
+        firmware_end_addr = (target_ulong)(-1);
     }
 
     if (machine->kernel_filename)
     {
-        if (firmware_end_addr != 0xFFFFFFFFF) {
+        if (firmware_end_addr != (target_ulong)(-1)) {
             kernel_start_addr = riscv_calc_kernel_start_addr(&s->soc.u_cpus,
                                                          firmware_end_addr);
         } else {

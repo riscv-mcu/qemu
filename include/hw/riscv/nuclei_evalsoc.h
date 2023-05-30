@@ -56,9 +56,9 @@
 //#define TYPE_NUCLEI_SYSTIMER "riscv.nuclei.systimer"
 
 #define RISCV_EVALSOC_SOC(obj) \
-    OBJECT_CHECK(DemoSoCSoCState, (obj), TYPE_EVALSOC_SOC)
+    OBJECT_CHECK(EvalSoCSoCState, (obj), TYPE_EVALSOC_SOC)
 
-typedef struct DemoSoCSoCState {
+typedef struct EvalSoCSoCState {
     /*< private >*/
     SysBusDevice parent_obj;
 
@@ -86,7 +86,7 @@ typedef struct DemoSoCSoCState {
     uint32_t serial;
     char *cpu_type;
 
-} DemoSoCSoCState;
+} EvalSoCSoCState;
 
 typedef struct
 {
@@ -98,14 +98,14 @@ typedef struct
 
     const char *download;
     /*< public >*/
-    DemoSoCSoCState soc;
+    EvalSoCSoCState soc;
     uint32_t msel;
     uint32_t serial;
-} DemoSoCState;
+} EvalSoCState;
 
 #define TYPE_RISCV_EVALSOC_MACHINE MACHINE_TYPE_NAME("evalsoc")
 #define RISCV_EVALSOC_MACHINE(obj) \
-    OBJECT_CHECK(DemoSoCState, (obj), TYPE_RISCV_EVALSOC_MACHINE)
+    OBJECT_CHECK(EvalSoCState, (obj), TYPE_RISCV_EVALSOC_MACHINE)
 
 enum {
     EVALSOC_DEBUG,
@@ -226,9 +226,9 @@ enum
 #define EVALSOC_PLIC_CONTEXT_STRIDE 0x1000
 
 #if defined(TARGET_RISCV32)
-#define EVALSOC_CPU TYPE_RISCV_CPU_NUCLEI_N307FD
+#define EVALSOC_CPU TYPE_RISCV_CPU_NUCLEI_N300FD
 #elif defined(TARGET_RISCV64)
-#define EVALSOC_CPU TYPE_RISCV_CPU_NUCLEI_NX600FD
+#define EVALSOC_CPU TYPE_RISCV_CPU_NUCLEI_NX900FD
 #endif
 
 #endif

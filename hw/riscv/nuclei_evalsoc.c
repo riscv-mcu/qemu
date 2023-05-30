@@ -34,6 +34,7 @@
 #include "hw/riscv/numa.h"
 #include "hw/intc/riscv_aclint.h"
 #include "hw/intc/sifive_plic.h"
+#include "hw/char/sifive_uart.h"
 #include "hw/misc/sifive_test.h"
 #include "chardev/char.h"
 #include "sysemu/arch_init.h"
@@ -57,7 +58,11 @@
 
 #define IREGION_BASE         0x18000000
 
-#define EVALSOC_DDR_ADDR     0xa0000000
+
+#define EVALSOC_DDR_BASE     0x80000000
+#define EVALSOC_ILM_ADDR     0x80000000
+#define EVALSOC_DLM_ADDR     0x90000000
+#define EVALSOC_DDR_MODE_ADDR     0xA0000000
 
 /* IREGION Offsets */
 #define IREGION_IINFO_OFS           (0x0)
@@ -89,10 +94,10 @@ static const struct MemmapEntry
     [EVALSOC_QSPI2] = { 0x10034000,    0x1000 },
     [EVALSOC_SMP]   = { IREGION_BASE + IREGION_SMP_OFS,           0x00001000 },
     [EVALSOC_XIP]   = { 0x20000000,    0x20000000},
-    [EVALSOC_DDR]   = { 0x80000000,    0x80000000 },
+    [EVALSOC_DDR]   = { EVALSOC_DDR_BASE,    0x80000000 },
 };
 
-static void create_fdt(DemoSoCState *s, const struct MemmapEntry *memmap,
+static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
                        uint64_t mem_size, const char *cmdline)
 {
     MachineState *ms = MACHINE(qdev_get_machine());
@@ -123,9 +128,9 @@ static void create_fdt(DemoSoCState *s, const struct MemmapEntry *memmap,
         }
     }
 
-    qemu_fdt_setprop_string(fdt, "/", "model", "nuclei,ux600");
+    qemu_fdt_setprop_string(fdt, "/", "model", "nuclei,evalsoc");
     qemu_fdt_setprop_string(fdt, "/", "compatible",
-                            "nuclei,ux600");
+                            "nuclei,evalsoc");
     qemu_fdt_setprop_cell(fdt, "/", "#size-cells", 0x2);
     qemu_fdt_setprop_cell(fdt, "/", "#address-cells", 0x2);
 
@@ -151,11 +156,11 @@ static void create_fdt(DemoSoCState *s, const struct MemmapEntry *memmap,
     g_free(nodename);
 
     nodename = g_strdup_printf("/memory@%lx",
-                               (long)EVALSOC_DDR_ADDR);
+                               (long)EVALSOC_DDR_BASE);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           EVALSOC_DDR_ADDR >> 32, EVALSOC_DDR_ADDR,
-                           mem_size >> 32, mem_size);
+        memmap[EVALSOC_DDR].base >> 32, memmap[EVALSOC_DDR].base,
+        mem_size >> 32, mem_size);
     qemu_fdt_setprop_string(fdt, nodename, "device_type", "memory");
     g_free(nodename);
 
@@ -418,7 +423,7 @@ static void evalsoc_machine_init(MachineState *machine)
 {
     const struct MemmapEntry *memmap = evalsoc_memmap;
     target_ulong start_addr = memmap[EVALSOC_DDR].base;
-    DemoSoCState *s = RISCV_EVALSOC_MACHINE(machine);
+    EvalSoCState *s = RISCV_EVALSOC_MACHINE(machine);
     MemoryRegion *system_memory = get_system_memory();
     uint32_t start_addr_hi32 = 0x00000000;
     uint32_t fdt_load_addr;
@@ -467,32 +472,32 @@ static void evalsoc_machine_init(MachineState *machine)
     /* create device tree */
     create_fdt(s, memmap, machine->ram_size, machine->kernel_cmdline);
 
-    start_addr = memmap[EVALSOC_DDR].base;
+    start_addr = EVALSOC_ILM_ADDR;
 
-    if(s->download == NULL)
-    {
-
-    }else if(!strcmp(s->download, "flash"))
-    {
+    if (s->download == NULL) {
+        start_addr = EVALSOC_ILM_ADDR;
+    } else if (!strcmp(s->download, "flash")) {
         start_addr = memmap[EVALSOC_XIP].base;
-    }else if(!strcmp(s->download, "flashxip"))
-    {
+    } else if (!strcmp(s->download, "flashxip")) {
         start_addr = memmap[EVALSOC_XIP].base;
-    }else if(!strcmp(s->download, "ddr"))
-    {
-        start_addr = EVALSOC_DDR_ADDR;//memmap[EVALSOC_DDR].base;
+    } else if(!strcmp(s->download, "ddr")) {
+        // For cpu release after 2023.06, the DDR base changed from 0xA0000000 to 0x80000000
+        // But we want to keep DOWNLOAD=ddr still use old 0xA0000000 base
+        start_addr = EVALSOC_DDR_MODE_ADDR;
+    } else if (!strcmp(s->download, "sram")) { // sram mode = ddr mode base address
+        start_addr = EVALSOC_DDR_MODE_ADDR;
     }
 
     if (machine->firmware) {
         firmware_end_addr = riscv_find_and_load_firmware(machine, BIOS_FILENAME,
                                                      start_addr, NULL);
     } else {
-        firmware_end_addr = 0xFFFFFFFFF;
+        firmware_end_addr = (target_ulong)(-1);
     }
 
     if (machine->kernel_filename)
     {
-        if (firmware_end_addr != 0xFFFFFFFFF) {
+        if (firmware_end_addr != (target_ulong)(-1)) {
             kernel_start_addr = riscv_calc_kernel_start_addr(&s->soc.cpus,
                                                          firmware_end_addr);
         } else {
@@ -523,7 +528,7 @@ static void evalsoc_machine_init(MachineState *machine)
         kernel_entry = 0;
     }
     /* Compute the fdt load address in dram */
-    fdt_load_addr = riscv_load_fdt(EVALSOC_DDR_ADDR,
+    fdt_load_addr = riscv_load_fdt(EVALSOC_DDR_BASE,
                                    machine->ram_size, s->fdt);
 
 #if defined(TARGET_RISCV64)
@@ -600,13 +605,13 @@ static void evalsoc_machine_instance_init(Object *obj)
 
 static char* evalsoc_machine_get_download(Object *obj, Error **errp)
 {
-    DemoSoCState *s = RISCV_EVALSOC_MACHINE(obj);
+    EvalSoCState *s = RISCV_EVALSOC_MACHINE(obj);
     return g_strdup(s->download);
 }
 
 static void evalsoc_machine_set_download(Object *obj, const char *value, Error **errp)
 {
-    DemoSoCState *s = RISCV_EVALSOC_MACHINE(obj);
+    EvalSoCState *s = RISCV_EVALSOC_MACHINE(obj);
     s->download = g_strdup(value);
 }
 
@@ -626,8 +631,8 @@ static void evalsoc_machine_class_init(ObjectClass *oc, void *data)
                                    evalsoc_machine_set_download);
     object_class_property_set_description(oc, "download",
                                           "Set on to tell QEMU's ROM to jump to "
-                                          "download modes. Otherwise QEMU will jump to DRAM "
-                                          "nuclei support three download modes(flashxip,flash,ilm,ddr)");
+                                          "download mode. Otherwise QEMU will jump to ilm base address, aka download=ilm"
+                                          "nuclei support these download modes(flashxip,flash,ilm,ddr,sram)");
 
 }
 
@@ -636,7 +641,7 @@ static const TypeInfo evalsoc_machine_typeinfo = {
     .parent     = TYPE_MACHINE,
     .class_init = evalsoc_machine_class_init,
     .instance_init = evalsoc_machine_instance_init,
-    .instance_size = sizeof(DemoSoCState),
+    .instance_size = sizeof(EvalSoCState),
 };
 
 static void evalsoc_machine_init_register_types(void)
@@ -650,8 +655,7 @@ type_init(evalsoc_machine_init_register_types)
 
 static void riscv_evalsoc_soc_init(Object *obj)
 {
-    MachineState *ms = MACHINE(qdev_get_machine());
-    DemoSoCSoCState *s = RISCV_EVALSOC_SOC(obj);
+    EvalSoCSoCState *s = RISCV_EVALSOC_SOC(obj);
 
     object_initialize_child(obj, "u-cluster", &s->u_cluster, TYPE_CPU_CLUSTER);
     qdev_prop_set_uint32(DEVICE(&s->u_cluster), "cluster-id", 1);
@@ -668,10 +672,9 @@ static void riscv_evalsoc_soc_init(Object *obj)
 static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
 {
     MachineState *ms = MACHINE(qdev_get_machine());
-    DemoSoCSoCState *s = RISCV_EVALSOC_SOC(dev);
+    EvalSoCSoCState *s = RISCV_EVALSOC_SOC(dev);
     const struct MemmapEntry *memmap = evalsoc_memmap;
     MemoryRegion *sys_mem = get_system_memory();
-    Error *err = NULL;
     int i = 0;
     char *plic_hart_config;
     size_t plic_hart_config_len;
@@ -796,8 +799,8 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
 }
 
 static Property evalsoc_soc_props[] = {
-    DEFINE_PROP_UINT32("serial", DemoSoCSoCState, serial, OTP_SERIAL),
-    DEFINE_PROP_STRING("cpu-type", DemoSoCSoCState, cpu_type),
+    DEFINE_PROP_UINT32("serial", EvalSoCSoCState, serial, OTP_SERIAL),
+    DEFINE_PROP_STRING("cpu-type", EvalSoCSoCState, cpu_type),
     DEFINE_PROP_END_OF_LIST()
 };
 
@@ -812,7 +815,7 @@ static void riscv_evalsoc_soc_class_init(ObjectClass *oc, void *data)
 static const TypeInfo riscv_evalsoc_soc_type_info = {
     .name = TYPE_EVALSOC_SOC,
     .parent = TYPE_DEVICE,
-    .instance_size = sizeof(DemoSoCSoCState),
+    .instance_size = sizeof(EvalSoCSoCState),
     .instance_init = riscv_evalsoc_soc_init,
     .class_init = riscv_evalsoc_soc_class_init,
 };

@@ -34,6 +34,7 @@
 #include "hw/riscv/numa.h"
 #include "hw/intc/riscv_aclint.h"
 #include "hw/intc/sifive_plic.h"
+#include "hw/char/sifive_uart.h"
 #include "hw/misc/sifive_test.h"
 #include "chardev/char.h"
 #include "sysemu/arch_init.h"
@@ -460,17 +461,14 @@ static void demosoc_machine_init(MachineState *machine)
 
     start_addr = memmap[DEMOSOC_ILM].base;
 
-    if(s->download == NULL)
-    {
-
-    }else if(!strcmp(s->download, "flash"))
-    {
+    if(s->download == NULL){
+    } else if (!strcmp(s->download, "flash")) {
         start_addr = memmap[DEMOSOC_XIP].base;
-    }else if(!strcmp(s->download, "flashxip"))
-    {
+    } else if (!strcmp(s->download, "flashxip")) {
         start_addr = memmap[DEMOSOC_XIP].base;
-    }else if(!strcmp(s->download, "ddr"))
-    {
+    } else if (!strcmp(s->download, "ddr")) {
+        start_addr = memmap[DEMOSOC_DDR].base;
+    } else if (!strcmp(s->download, "sram")) {
         start_addr = memmap[DEMOSOC_DDR].base;
     }
 
@@ -478,12 +476,12 @@ static void demosoc_machine_init(MachineState *machine)
         firmware_end_addr = riscv_find_and_load_firmware(machine, BIOS_FILENAME,
                                                      start_addr, NULL);
     } else {
-        firmware_end_addr = 0xFFFFFFFFF;
+        firmware_end_addr = (target_ulong)(-1);
     }
 
     if (machine->kernel_filename)
     {
-        if (firmware_end_addr != 0xFFFFFFFFF) {
+        if (firmware_end_addr != (target_ulong)(-1)) {
             kernel_start_addr = riscv_calc_kernel_start_addr(&s->soc.cpus,
                                                          firmware_end_addr);
         } else {
@@ -617,8 +615,8 @@ static void demosoc_machine_class_init(ObjectClass *oc, void *data)
                                    demosoc_machine_set_download);
     object_class_property_set_description(oc, "download",
                                           "Set on to tell QEMU's ROM to jump to "
-                                          "download modes. Otherwise QEMU will jump to DRAM "
-                                          "nuclei support three download modes(flashxip,flash,ilm,ddr)");
+                                          "download modes. Otherwise QEMU will jump to ilm base address, aka download=ilm"
+                                          "nuclei support these download modes(flashxip,flash,ilm,ddr,sram)");
 
 }
 
@@ -641,7 +639,6 @@ type_init(demosoc_machine_init_register_types)
 
 static void riscv_demosoc_soc_init(Object *obj)
 {
-    MachineState *ms = MACHINE(qdev_get_machine());
     DemoSoCSoCState *s = RISCV_DEMOSOC_SOC(obj);
 
     object_initialize_child(obj, "u-cluster", &s->u_cluster, TYPE_CPU_CLUSTER);
@@ -662,7 +659,6 @@ static void riscv_demosoc_soc_realize(DeviceState *dev, Error **errp)
     DemoSoCSoCState *s = RISCV_DEMOSOC_SOC(dev);
     const struct MemmapEntry *memmap = demosoc_memmap;
     MemoryRegion *sys_mem = get_system_memory();
-    Error *err = NULL;
     int i = 0;
     char *plic_hart_config;
     size_t plic_hart_config_len;
@@ -717,8 +713,8 @@ static void riscv_demosoc_soc_realize(DeviceState *dev, Error **errp)
                                  memmap[DEMOSOC_PLIC].size);
     g_free(plic_hart_config);
 
-    s->eclic = nuclei_eclic_create(memmap[DEMOSOC_ECLIC].base, 
-                                    memmap[DEMOSOC_ECLIC].size, 
+    s->eclic = nuclei_eclic_create(memmap[DEMOSOC_ECLIC].base,
+                                    memmap[DEMOSOC_ECLIC].size,
                                     false, false, true,
                                     ms->smp.cpus,
                                     DEMOSOC_INT_MAX,
