@@ -490,6 +490,37 @@ static void rv32imafdcu_nuclei_cpu_init(Object *obj)
     set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
 }
+
+static void rv32imacu_nuclei_u_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV32, RVI | RVM | RVA | RVC | RVS | RVU);
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+}
+
+static void rv32imafcu_nuclei_u_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV32, RVI | RVM | RVA | RVF | RVC | RVS | RVU);
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+}
+
+static void rv32imafdcu_nuclei_u_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV32, RVI | RVM | RVA | RVF | RVD | RVC | RVS | RVU);
+    register_cpu_props(DEVICE(obj));
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+}
+
 #endif
 
 #if defined(CONFIG_KVM)
@@ -1615,6 +1646,12 @@ static const TypeInfo riscv_cpu_type_infos[] = {
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N900,      rv32imacu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N900F,     rv32imafcu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N900FD,    rv32imafdcu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_U600,      rv32imacu_nuclei_u_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_U600F,     rv32imafcu_nuclei_u_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_U600FD,    rv32imafdcu_nuclei_u_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_U900,      rv32imacu_nuclei_u_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_U900F,     rv32imafcu_nuclei_u_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_U900FD,    rv32imafdcu_nuclei_u_cpu_init),
 #elif defined(TARGET_RISCV64)
     DEFINE_CPU(TYPE_RISCV_CPU_BASE64,           rv64_base_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_SIFIVE_E51,       rv64_sifive_e_cpu_init),
