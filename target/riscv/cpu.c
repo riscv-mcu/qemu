@@ -138,6 +138,7 @@ static const struct isa_ext_data isa_edata_arr[] = {
     ISA_EXT_DATA_ENTRY(xtheadmempair, true, PRIV_VERSION_1_11_0, ext_xtheadmempair),
     ISA_EXT_DATA_ENTRY(xtheadsync, true, PRIV_VERSION_1_11_0, ext_xtheadsync),
     ISA_EXT_DATA_ENTRY(xventanacondops, true, PRIV_VERSION_1_12_0, ext_XVentanaCondOps),
+    ISA_EXT_DATA_ENTRY(xxlcz, true, PRIV_VERSION_1_12_0, ext_xxlcz),
 };
 
 static bool isa_ext_is_enabled(RISCVCPU *cpu,
@@ -1516,6 +1517,9 @@ static Property riscv_cpu_extensions[] = {
     DEFINE_PROP_BOOL("x-zcf", RISCVCPU, cfg.ext_zcf, false),
     DEFINE_PROP_BOOL("x-zcmp", RISCVCPU, cfg.ext_zcmp, false),
     DEFINE_PROP_BOOL("x-zcmt", RISCVCPU, cfg.ext_zcmt, false),
+
+    /* Nuclei custom xxclz extension */
+    DEFINE_PROP_BOOL("x-xxlcz", RISCVCPU, cfg.ext_xxlcz, false),
 
     /* ePMP 0.9.3 */
     DEFINE_PROP_BOOL("x-epmp", RISCVCPU, cfg.epmp, false),
