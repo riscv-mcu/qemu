@@ -386,7 +386,7 @@ static bool trans_xl_bset(DisasContext *ctx, arg_xl_bset *a)
 static bool trans_xl_bsetr(DisasContext *ctx, arg_xl_bsetr *a)
 {
     REQUIRE_XXLCZ(ctx);
-    return gen_arith(ctx, a, EXT_NONE, gen_helper_xl_bset, NULL);
+    return gen_arith(ctx, a, EXT_NONE, gen_helper_xl_bsetr, NULL);
 }
 
 static bool trans_xl_bclr(DisasContext *ctx, arg_xl_bclr *a)
@@ -405,7 +405,7 @@ static bool trans_xl_bclr(DisasContext *ctx, arg_xl_bclr *a)
 static bool trans_xl_bclrr(DisasContext *ctx, arg_xl_bclrr *a)
 {
     REQUIRE_XXLCZ(ctx);
-    return gen_arith(ctx, a, EXT_NONE, gen_helper_xl_bclr, NULL);
+    return gen_arith(ctx, a, EXT_NONE, gen_helper_xl_bclrr, NULL);
 }
 
 static bool trans_xl_clb(DisasContext *ctx, arg_xl_clb *a)
