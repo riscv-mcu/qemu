@@ -635,7 +635,7 @@ static void evalsoc_machine_class_init(ObjectClass *oc, void *data)
 }
 
 static const TypeInfo evalsoc_machine_typeinfo = {
-    .name       = MACHINE_TYPE_NAME("nuclei-evalsoc"),
+    .name       = MACHINE_TYPE_NAME("nuclei_evalsoc"),
     .parent     = TYPE_MACHINE,
     .class_init = evalsoc_machine_class_init,
     .instance_init = evalsoc_machine_instance_init,

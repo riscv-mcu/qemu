@@ -622,7 +622,7 @@ static void demosoc_machine_class_init(ObjectClass *oc, void *data)
 }
 
 static const TypeInfo demosoc_machine_typeinfo = {
-    .name       = MACHINE_TYPE_NAME("nuclei-demosoc"),
+    .name       = MACHINE_TYPE_NAME("nuclei_demosoc"),
     .parent     = TYPE_MACHINE,
     .class_init = demosoc_machine_class_init,
     .instance_init = demosoc_machine_instance_init,
