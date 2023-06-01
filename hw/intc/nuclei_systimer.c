@@ -472,7 +472,7 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_ba
             if (!env) {
                 continue;
             }
-            riscv_cpu_set_rdtime_fn(env, cpu_riscv_read_rtc, dev);
+            riscv_cpu_set_rdtime_fn(env, cpu_riscv_read_rtc, s->timebase_freq);
             env->timer = timer_new_ns(QEMU_CLOCK_VIRTUAL,
                                     &sifive_clint_timer_cb, cpu);
             env->timecmp = 0;
