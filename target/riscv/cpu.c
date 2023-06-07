@@ -1157,6 +1157,12 @@ static void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         }
     }
 
+    // If zca/zcb/zcf/zcd/zcmp/zcmt enabled, extension c should be disabled for nuclei processor
+    if (cpu->cfg.ext_zca || cpu->cfg.ext_zcb || cpu->cfg.ext_zcf || \
+        cpu->cfg.ext_zcd || cpu->cfg.ext_zcmp || cpu->cfg.ext_zcmt) {
+        cpu->cfg.ext_c = false;
+    }
+
     if (cpu->cfg.ext_c) {
         cpu->cfg.ext_zca = true;
         if (cpu->cfg.ext_f && env->misa_mxl_max == MXL_RV32) {
@@ -1979,7 +1985,7 @@ static void cpu_set_ext_state(Object *obj, const char *value, Error **errp)
 
     for (subext = strtok(isa_ext, "_"); subext; subext = strtok(NULL, "_")) {
         for (i = 0; i < ARRAY_SIZE(isa_edata_arr); i++) {
-            if (isa_edata_arr[i].multi_letter && strcmp(isa_edata_arr[i].name, subext) == 0) {
+            if (strcmp(isa_edata_arr[i].name, subext) == 0) {
                 isa_ext_update_enabled(cpu, &isa_edata_arr[i], true);
             }
         }
