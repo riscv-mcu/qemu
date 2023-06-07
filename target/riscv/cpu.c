@@ -1961,6 +1961,32 @@ static const struct TCGCPUOps riscv_tcg_ops = {
 #endif /* !CONFIG_USER_ONLY */
 };
 
+static char* cpu_get_ext_state(Object *obj, Error **errp)
+{
+    RISCVCPU *cpu = RISCV_CPU(obj);
+    return riscv_isa_string(cpu);
+}
+
+static void cpu_set_ext_state(Object *obj, const char *value, Error **errp)
+{
+    RISCVCPU *cpu = RISCV_CPU(obj);
+    const size_t slen = strlen(value);
+    char *isa_ext = g_new(char, slen);
+    char *subext = NULL;
+    int i = 0;
+
+    memcpy(isa_ext, value, slen);
+
+    for (subext = strtok(isa_ext, "_"); subext; subext = strtok(NULL, "_")) {
+        for (i = 0; i < ARRAY_SIZE(isa_edata_arr); i++) {
+            if (isa_edata_arr[i].multi_letter && strcmp(isa_edata_arr[i].name, subext) == 0) {
+                isa_ext_update_enabled(cpu, &isa_edata_arr[i], true);
+            }
+        }
+    }
+    g_free(isa_ext);
+}
+
 static void riscv_cpu_class_init(ObjectClass *c, void *data)
 {
     RISCVCPUClass *mcc = RISCV_CPU_CLASS(c);
@@ -1991,6 +2017,12 @@ static void riscv_cpu_class_init(ObjectClass *c, void *data)
     cc->gdb_arch_name = riscv_gdb_arch_name;
     cc->gdb_get_dynamic_xml = riscv_gdb_get_dynamic_xml;
     cc->tcg_ops = &riscv_tcg_ops;
+
+    object_class_property_add_str(c, "ext",
+                                   cpu_get_ext_state,
+                                   cpu_set_ext_state);
+    object_class_property_set_description(c, "ext",
+                                          "nuclei arch extension, such as _zba_zbb_zbc");
 
     device_class_set_props(dc, riscv_cpu_properties);
 }
