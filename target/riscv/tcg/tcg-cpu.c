@@ -958,7 +958,7 @@ static void cpu_set_misa_ext_cfg(Object *obj, Visitor *v, const char *name,
     target_ulong misa_bit = misa_ext_cfg->misa_bit;
     RISCVCPU *cpu = RISCV_CPU(obj);
     CPURISCVState *env = &cpu->env;
-    bool vendor_cpu = riscv_cpu_is_vendor(obj);
+    // bool vendor_cpu = riscv_cpu_is_vendor(obj);
     bool prev_val, value;
 
     if (!visit_type_bool(v, name, &value, errp)) {
@@ -974,12 +974,12 @@ static void cpu_set_misa_ext_cfg(Object *obj, Visitor *v, const char *name,
     }
 
     if (value) {
-        if (vendor_cpu) {
-            g_autofree char *cpuname = riscv_cpu_get_name(cpu);
-            error_setg(errp, "'%s' CPU does not allow enabling extensions",
-                       cpuname);
-            return;
-        }
+        // if (vendor_cpu) {
+        //     g_autofree char *cpuname = riscv_cpu_get_name(cpu);
+        //     error_setg(errp, "'%s' CPU does not allow enabling extensions",
+        //                cpuname);
+        //     return;
+        // }
 
         if (misa_bit == RVH && env->priv_ver < PRIV_VERSION_1_12_0) {
             /*
@@ -1195,7 +1195,7 @@ static void cpu_set_multi_ext_cfg(Object *obj, Visitor *v, const char *name,
 {
     const RISCVCPUMultiExtConfig *multi_ext_cfg = opaque;
     RISCVCPU *cpu = RISCV_CPU(obj);
-    bool vendor_cpu = riscv_cpu_is_vendor(obj);
+    // bool vendor_cpu = riscv_cpu_is_vendor(obj);
     bool prev_val, value;
 
     if (!visit_type_bool(v, name, &value, errp)) {
@@ -1217,12 +1217,12 @@ static void cpu_set_multi_ext_cfg(Object *obj, Visitor *v, const char *name,
         return;
     }
 
-    if (value && vendor_cpu) {
-        g_autofree char *cpuname = riscv_cpu_get_name(cpu);
-        error_setg(errp, "'%s' CPU does not allow enabling extensions",
-                   cpuname);
-        return;
-    }
+    // if (value && vendor_cpu) {
+    //     g_autofree char *cpuname = riscv_cpu_get_name(cpu);
+    //     error_setg(errp, "'%s' CPU does not allow enabling extensions",
+    //                cpuname);
+    //     return;
+    // }
 
     if (value) {
         cpu_bump_multi_ext_priv_ver(&cpu->env, multi_ext_cfg->offset);

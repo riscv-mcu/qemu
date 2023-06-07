@@ -2735,6 +2735,45 @@ static const struct SysemuCPUOps riscv_sysemu_ops = {
 };
 #endif
 
+static char* cpu_get_ext_state(Object *obj, Error **errp)
+{
+    RISCVCPU *cpu = RISCV_CPU(obj);
+    return riscv_isa_string(cpu);
+}
+
+static void cpu_set_ext_state(Object *obj, const char *value, Error **errp)
+{
+    const RISCVCPUMultiExtConfig *prop;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+    /* need to copy full string include terminator char \0 */
+    const size_t slen = strlen(value) + 1;
+    char *isa_ext = g_new(char, slen);
+    char *subext = NULL;
+
+    memcpy(isa_ext, value, slen);
+
+    for (subext = strtok(isa_ext, "_"); subext; subext = strtok(NULL, "_")) {
+        if (strcmp(subext, "v") == 0)
+            cpu->env.misa_ext |= RVV;
+
+        for (prop = riscv_cpu_extensions; prop && prop->name; prop++) {
+            if (strcmp(prop->name, subext) == 0) {
+                isa_ext_update_enabled(cpu, prop->offset, true);
+                if ((strcmp(prop->name, "zve64d") == 0)
+                    && (cpu->cfg.vlenb >= 128 >>3))
+                    cpu->env.misa_ext |= RVV;
+            }
+        }
+
+        for (prop = riscv_cpu_vendor_exts; prop && prop->name; prop++) {
+            if (strcmp(prop->name, subext) == 0) {
+                isa_ext_update_enabled(cpu, prop->offset, true);
+            }
+        }
+    }
+    g_free(isa_ext);
+}
+
 static void riscv_cpu_common_class_init(ObjectClass *c, void *data)
 {
     RISCVCPUClass *mcc = RISCV_CPU_CLASS(c);
@@ -2763,6 +2802,12 @@ static void riscv_cpu_common_class_init(ObjectClass *c, void *data)
     cc->get_arch_id = riscv_get_arch_id;
 #endif
     cc->gdb_arch_name = riscv_gdb_arch_name;
+
+    object_class_property_add_str(c, "ext",
+                                   cpu_get_ext_state,
+                                   cpu_set_ext_state);
+    object_class_property_set_description(c, "ext",
+                        "nuclei arch extension, such as _zba_zbb_zbc");
 
     device_class_set_props(dc, riscv_cpu_properties);
 }

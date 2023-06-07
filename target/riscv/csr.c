@@ -1384,13 +1384,10 @@ static RISCVException write_mstatus(CPURISCVState *env, int csrno,
     mask = MSTATUS_SIE | MSTATUS_SPIE | MSTATUS_MIE | MSTATUS_MPIE |
         MSTATUS_SPP | MSTATUS_MPRV | MSTATUS_SUM |
         MSTATUS_MPP | MSTATUS_MXR | MSTATUS_TVM | MSTATUS_TSR |
-        MSTATUS_TW;
+        MSTATUS_TW | MSTATUS_VS;
 
     if (riscv_has_ext(env, RVF)) {
         mask |= MSTATUS_FS;
-    }
-    if (riscv_has_ext(env, RVV)) {
-        mask |= MSTATUS_VS;
     }
 
     if (xl != MXL_RV32 || env->debugger) {
