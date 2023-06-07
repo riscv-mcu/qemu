@@ -116,6 +116,10 @@ static const struct isa_ext_data isa_edata_arr[] = {
     ISA_EXT_DATA_ENTRY(svnapot, true, PRIV_VERSION_1_12_0, ext_svnapot),
     ISA_EXT_DATA_ENTRY(svpbmt, true, PRIV_VERSION_1_12_0, ext_svpbmt),
     ISA_EXT_DATA_ENTRY(xventanacondops, true, PRIV_VERSION_1_12_0, ext_XVentanaCondOps),
+    ISA_EXT_DATA_ENTRY(xxldsp, true, PRIV_VERSION_1_12_0, ext_xxldsp),
+    ISA_EXT_DATA_ENTRY(xxldspn1x, true, PRIV_VERSION_1_12_0, ext_xxldspn1x),
+    ISA_EXT_DATA_ENTRY(xxldspn2x, true, PRIV_VERSION_1_12_0, ext_xxldspn2x),
+    ISA_EXT_DATA_ENTRY(xxldspn3x, true, PRIV_VERSION_1_12_0, ext_xxldspn3x),
     ISA_EXT_DATA_ENTRY(xxlcz, true, PRIV_VERSION_1_12_0, ext_xxlcz),
 };
 
@@ -337,6 +341,7 @@ static void rv64imacu_nuclei_u_cpu_init(Object *obj)
     set_misa(env, MXL_RV64, RVI | RVM | RVA | RVC | RVS | RVU);
     register_cpu_props(DEVICE(obj));
     set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = true;
 }
 
 static void rv64imafcu_nuclei_u_cpu_init(Object *obj)
@@ -347,6 +352,7 @@ static void rv64imafcu_nuclei_u_cpu_init(Object *obj)
     set_misa(env, MXL_RV64, RVI | RVM | RVA | RVF | RVC | RVS | RVU);
     register_cpu_props(DEVICE(obj));
     set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = true;
 }
 
 static void rv64imafdcu_nuclei_u_cpu_init(Object *obj)
@@ -357,6 +363,7 @@ static void rv64imafdcu_nuclei_u_cpu_init(Object *obj)
     set_misa(env, MXL_RV64, RVI | RVM | RVA | RVF | RVD | RVC | RVS | RVU);
     register_cpu_props(DEVICE(obj));
     set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = true;
 }
 
 #else
@@ -499,6 +506,7 @@ static void rv32imacu_nuclei_u_cpu_init(Object *obj)
     set_misa(env, MXL_RV32, RVI | RVM | RVA | RVC | RVS | RVU);
     register_cpu_props(DEVICE(obj));
     set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = true;
 }
 
 static void rv32imafcu_nuclei_u_cpu_init(Object *obj)
@@ -509,6 +517,7 @@ static void rv32imafcu_nuclei_u_cpu_init(Object *obj)
     set_misa(env, MXL_RV32, RVI | RVM | RVA | RVF | RVC | RVS | RVU);
     register_cpu_props(DEVICE(obj));
     set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = true;
 }
 
 static void rv32imafdcu_nuclei_u_cpu_init(Object *obj)
@@ -519,6 +528,7 @@ static void rv32imafdcu_nuclei_u_cpu_init(Object *obj)
     set_misa(env, MXL_RV32, RVI | RVM | RVA | RVF | RVD | RVC | RVS | RVU);
     register_cpu_props(DEVICE(obj));
     set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = true;
 }
 
 #endif
@@ -1126,7 +1136,6 @@ static void riscv_cpu_realize(DeviceState *dev, Error **errp)
             set_vext_version(env, vext_version);
         }
 
-
         if (cpu->cfg.ext_xxldspn3x) {
             cpu->cfg.ext_xxldspn2x = true;
             cpu->cfg.ext_xxldspn1x = true;
@@ -1139,6 +1148,10 @@ static void riscv_cpu_realize(DeviceState *dev, Error **errp)
         }
 
         if (cpu->cfg.ext_xxldspn1x) {
+            cpu->cfg.ext_p = true;
+        }
+
+        if (cpu->cfg.ext_xxldsp) {
             cpu->cfg.ext_p = true;
         }
 
@@ -1158,7 +1171,7 @@ static void riscv_cpu_realize(DeviceState *dev, Error **errp)
                 // qemu_log("packed verison is not specified, "
                 //          "use the default value v0.9.4\n");
             }
-            if (env->misa_ext == RV64) {
+            if ((env->misa_ext & RV64) == RV64) {
                 if (!cpu->cfg.ext_psfoperand) {
                     error_setg(errp, "The Zpsfoperand"
                                      "sub-extensions is required for RV64P.");
@@ -1328,6 +1341,7 @@ static Property riscv_cpu_extensions[] = {
     DEFINE_PROP_BOOL("zksed", RISCVCPU, cfg.ext_zksed, false),
     DEFINE_PROP_BOOL("zksh", RISCVCPU, cfg.ext_zksh, false),
     DEFINE_PROP_BOOL("zkt", RISCVCPU, cfg.ext_zkt, false),
+    DEFINE_PROP_BOOL("xxldsp", RISCVCPU, cfg.ext_xxldsp, false),
     DEFINE_PROP_BOOL("xxldspn1x", RISCVCPU, cfg.ext_xxldspn1x, false),
     DEFINE_PROP_BOOL("xxldspn2x", RISCVCPU, cfg.ext_xxldspn2x, false),
     DEFINE_PROP_BOOL("xxldspn3x", RISCVCPU, cfg.ext_xxldspn3x, false),
@@ -1460,36 +1474,22 @@ static char* cpu_get_ext_state(Object *obj, Error **errp)
 
 static void cpu_set_ext_state(Object *obj, const char *value, Error **errp)
 {
-    uint32_t ext = 0;
-    int ii = 0;
     RISCVCPU *cpu = RISCV_CPU(obj);
-    CPURISCVState *env = &cpu->env;
     const size_t slen = strlen(value);
-    char *isa_str = g_new(char, slen);
-    memcpy(isa_str, value, slen);
-    for (ii = 0; ii < slen; ii++) 
-    {
-        if(isa_str[ii] == 'b')
-        {
-            ext |= RVB;
-        }
+    char *isa_ext = g_new(char, slen);
+    char *subext = NULL;
+    int i = 0;
 
-        if(isa_str[ii] == 'k')
-        {
-            ext |= RVK;
-        }
+    memcpy(isa_ext, value, slen);
 
-        if(isa_str[ii] == 'p')
-        {
-            ext |= RVP;
-        }
-
-        if(isa_str[ii] == 'v')
-        {
-            ext |= RVV;
+    for (subext = strtok(isa_ext, "_"); subext; subext = strtok(NULL, "_")) {
+        for (i = 0; i < ARRAY_SIZE(isa_edata_arr); i++) {
+            if (isa_edata_arr[i].multi_letter && strcmp(isa_edata_arr[i].name, subext) == 0) {
+                isa_ext_update_enabled(cpu, &isa_edata_arr[i], true);
+            }
         }
     }
-    set_misa(env, env->misa_mxl, ext);
+    g_free(isa_ext);
 }
 
 static void riscv_cpu_class_init(ObjectClass *c, void *data)
@@ -1529,7 +1529,7 @@ static void riscv_cpu_class_init(ObjectClass *c, void *data)
                                    cpu_get_ext_state,
                                    cpu_set_ext_state);
     object_class_property_set_description(c, "ext",
-                                          "nuclei ext");
+                                          "nuclei arch extension, such as _zba_zbb_zbc");
 
     device_class_set_props(dc, riscv_cpu_properties);
 }
