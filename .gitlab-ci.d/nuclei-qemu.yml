@@ -149,7 +149,7 @@ build_windows_qemu:
 test_sdk:
   stage: test
   timeout: 2h 30m
-  when: never
+  when: manual
   interruptible: true
   script:
     - apt-get -y update --fix-missing 
@@ -184,7 +184,7 @@ test_sdk:
 test_nmsis:
   stage: test
   timeout: 4h
-  when: never
+  when: manual
   interruptible: true
   script:
     - apt-get -y update --fix-missing 
