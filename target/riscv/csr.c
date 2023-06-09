@@ -4715,10 +4715,10 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_PUSHSEPC]      = { "pushsepc",      any,   read_zero, write_any},
 
     /* User Timers and Counters */
-    [CSR_CYCLE]    = { "cycle",    ctr,    read_hpmcounter  },
-    [CSR_INSTRET]  = { "instret",  ctr,    read_hpmcounter  },
-    [CSR_CYCLEH]   = { "cycleh",   ctr32,  read_hpmcounterh },
-    [CSR_INSTRETH] = { "instreth", ctr32,  read_hpmcounterh },
+    [CSR_CYCLE]    = { "cycle",    any,    read_hpmcounter  },
+    [CSR_INSTRET]  = { "instret",  any,    read_hpmcounter  },
+    [CSR_CYCLEH]   = { "cycleh",   any32,  read_hpmcounterh },
+    [CSR_INSTRETH] = { "instreth", any32,  read_hpmcounterh },
 
     /* P-Extension Registers */
     [CSR_UCODE]    = { "ucode",    any,    read_zero, write_any},
@@ -4760,8 +4760,8 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
      * In privileged mode, the monitor will have to emulate TIME CSRs only if
      * rdtime callback is not provided by machine/platform emulation.
      */
-    [CSR_TIME]  = { "time",  ctr,   read_time  },
-    [CSR_TIMEH] = { "timeh", ctr32, read_timeh },
+    [CSR_TIME]  = { "time",  any,   read_time  },
+    [CSR_TIMEH] = { "timeh", any32, read_timeh },
 
     /* Crypto Extension */
     [CSR_SEED] = { "seed", seed, NULL, NULL, rmw_seed },
