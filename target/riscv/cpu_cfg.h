@@ -219,6 +219,12 @@ static inline bool has_xxlcz_p(const RISCVCPUConfig *cfg)
            cfg->ext_xxlczbitrev || cfg->ext_xxlczgp;
 }
 
+static inline bool has_xxldsp_p(const RISCVCPUConfig *cfg)
+{
+    return cfg->ext_xxldsp || cfg->ext_xxldspn1x ||
+           cfg->ext_xxldspn2x || cfg->ext_xxldspn3x;
+}
+
 #define MATERIALISE_EXT_PREDICATE(ext) \
     static inline bool has_ ## ext ## _p(const RISCVCPUConfig *cfg) \
     { \

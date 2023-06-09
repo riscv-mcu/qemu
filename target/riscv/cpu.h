@@ -51,6 +51,9 @@ typedef struct CPUArchState CPURISCVState;
 
 #define RV(x) ((target_ulong)1 << (x - 'A'))
 
+#define RV32 ((target_ulong)1 << (TARGET_LONG_BITS - 2))
+#define RV64 ((target_ulong)2 << (TARGET_LONG_BITS - 2))
+
 /*
  * Update misa_bits[], misa_ext_info_arr[] and misa_ext_cfgs[]
  * when adding new MISA bits here.

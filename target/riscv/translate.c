@@ -1159,6 +1159,10 @@ static uint32_t opcode_at(DisasContextBase *dcbase, target_ulong pc)
 #include "decode-xxlcz.c.inc"
 #include "insn_trans/trans_xxlcz.c.inc"
 
+/* Include decoders for Nuclei xxldsp extensions */
+#include "decode-xxldsp.c.inc"
+#include "insn_trans/trans_xxldsp.c.inc"
+
 /* The specification allows for longer insns, but not supported by qemu. */
 #define MAX_INSN_LEN  4
 
@@ -1172,6 +1176,7 @@ const RISCVDecoder decoder_table[] = {
     { has_xthead_p, decode_xthead},
     { has_XVentanaCondOps_p, decode_XVentanaCodeOps},
     { has_xxlcz_p,  decode_xxlcz },
+    { has_xxldsp_p, decode_xxldsp },
 };
 
 const size_t decoder_table_size = ARRAY_SIZE(decoder_table);
