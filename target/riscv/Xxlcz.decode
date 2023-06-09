@@ -1,0 +1,125 @@
+#
+# RISC-V translation routines for the Xxlcz Instruction Set.
+#
+# Copyright (c) 2021-2023 Nuclei.
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms and conditions of the GNU General Public License,
+# version 2 or later, as published by the Free Software Foundation.
+#
+# This program is distributed in the hope it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+# more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Fields
+%rs2  20:5
+%rs1  15:5
+%rd    7:5
+
+# immediates:
+%imm_i8   20:s8
+%imm_s8   25:s3 7:5
+%imm_b    31:s1 7:1 25:6 8:4     !function=ex_shift_1
+%imm_b12  7:s1 25:6 8:4
+%imm_lgp16  14:s16
+%imm_lgp15  15:s15
+%imm_sgp16  25:s5 14:6 7:5
+%imm_sgp15  25:s5 15:5 7:5
+%imm_mac    20:s9
+%imm_bitop1 25:5
+%imm_bitop2 20:5
+%imm_bri    20:s5
+%imm_bitrev 20:7
+%imm_addib_scale  29:2
+%imm_addib_imm    20:s9
+
+# Argument sets
+&i    imm rs1 rd   !extern
+&r    rd rs1 rs2   !extern
+&s    imm rs1 rs2  !extern
+&r2   rd rs1       !extern
+&b    imm rs2 rs1  !extern
+&xl_lgp       imm rd
+&xl_sgp       imm rs2
+&xl_mac       imm rs1 rd
+&xl_bitop     imm1 imm2 rs1 rd
+&xl_brib      imm ofst rs1
+&xl_addibr     scale imm rs1 rd
+
+# Formats
+@r         .......  ..... ..... ... .....  ....... &r                 %rs2 %rs1 %rd
+@b12       .......   ..... ..... ... ..... ....... &b      imm=%imm_b12 %rs2 %rs1
+@r2        .......   ..... ..... ... ..... ....... &r2                     %rs1 %rd
+@i8        .... ........  ..... ... .....  ....... &i      imm=%imm_i8     %rs1 %rd
+@s8        .... ... ..... ..... ... .....  ....... &s      imm=%imm_s8 %rs2 %rs1
+
+@xl_lgp16   ..  ................  ..  .....  ....... &xl_lgp  imm=%imm_lgp16 %rd
+@xl_lgp15   ..  ................  ..  .....  ....... &xl_lgp  imm=%imm_lgp15 %rd
+@xl_sgp16   ..  ..... ..... ...... .. .....  ....... &xl_sgp  imm=%imm_sgp16 %rs2
+@xl_sgp15   ..  ..... ..... ...... .. .....  ....... &xl_sgp  imm=%imm_sgp15 %rs2
+@xl_mac     ..  ..... ..... ..... ... .....  ....... &xl_mac    imm=%imm_mac %rs1 %rd
+@xl_bitop   ..  ..... ..... ..... ... .....  ....... &xl_bitop  imm1=%imm_bitop1 imm2=%imm_bitop2 %rs1 %rd
+@xl_brib    ........ .... .....  ...  .....  ....... &xl_brib   imm=%imm_bri ofst=%imm_b %rs1
+@xl_bitrev  ..... .. ..... ..... ...  .....  ....... &i imm=%imm_bitrev %rs1 %rd
+@xl_addib   .  .. ......... .....  ... ..... ....... &xl_addibr  scale=%imm_addib_scale imm=%imm_addib_imm %rs1 %rd
+
+#XLCZ
+xl_lb           0000  ........   ..... 001 ..... 1111011 @i8
+xl_lbu          0001  ........   ..... 001 ..... 1111011 @i8
+xl_lh           0010  ........   ..... 001 ..... 1111011 @i8
+xl_lhu          0011  ........   ..... 001 ..... 1111011 @i8
+xl_lw           0100  ........   ..... 001 ..... 1111011 @i8
+xl_sb           0101  ...  ..... ..... 001 ..... 1111011 @s8
+xl_sh           0110  ...  ..... ..... 001 ..... 1111011 @s8
+xl_sw           0111  ...  ..... ..... 001 ..... 1111011 @s8
+xl_lwu          1000  ........   ..... 001 ..... 1111011 @i8
+xl_ld           1001  ........   ..... 001 ..... 1111011 @i8
+xl_sd           1010  ...  ..... ..... 001 ..... 1111011 @s8
+
+xl_lgp_b        00   ................   00 ..... 1011011 @xl_lgp16
+xl_lgp_bu       01   ................   00 ..... 1011011 @xl_lgp16
+xl_lgp_h        00   ...............   001 ..... 1011011 @xl_lgp15
+xl_lgp_hu       00   ...............   101 ..... 1011011 @xl_lgp15
+xl_lgp_w        00   ...............   010 ..... 1011011 @xl_lgp15
+xl_sgp_b        11   ..... ..... ...... 00 ..... 1011011 @xl_sgp16
+xl_sgp_h        10   ..... ..... ..... 001 ..... 1011011 @xl_sgp15
+xl_sgp_w        10   ..... ..... ..... 010 ..... 1011011 @xl_sgp15
+xl_lgp_wu       00   ...............   110 ..... 1011011 @xl_lgp15
+xl_lgp_d        00   ...............   011 ..... 1011011 @xl_lgp15
+xl_sgp_d        10   ..... ..... ..... 011 ..... 1011011 @xl_sgp15
+
+xl_muli         110   .... ..... ..... 001 ..... 1111011 @xl_mac
+
+xl_slet         1110011   .....  ..... 001 ..... 1111011 @r
+xl_sletu        1110100   .....  ..... 001 ..... 1111011 @r
+
+xl_extract      00  ..... ..... .....  101 ..... 1111011 @xl_bitop
+xl_extractr     01  00000 ..... .....  101 ..... 1111011 @r
+xl_extractu     10  ..... ..... .....  101 ..... 1111011 @xl_bitop
+xl_extractur    11  00000 ..... .....  101 ..... 1111011 @r
+xl_insert       00  ..... ..... .....  110 ..... 1111011 @xl_bitop
+xl_bset         10  ..... ..... .....  110 ..... 1111011 @xl_bitop
+xl_bsetr        11  00000 ..... .....  110 ..... 1111011 @r
+xl_bclr         00  ..... ..... .....  111 ..... 1111011 @xl_bitop
+xl_bclrr        01  00000 ..... .....  111 ..... 1111011 @r
+xl_clb          1110101  00000  .....  001 ..... 1111011 @r2
+xl_fl1          1110110  00000  .....  001 ..... 1111011 @r2
+xl_ff1          1110111  00000  .....  001 ..... 1111011 @r2
+xl_fl0          1111000  00000  .....  001 ..... 1111011 @r2
+xl_ff0          1111001  00000  .....  001 ..... 1111011 @r2
+
+xl_beqi         .......  .....  .....  010 ..... 1111011 @xl_brib
+xl_bnei         .......  .....  .....  100 ..... 1111011 @xl_brib
+
+xl_bitrev       10110 .. .....  .....  001 ..... 1111011 @xl_bitrev
+
+xl_addrchk      0 ...... .....  .....  011 ..... 1111011 @b12
+xl_bezm         1 ...... .....  .....  011 ..... 1111011 @b12
+xl_nzmsk        1110000  00000  .....  001 ..... 1111011 @r2
+xl_ffnz         1110001	 00000  .....  001 ..... 1111011 @r2
+
+xl_addibne      1  .. ......... .....  111 ..... 1111011 @xl_addib
