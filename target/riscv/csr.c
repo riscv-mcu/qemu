@@ -897,7 +897,7 @@ static int read_mcycle(CPURISCVState *env, int csrno, target_ulong *val)
             }
             cur_val = muldiv64(qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL), 32768, NANOSECONDS_PER_SECOND);
             *val = last_val;
-        }    
+        }
     }
 #else
     *val = cpu_get_host_ticks();
@@ -929,7 +929,7 @@ static RISCVException read_instret(CPURISCVState *env, int csrno,
             static int cnt = 1;
             prev_instret = prev_instret + (cnt++) + (cnt++);
             *val = prev_instret;
-        }    
+        }
     }
 #else
     *val = cpu_get_host_ticks();
@@ -2214,6 +2214,11 @@ static int rmw_mnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
     int clic_priv, clic_il, clic_irq;
     bool ready;
     CPUState *cs = env_cpu(env);
+
+    if (env->debugger) {
+        return RISCV_EXCP_NONE;
+    }
+
     if (write_mask) {
         env->mstatus |= new_value & (write_mask & 0b11111);
     }
@@ -2646,6 +2651,11 @@ static int rmw_snxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
     int clic_priv, clic_il, clic_irq;
     bool ready;
     CPUState *cs = env_cpu(env);
+
+    if (env->debugger) {
+        return RISCV_EXCP_NONE;
+    }
+
     if (write_mask) {
         env->mstatus |= new_value & (write_mask & 0b11111);
     }
@@ -4014,7 +4024,7 @@ static int rmw_mscratchcswl(CPURISCVState *env, int csrno, target_ulong *ret_val
 {
 #if 1
     target_ulong t;
-    if( (get_field(env->mcause, MCAUSE_MPIL) == 0) 
+    if( (get_field(env->mcause, MCAUSE_MPIL) == 0)
         != (get_field(env->mintstatus, MINTSTATUS_MIL) == 0))
     {
         t = new_value;
@@ -4176,8 +4186,8 @@ static int rmw_pushmsubm(CPURISCVState *env, int csrno, target_ulong *ret_value,
 {
 #if 1
     uint64_t notify_addr = 0;
-    uint32_t riscv_addr_size = 4; 
-    if (riscv_cpu_mxl(env) == MXL_RV32) 
+    uint32_t riscv_addr_size = 4;
+    if (riscv_cpu_mxl(env) == MXL_RV32)
     {
     }
     else
@@ -4199,7 +4209,7 @@ static int read_mtvt2(CPURISCVState *env, int csrno, target_ulong *val)
     {
         low_bit = 1;
     }
-    *val = ((env->mtvt2 & (target_ulong)(~0x3)) | low_bit);    
+    *val = ((env->mtvt2 & (target_ulong)(~0x3)) | low_bit);
     return RISCV_EXCP_NONE;
 }
 
@@ -4216,8 +4226,8 @@ static int rmw_jalmnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
 #if 1
     target_ulong addr;
 
-    uint32_t riscv_addr_size = 4; 
-    if (riscv_cpu_mxl(env) == MXL_RV32) 
+    uint32_t riscv_addr_size = 4;
+    if (riscv_cpu_mxl(env) == MXL_RV32)
     {
     }
     else
@@ -4244,15 +4254,15 @@ static int rmw_pushmcause(CPURISCVState *env, int csrno, target_ulong *ret_value
 {
 #if 1
     uint64_t notify_addr = 0;
-    uint32_t riscv_addr_size = 4; 
-    if (riscv_cpu_mxl(env) == MXL_RV32) 
+    uint32_t riscv_addr_size = 4;
+    if (riscv_cpu_mxl(env) == MXL_RV32)
     {
     }
     else
     {
         riscv_addr_size = 8;
     }
-    
+
     notify_addr = new_value * riscv_addr_size + env->gpr[2];
 
     cpu_physical_memory_rw(notify_addr, &env->mcause,  riscv_addr_size, 1);
@@ -4265,9 +4275,9 @@ static int rmw_pushmepc(CPURISCVState *env, int csrno, target_ulong *ret_value,
 {
 #if 1
     uint64_t notify_addr = 0;
-    uint32_t riscv_addr_size = 4; 
+    uint32_t riscv_addr_size = 4;
 
-    if (riscv_cpu_mxl(env) == MXL_RV32) 
+    if (riscv_cpu_mxl(env) == MXL_RV32)
     {
     }
     else
@@ -4758,7 +4768,7 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
 
     /* Zcmt Extension */
     [CSR_JVT] = {"jvt", zcmt, read_jvt, write_jvt},
-    
+
 #if !defined(CONFIG_USER_ONLY)
     /* Machine Timers and Counters */
     [CSR_MCYCLE]    = { "mcycle",    any,   read_hpmcounter,
@@ -5381,6 +5391,6 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_SINTSTATUS] =          {"sintstatus", any,  read_sintstatus,  write_sintthresh   },
     /* Supervisor Mode Core Level Interrupt Controller */
     [CSR_STVT] = { "stvt", any,  read_stvt, write_stvt       },
-    [CSR_SNXTI] = { "snxti", any,   NULL,  rmw_snxti   },
+    [CSR_SNXTI] = { "snxti", any,   any,  rmw_snxti   },
 #endif /* !CONFIG_USER_ONLY */
 };
