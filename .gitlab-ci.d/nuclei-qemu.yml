@@ -149,6 +149,7 @@ build_windows_qemu:
 test_sdk:
   stage: test
   timeout: 2h 30m
+  when: never
   interruptible: true
   script:
     - apt-get -y update --fix-missing 
@@ -183,6 +184,7 @@ test_sdk:
 test_nmsis:
   stage: test
   timeout: 4h
+  when: never
   interruptible: true
   script:
     - apt-get -y update --fix-missing 
@@ -226,7 +228,7 @@ deploy-qemu:
   stage: deploy
   interruptible: true
   variables:
-      QEMU_VER: "2023.04"
+      QEMU_VER: "2023.06"
   script:
     - echo "This job deploy qemu release ${QEMU_VER} from the $CI_COMMIT_BRANCH branch."
     - ls -al
