@@ -1306,7 +1306,8 @@ static Property riscv_cpu_extensions[] = {
     DEFINE_PROP_BOOL("v", RISCVCPU, cfg.ext_v, false),
     DEFINE_PROP_BOOL("p", RISCVCPU, cfg.ext_p, false),
     DEFINE_PROP_BOOL("h", RISCVCPU, cfg.ext_h, false),
-    DEFINE_PROP_UINT8("pmu-num", RISCVCPU, cfg.pmu_num, 16),
+    // Max pmu_num is RV_MAX_MHPMCOUNTERS - 3, see target/riscv/cpu.h and target/riscv/pmu.c
+    DEFINE_PROP_UINT8("pmu-num", RISCVCPU, cfg.pmu_num, 29),
     DEFINE_PROP_BOOL("sscofpmf", RISCVCPU, cfg.ext_sscofpmf, false),
     DEFINE_PROP_BOOL("Zifencei", RISCVCPU, cfg.ext_ifencei, true),
     DEFINE_PROP_BOOL("Zicsr", RISCVCPU, cfg.ext_icsr, true),
