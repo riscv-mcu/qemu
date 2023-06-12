@@ -80,6 +80,10 @@ typedef struct DisasContext {
     bool virt_enabled;
     const RISCVCPUConfig *cfg_ptr;
     bool ext_psfoperand;
+    bool ext_xxldsp;
+    bool ext_xxldspn1x;
+    bool ext_xxldspn2x;
+    bool ext_xxldspn3x;
     bool hlsx;
     /* vector extension */
     bool vill;
@@ -1206,6 +1210,10 @@ static void riscv_tr_init_disas_context(DisasContextBase *dcbase, CPUState *cs)
     ctx->misa_mxl_max = env->misa_mxl_max;
     ctx->xl = FIELD_EX32(tb_flags, TB_FLAGS, XL);
     ctx->ext_psfoperand = cpu->cfg.ext_psfoperand;
+    ctx->ext_xxldsp = cpu->cfg.ext_xxldsp;
+    ctx->ext_xxldspn1x = cpu->cfg.ext_xxldspn1x;
+    ctx->ext_xxldspn2x = cpu->cfg.ext_xxldspn2x;
+    ctx->ext_xxldspn3x = cpu->cfg.ext_xxldspn3x;
     ctx->cs = cs;
     ctx->pm_mask_enabled = FIELD_EX32(tb_flags, TB_FLAGS, PM_MASK_ENABLED);
     ctx->pm_base_enabled = FIELD_EX32(tb_flags, TB_FLAGS, PM_BASE_ENABLED);

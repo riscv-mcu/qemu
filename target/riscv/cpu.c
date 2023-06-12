@@ -138,6 +138,10 @@ static const struct isa_ext_data isa_edata_arr[] = {
     ISA_EXT_DATA_ENTRY(xtheadmempair, true, PRIV_VERSION_1_11_0, ext_xtheadmempair),
     ISA_EXT_DATA_ENTRY(xtheadsync, true, PRIV_VERSION_1_11_0, ext_xtheadsync),
     ISA_EXT_DATA_ENTRY(xventanacondops, true, PRIV_VERSION_1_12_0, ext_XVentanaCondOps),
+    ISA_EXT_DATA_ENTRY(xxldsp, true, PRIV_VERSION_1_12_0, ext_xxldsp),
+    ISA_EXT_DATA_ENTRY(xxldspn1x, true, PRIV_VERSION_1_12_0, ext_xxldspn1x),
+    ISA_EXT_DATA_ENTRY(xxldspn2x, true, PRIV_VERSION_1_12_0, ext_xxldspn2x),
+    ISA_EXT_DATA_ENTRY(xxldspn3x, true, PRIV_VERSION_1_12_0, ext_xxldspn3x),
     ISA_EXT_DATA_ENTRY(xxlcz, true, PRIV_VERSION_1_12_0, ext_xxlcz),
 };
 
@@ -1098,6 +1102,25 @@ static void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         }
         set_vext_version(env, vext_version);
     }
+    if (cpu->cfg.ext_xxldspn3x) {
+        cpu->cfg.ext_xxldspn2x = true;
+        cpu->cfg.ext_xxldspn1x = true;
+        cpu->cfg.ext_p = true;
+    }
+
+    if (cpu->cfg.ext_xxldspn2x) {
+        cpu->cfg.ext_xxldspn1x = true;
+        cpu->cfg.ext_p = true;
+    }
+
+    if (cpu->cfg.ext_xxldspn1x) {
+        cpu->cfg.ext_p = true;
+    }
+
+    if (cpu->cfg.ext_xxldsp) {
+        cpu->cfg.ext_p = true;
+    }
+
     if (cpu->cfg.ext_p) {
         int pext_version = PEXT_VERSION_0_09_4;
         ext |= RVP;
@@ -1512,6 +1535,10 @@ static Property riscv_cpu_extensions[] = {
     DEFINE_PROP_BOOL("zksed", RISCVCPU, cfg.ext_zksed, false),
     DEFINE_PROP_BOOL("zksh", RISCVCPU, cfg.ext_zksh, false),
     DEFINE_PROP_BOOL("zkt", RISCVCPU, cfg.ext_zkt, false),
+    DEFINE_PROP_BOOL("xxldsp", RISCVCPU, cfg.ext_xxldsp, false),
+    DEFINE_PROP_BOOL("xxldspn1x", RISCVCPU, cfg.ext_xxldspn1x, false),
+    DEFINE_PROP_BOOL("xxldspn2x", RISCVCPU, cfg.ext_xxldspn2x, false),
+    DEFINE_PROP_BOOL("xxldspn3x", RISCVCPU, cfg.ext_xxldspn3x, false),
 
     DEFINE_PROP_BOOL("zdinx", RISCVCPU, cfg.ext_zdinx, false),
     DEFINE_PROP_BOOL("zfinx", RISCVCPU, cfg.ext_zfinx, false),
