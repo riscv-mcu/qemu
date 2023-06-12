@@ -782,6 +782,9 @@ static void riscv_demosoc_soc_realize(DeviceState *dev, Error **errp)
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi2), 0,
                        qdev_get_gpio_in(DEVICE(s->plic), DEMOSOC_SPI2_IRQ));
 
+    /* SiFive Test MMIO device */
+    sifive_test_create(memmap[DEMOSOC_TEST].base);
+
 }
 
 static Property demosoc_soc_props[] = {

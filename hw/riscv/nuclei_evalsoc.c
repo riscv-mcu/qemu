@@ -794,6 +794,8 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi2), 0,
                        qdev_get_gpio_in(DEVICE(s->plic), EVALSOC_SPI2_IRQ));
 
+    /* SiFive Test MMIO device */
+    sifive_test_create(memmap[EVALSOC_TEST].base);
 }
 
 static Property evalsoc_soc_props[] = {
