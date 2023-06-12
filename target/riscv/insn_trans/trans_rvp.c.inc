@@ -200,6 +200,36 @@ rvp_shifti_ool(DisasContext *ctx, arg_shift *a,
     return true;
 }
 
+static inline bool rvp_shifti_ool_d(DisasContext *ctx, arg_shift *a,
+               void (* fn)(TCGv_i64, TCGv_ptr, TCGv_i64, TCGv_i64))
+{
+#ifdef TARGET_RISCV64
+    return true;
+#else
+    TCGv_i32 a0, a1, d0, d1;
+    TCGv_i64 src1, dst, shift;
+
+    a0 = get_gpr(ctx, a->rs1, EXT_ZERO);
+    a1 = get_gpr(ctx, a->rs1 + 1, EXT_ZERO);
+    src1 = tcg_temp_new_i64();
+
+    shift = tcg_constant_i64(a->shamt);
+    dst = tcg_temp_new_i64();
+    
+    tcg_gen_concat_i32_i64(src1, a0, a1);
+    fn(dst, cpu_env, src1, shift);
+
+    d1 = tcg_temp_new_i32();
+    d0 = tcg_temp_new_i32();
+
+    tcg_gen_extrl_i64_i32(d0, dst);
+    tcg_gen_extrh_i64_i32(d1, dst);
+    gen_set_gpr(ctx, a->rd, d0);
+    gen_set_gpr(ctx, a->rd, d1);
+
+    return true;
+#endif
+}
 static inline bool
 rvp_shifti(DisasContext *ctx, arg_shift *a,
            void (* vecop)(TCGv, TCGv, target_long),
@@ -218,6 +248,13 @@ rvp_shifti(DisasContext *ctx, arg_shift *a,
 static bool trans_##NAME(DisasContext *s, arg_shift *a)  \
 {                                                        \
     return rvp_shifti(s, a, VECOP, OP);                  \
+}
+
+#define GEN_RVP_SHIFTI_D(NAME)                           \
+static bool trans_##NAME(DisasContext *s, arg_shift *a)  \
+{                                                        \
+    REQUIRE_P(s);                                        \
+    return rvp_shifti_ool_d(s, a, gen_helper_##NAME);    \
 }
 
 GEN_RVP_SHIFTI(srai16, tcg_gen_vec_sar16i_tl, gen_helper_sra16);
@@ -468,6 +505,57 @@ GEN_RVP_R2_OOL_D(dkabs32);
 GEN_RVP_R_OOL_D(dkslra32);
 GEN_RVP_R_OOL_D(dkadd32);
 GEN_RVP_R_OOL_D(dksub32);
+GEN_RVP_R_OOL_D(dradd16);
+GEN_RVP_R_OOL_D(dsub16);
+GEN_RVP_R_OOL_D(dradd32);
+GEN_RVP_R_OOL_D(dsub32);
+GEN_RVP_R_OOL_D(dkmda);
+GEN_RVP_R_OOL_D(dkmxda);
+GEN_RVP_R_OOL_D(dsmdrs);
+GEN_RVP_R_OOL_D(dsmxds);
+GEN_RVP_R_OOL_D(dsmbb32);
+GEN_RVP_R_OOL_D(dsmbb32_sra14);
+GEN_RVP_R_OOL_D(dsmbb32_sra32);
+GEN_RVP_R_OOL_D(dsmbt32);
+GEN_RVP_R_OOL_D(dsmbt32_sra14);
+GEN_RVP_R_OOL_D(dsmbt32_sra32);
+GEN_RVP_R_OOL_D(dsmtt32);
+GEN_RVP_R_OOL_D(dsmtt32_sra14);
+GEN_RVP_R_OOL_D(dsmtt32_sra32);
+GEN_RVP_R_OOL_D(dpkbb32);
+GEN_RVP_R_OOL_D(dpkbt32);
+GEN_RVP_R_OOL_D(dpktt32);
+GEN_RVP_R_OOL_D(dpktb32);
+GEN_RVP_R_OOL_D(dpktb16);
+GEN_RVP_R_OOL_D(dpkbb16);
+GEN_RVP_R_OOL_D(dpkbt16);
+GEN_RVP_R_OOL_D(dpktt16);
+GEN_RVP_R_OOL_D(dsra16);
+GEN_RVP_R_OOL_D(dadd16);
+GEN_RVP_R_OOL_D(dadd32);
+GEN_RVP_R_OOL_D(dsmbb16);
+GEN_RVP_R_OOL_D(dsmbt16);
+GEN_RVP_R_OOL_D(dsmtt16);
+GEN_RVP_R_OOL_D(drcrsa16);
+GEN_RVP_R_OOL_D(drcras16);
+GEN_RVP_R_OOL_D(dkcrsa16);
+GEN_RVP_R_OOL_D(dkcras16);
+GEN_RVP_R_OOL_D(drsub16);
+GEN_RVP_R_OOL_D(drsub32);
+GEN_RVP_R_OOL_D(dstsa32);
+GEN_RVP_R_OOL_D(dstas32);
+GEN_RVP_R_OOL_D(dkcras32);
+GEN_RVP_R_OOL_D(dkcrsa32);
+GEN_RVP_R_OOL_D(dcrsa32);
+GEN_RVP_R_OOL_D(dcras32);
+GEN_RVP_R_OOL_D(dkstsa16);
+GEN_RVP_R_OOL_D(dkstas16);
+GEN_RVP_R_OOL_D(drcrsa32);
+GEN_RVP_R_OOL_D(drcras32);
+GEN_RVP_R2_OOL_D(dkclip64);
+GEN_RVP_SHIFTI_D(dsclip8);
+GEN_RVP_SHIFTI_D(dsclip16);
+GEN_RVP_SHIFTI_D(dsclip32);
 
 /* 8-bit Unpacking Instructions */
 GEN_RVP_R2_OOL(sunpkd810);
@@ -583,8 +671,8 @@ static inline bool r_acc_ool_d(DisasContext *ctx, arg_r *a,
     t1 = get_gpr(ctx, a->rs2 + 1, EXT_ZERO);
     tcg_gen_concat_tl_i64(src2, t0, t1);
 
-    t0 = get_gpr(ctx, a->rd, EXT_ZERO);
-    t1 = get_gpr(ctx, a->rd + 1, EXT_ZERO);
+    t0 = dest_gpr(ctx, a->rd);
+    t1 = dest_gpr(ctx, a->rd + 1);
     tcg_gen_concat_tl_i64(src3, t0, t1);
     fn(dst, cpu_env, src1, src2, src3);
     set_pair_regs(ctx, dst, a->rd);
@@ -634,6 +722,28 @@ GEN_RVP_R_ACC_OOL_D(dsmslxda);
 GEN_RVP_R_ACC_OOL_D(ddsmaqa);
 GEN_RVP_R_ACC_OOL_D(ddsmaqasu);
 GEN_RVP_R_ACC_OOL_D(ddumaqa);
+GEN_RVP_R_OOL_D(dmsr16);
+GEN_RVP_R_OOL_D(dmsr17);
+GEN_RVP_R_OOL_D(dmsr33);
+GEN_RVP_R_OOL_D(dmxsr33);
+GEN_RVP_R_ACC_OOL_D(dsmada16);
+GEN_RVP_R_ACC_OOL_D(dsmaxda16);
+GEN_RVP_R_ACC_OOL_D(dksms32_u);
+GEN_RVP_R_ACC_OOL_D(dmada32);
+GEN_RVP_R2_OOL_D(dredas16);
+GEN_RVP_R2_OOL_D(dredsa16);
+GEN_RVP_R2_OOL_D(dreda32);
+GEN_RVP_R2_OOL_D(dreds32);
+GEN_RVP_R_OOL_D(dsma32_u);
+GEN_RVP_R_OOL_D(dsmxs32_u);
+GEN_RVP_R_OOL_D(dsmxa32_u);
+GEN_RVP_R_OOL_D(dsms32_u);
+GEN_RVP_R_ACC_OOL_D(dsmalbb);
+GEN_RVP_R_ACC_OOL_D(dsmalbt);
+GEN_RVP_R_ACC_OOL_D(dsmaltt);
+GEN_RVP_R_ACC_OOL_D(dkmabb32);
+GEN_RVP_R_ACC_OOL_D(dkmabt32);
+GEN_RVP_R_ACC_OOL_D(dkmatt32);
 
 /* Signed 16-bit Multiply with 64-bit Add/Subtract Instructions */
 static bool
