@@ -49,7 +49,7 @@ static inline uint64_t
 rvprd(CPURISCVState *env, uint64_t a, uint64_t b,
      uint8_t step, uint8_t size, PackedFn3i *fn)
 {
-    int i, passes = sizeof(uint32_t)*2 / size;
+    int i, passes = sizeof(uint64_t) / size;
     uint64_t result = 0;
 
     for (i = 0; i < passes; i += step) {
@@ -1935,7 +1935,7 @@ static inline target_ulong rvpr2(CPURISCVState *env, target_ulong a,
 static inline uint64_t rvpr2d(CPURISCVState *env, uint64_t a,
                                  uint8_t step, uint8_t size, PackedFn2i *fn)
 {
-    int i, passes = sizeof(uint32_t) * 2 / size;
+    int i, passes = sizeof(uint64_t) / size;
     uint64_t result;
     for (i = 0; i < passes; i += step) 
     {
@@ -4984,7 +4984,7 @@ rvpr_acc_d(CPURISCVState *env, uint64_t a,
          uint64_t b, uint64_t c,
          uint8_t step, uint8_t size, PackedFn4i *fn)
 {
-    int i, passes = sizeof(uint32_t) * 2 / size;
+    int i, passes = sizeof(uint64_t) / size;
     uint64_t result = 0;
 
     for (i = 0; i < passes; i += step) {
