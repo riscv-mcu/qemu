@@ -1958,6 +1958,18 @@ static inline uint64_t rvpr2d(CPURISCVState *env, uint64_t a,
     return result;
 }
 
+static inline uint64_t rvpr2_64_64(CPURISCVState *env, uint64_t a,
+                                 uint8_t step, uint8_t size, PackedFn2i *fn)
+{
+    int i, passes = sizeof(uint64_t) / size;
+    uint64_t result;
+
+    for (i = 0; i < passes; i += step) {
+        fn(env, &result, &a, i);
+    }
+    return result;
+}
+
 #define RVPR2(NAME, STEP, SIZE)                                  \
 target_ulong HELPER(NAME)(CPURISCVState *env, target_ulong a)    \
 {                                                                \
@@ -1968,6 +1980,12 @@ target_ulong HELPER(NAME)(CPURISCVState *env, target_ulong a)    \
 uint64_t HELPER(NAME)(CPURISCVState *env, uint64_t a1)            \
 {                                                                 \
     return rvpr2d(env, a1, STEP, SIZE, (PackedFn2i *)do_##NAME);  \
+}
+
+#define RVPR2_64_64(NAME, STEP, SIZE)                                  \
+uint64_t HELPER(NAME)(CPURISCVState *env, uint64_t a)    \
+{                                                                \
+    return rvpr2_64_64(env, a, STEP, SIZE, (PackedFn2i *)do_##NAME);   \
 }
 
 static inline void do_kabs16(CPURISCVState *env, void *vd, void *va, uint8_t i)
@@ -4884,106 +4902,80 @@ do_expd80(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
     int8_t *a = va;
     int8_t *d = vd;
-    d[0] = a[0];
-    d[1] = a[0];
-    d[2] = a[0];
-    d[3] = a[0];
+    d[i] = a[0];
 }
 
-RVPR2(expd80, 4, 1);
+RVPR2(expd80, 1, 1);
 
 static inline void
 do_expd81(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
     int8_t *a = va;
     int8_t *d = vd;
-    d[0] = a[1];
-    d[1] = a[1];
-    d[2] = a[1];
-    d[3] = a[1];
+    d[i] = a[1];
 }
 
-RVPR2(expd81, 4, 1);
+RVPR2(expd81, 1, 1);
 
 static inline void
 do_expd82(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
     int8_t *a = va;
     int8_t *d = vd;
-    d[0] = a[2];
-    d[1] = a[2];
-    d[2] = a[2];
-    d[3] = a[2];
+    d[i] = a[2];
 }
 
-RVPR2(expd82, 4, 1);
+RVPR2(expd82, 1, 1);
 
 static inline void
 do_expd83(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
     int8_t *a = va;
     int8_t *d = vd;
-    d[0] = a[3];
-    d[1] = a[3];
-    d[2] = a[3];
-    d[3] = a[3];
+    d[i] = a[3];
 }
 
-RVPR2(expd83, 4, 1);
-
+RVPR2(expd83, 1, 1);
 
 static inline void
 do_expd84(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
     int8_t *a = va;
     int8_t *d = vd;
-    d[0] = a[4];
-    d[1] = a[4];
-    d[2] = a[4];
-    d[3] = a[4];
+    d[i] = a[4];
 }
 
-RVPR2(expd84, 4, 1);
-
+RVPR2_64_64(expd84, 1, 1);
 
 static inline void
 do_expd85(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
     int8_t *a = va;
     int8_t *d = vd;
-    d[0] = a[5];
-    d[1] = a[5];
-    d[2] = a[5];
-    d[3] = a[5];
+    d[i] = a[5];
 }
 
-RVPR2(expd85, 4, 1);
+RVPR2_64_64(expd85, 1, 1);
 
 static inline void
 do_expd86(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
     int8_t *a = va;
     int8_t *d = vd;
-    d[0] = a[6];
-    d[1] = a[6];
-    d[2] = a[6];
-    d[3] = a[6];
+    d[i] = a[6];
 }
 
-RVPR2(expd86, 4, 1);
+RVPR2_64_64(expd86, 1, 1);
 
 static inline void
 do_expd87(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
     int8_t *a = va;
     int8_t *d = vd;
-    d[0] = a[7];
-    d[1] = a[7];
-    d[2] = a[7];
-    d[3] = a[7];
+    d[i] = a[7];
 }
 
-RVPR2(expd87, 4, 1);
+RVPR2_64_64(expd87, 1, 1);
 
 static inline void do_dkabs32(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
