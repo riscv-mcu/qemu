@@ -97,8 +97,15 @@ static void do_dealloc_guestfd(GuestFD *gf)
  */
 static GuestFD *do_get_guestfd(int guestfd)
 {
-    if (guestfd < 0 || guestfd >= guestfd_array->len) {
+    if (guestfd < 0) {
         return NULL;
+    }
+    if (guestfd >= guestfd_array->len) {
+        if (guestfd <= STDERR_FILENO) {
+            associate_guestfd(alloc_guestfd(), guestfd);
+        } else {
+            return NULL;
+        }
     }
 
     return &g_array_index(guestfd_array, GuestFD, guestfd);
