@@ -45,7 +45,6 @@
 #include "hw/pci-host/gpex.h"
 #include "hw/display/ramfb.h"
 //#include "hw/intc/nuclei_eclic.h"
-//#include "hw/char/nuclei_uart.h"
 #include "hw/riscv/nuclei_evalsoc.h"
 #include "hw/ssi/ssi.h"
 
@@ -838,4 +837,3 @@ static void riscv_evalsoc_soc_register_types(void)
 }
 
 type_init(riscv_evalsoc_soc_register_types)
-

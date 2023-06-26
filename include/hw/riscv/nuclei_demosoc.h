@@ -33,7 +33,7 @@
 
 #include "hw/cpu/cluster.h"
 #include "hw/riscv/riscv_hart.h"
-//#include "hw/char/nuclei_uart.h"
+#include "hw/char/nuclei_uart.h"
 //#include "hw/intc/nuclei_systimer.h"
 #include "hw/gpio/sifive_gpio.h"
 //#include "hw/intc/nuclei_eclic.h"
