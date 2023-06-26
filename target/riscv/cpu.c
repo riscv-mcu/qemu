@@ -458,6 +458,73 @@ static void rv128_base_cpu_init(Object *obj)
     set_satp_mode_max_supported(RISCV_CPU(obj), VM_1_10_SV57);
 #endif
 }
+
+static void rv64imacu_nuclei_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV64, RVI | RVM | RVA | RVC | RVU);
+    register_cpu_props(obj);
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = false;
+}
+
+static void rv64imafcu_nuclei_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV64, RVI | RVM | RVA | RVC | RVU);
+    register_cpu_props(obj);
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = false;
+}
+
+static void rv64imafdcu_nuclei_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV64, RVI | RVM | RVA | RVF | RVD | RVC | RVU);
+    register_cpu_props(obj);
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = false;
+}
+
+static void rv64imacu_nuclei_u_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV64, RVI | RVM | RVA | RVC | RVS | RVU);
+    register_cpu_props(obj);
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = true;
+}
+
+static void rv64imafcu_nuclei_u_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV64, RVI | RVM | RVA | RVF | RVC | RVS | RVU);
+    register_cpu_props(obj);
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = true;
+}
+
+static void rv64imafdcu_nuclei_u_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV64, RVI | RVM | RVA | RVF | RVD | RVC | RVS | RVU);
+    register_cpu_props(obj);
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = true;
+}
+
 #else
 static void rv32_base_cpu_init(Object *obj)
 {
@@ -525,6 +592,119 @@ static void rv32_imafcu_nommu_cpu_init(Object *obj)
     set_satp_mode_max_supported(cpu, VM_1_10_MBARE);
 #endif
 }
+
+static void rv32iacu_nuclei_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV32, RVI | RVA | RVC | RVU);
+    register_cpu_props(obj);
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = false;
+}
+
+static void rv32eacu_nuclei_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV32, RVE | RVA | RVC | RVU);
+    register_cpu_props(obj);
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = false;
+}
+
+static void rv32imcu_nuclei_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV32, RVI | RVM | RVC | RVU);
+    register_cpu_props(obj);
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = false;
+}
+
+static void rv32imacu_nuclei_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV32, RVI | RVM | RVA | RVC | RVU);
+    register_cpu_props(obj);
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = false;
+}
+
+static void rv32emacu_nuclei_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV32, RVE | RVM | RVA | RVC | RVU);
+    register_cpu_props(obj);
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = false;
+}
+
+static void rv32imafcu_nuclei_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV32, RVI | RVM | RVA | RVF | RVC | RVU);
+
+    register_cpu_props(obj);
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = false;
+}
+
+static void rv32imafdcu_nuclei_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV32, RVI | RVM | RVA | RVF | RVD | RVC | RVU);
+
+    register_cpu_props(obj);
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = false;
+}
+
+static void rv32imacu_nuclei_u_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV32, RVI | RVM | RVA | RVC | RVS | RVU);
+    register_cpu_props(obj);
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = true;
+}
+
+static void rv32imafcu_nuclei_u_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV32, RVI | RVM | RVA | RVF | RVC | RVS | RVU);
+    register_cpu_props(obj);
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = true;
+}
+
+static void rv32imafdcu_nuclei_u_cpu_init(Object *obj)
+{
+    CPURISCVState *env = &RISCV_CPU(obj)->env;
+    RISCVCPU *cpu = RISCV_CPU(obj);
+
+    set_misa(env, MXL_RV32, RVI | RVM | RVA | RVF | RVD | RVC | RVS | RVU);
+    register_cpu_props(obj);
+    set_priv_version(env, PRIV_VERSION_1_12_0);
+    cpu->cfg.mmu = true;
+}
+
 #endif
 
 #if defined(CONFIG_KVM)
@@ -1857,6 +2037,31 @@ static const TypeInfo riscv_cpu_type_infos[] = {
     DEFINE_CPU(TYPE_RISCV_CPU_SIFIVE_E31,       rv32_sifive_e_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_SIFIVE_E34,       rv32_imafcu_nommu_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_SIFIVE_U34,       rv32_sifive_u_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N200,      rv32imcu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N201,      rv32iacu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N201E,     rv32eacu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N203,      rv32imacu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N203E,     rv32emacu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N205,      rv32imacu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N205E,     rv32emacu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N300,      rv32imacu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N300F,     rv32imafcu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N300FD,    rv32imafdcu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N305,      rv32imacu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N307,      rv32imafcu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N307FD,    rv32imafdcu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N600,      rv32imacu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N600F,     rv32imafcu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N600FD,    rv32imafdcu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N900,      rv32imacu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N900F,     rv32imafcu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N900FD,    rv32imafdcu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_U600,      rv32imacu_nuclei_u_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_U600F,     rv32imafcu_nuclei_u_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_U600FD,    rv32imafdcu_nuclei_u_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_U900,      rv32imacu_nuclei_u_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_U900F,     rv32imafcu_nuclei_u_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_U900FD,    rv32imafdcu_nuclei_u_cpu_init),
 #elif defined(TARGET_RISCV64)
     DEFINE_CPU(TYPE_RISCV_CPU_BASE64,           rv64_base_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_SIFIVE_E51,       rv64_sifive_e_cpu_init),
@@ -1864,6 +2069,18 @@ static const TypeInfo riscv_cpu_type_infos[] = {
     DEFINE_CPU(TYPE_RISCV_CPU_SHAKTI_C,         rv64_sifive_u_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_THEAD_C906,       rv64_thead_c906_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_BASE128,          rv128_base_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_NX600,     rv64imacu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_NX600F,    rv64imafcu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_NX600FD,   rv64imafdcu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_NX900,     rv64imacu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_NX900F,    rv64imafcu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_NX900FD,   rv64imafdcu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX600,     rv64imacu_nuclei_u_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX600F,    rv64imafcu_nuclei_u_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX600FD,   rv64imafdcu_nuclei_u_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX900,     rv64imacu_nuclei_u_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX900F,    rv64imafcu_nuclei_u_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX900FD,   rv64imafdcu_nuclei_u_cpu_init),
 #endif
 };
 
