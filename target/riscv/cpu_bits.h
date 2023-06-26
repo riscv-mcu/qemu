@@ -162,6 +162,9 @@
 /* 32-bit only */
 #define CSR_MSTATUSH        0x310
 
+#define CSR_MSCOUNTEREN     0x321
+#define CSR_MHCOUNTEREN     0x322
+
 /* Machine Trap Handling */
 #define CSR_MSCRATCH        0x340
 #define CSR_MEPC            0x341
@@ -335,6 +338,11 @@
 #define CSR_PMPCFG1         0x3a1
 #define CSR_PMPCFG2         0x3a2
 #define CSR_PMPCFG3         0x3a3
+#define CSR_PMPCFG4         0x3a4
+#define CSR_PMPCFG5         0x3a5
+#define CSR_PMPCFG6         0x3a6
+#define CSR_PMPCFG7         0x3a7
+#define CSR_PMPCFG8         0x3a8
 #define CSR_PMPADDR0        0x3b0
 #define CSR_PMPADDR1        0x3b1
 #define CSR_PMPADDR2        0x3b2
@@ -351,6 +359,55 @@
 #define CSR_PMPADDR13       0x3bd
 #define CSR_PMPADDR14       0x3be
 #define CSR_PMPADDR15       0x3bf
+#define CSR_PMPADDR16       0x3c0
+#define CSR_PMPADDR17       0x3c1
+#define CSR_PMPADDR18       0x3c2
+#define CSR_PMPADDR19       0x3c3
+#define CSR_PMPADDR20       0x3c4
+#define CSR_PMPADDR21       0x3c5
+#define CSR_PMPADDR22       0x3c6
+#define CSR_PMPADDR23       0x3c7
+#define CSR_PMPADDR24       0x3c8
+#define CSR_PMPADDR25       0x3c9
+#define CSR_PMPADDR26       0x3ca
+#define CSR_PMPADDR27       0x3cb
+#define CSR_PMPADDR28       0x3cc
+#define CSR_PMPADDR29       0x3cd
+#define CSR_PMPADDR30       0x3ce
+#define CSR_PMPADDR31       0x3cf
+#define CSR_PMPADDR32       0x3d0
+#define CSR_PMPADDR33       0x3d1
+#define CSR_PMPADDR34       0x3d2
+#define CSR_PMPADDR35       0x3d3
+#define CSR_PMPADDR36       0x3d4
+#define CSR_PMPADDR37       0x3d5
+#define CSR_PMPADDR38       0x3d6
+#define CSR_PMPADDR39       0x3d7
+#define CSR_PMPADDR40       0x3d8
+#define CSR_PMPADDR41       0x3d9
+#define CSR_PMPADDR42       0x3da
+#define CSR_PMPADDR43       0x3db
+#define CSR_PMPADDR44       0x3dc
+#define CSR_PMPADDR45       0x3dd
+#define CSR_PMPADDR46       0x3de
+#define CSR_PMPADDR47       0x3df
+#define CSR_PMPADDR48       0x3e0
+#define CSR_PMPADDR49       0x3e1
+#define CSR_PMPADDR50       0x3e2
+#define CSR_PMPADDR51       0x3e3
+#define CSR_PMPADDR52       0x3e4
+#define CSR_PMPADDR53       0x3e5
+#define CSR_PMPADDR54       0x3e6
+#define CSR_PMPADDR55       0x3e7
+#define CSR_PMPADDR56       0x3e8
+#define CSR_PMPADDR57       0x3e9
+#define CSR_PMPADDR58       0x3ea
+#define CSR_PMPADDR59       0x3eb
+#define CSR_PMPADDR60       0x3ec
+#define CSR_PMPADDR61       0x3ed
+#define CSR_PMPADDR62       0x3ee
+#define CSR_PMPADDR63       0x3ef
+
 
 /* Debug/Trace Registers (shared with Debug Mode) */
 #define CSR_TSELECT         0x7a0
@@ -363,6 +420,99 @@
 #define CSR_DCSR            0x7b0
 #define CSR_DPC             0x7b1
 #define CSR_DSCRATCH        0x7b2
+
+/* === TEE CSR Registers === */
+#define CSR_NUCLEI_SPMPCFG0            0x1A0
+#define CSR_NUCLEI_SPMPCFG1            0x1A1
+#define CSR_NUCLEI_SPMPCFG2            0x1A2
+#define CSR_NUCLEI_SPMPCFG3            0x1A3
+#define CSR_NUCLEI_SPMPADDR0           0x1B0
+#define CSR_NUCLEI_SPMPADDR1           0x1B1
+#define CSR_NUCLEI_SPMPADDR2           0x1B2
+#define CSR_NUCLEI_SMPUSWITCH0         0x170
+#define CSR_NUCLEI_SMPUSWITCH1         0x171
+#define CSR_NUCLEI_JALSNXTI            0x947
+#define CSR_NUCLEI_STVT2               0x948
+#define CSR_NUCLEI_PUSHSCAUSE          0x949
+#define CSR_NUCLEI_PUSHSEPC            0x94A
+#define CSR_NUCLEI_SDCAUSE             0x9C0
+/* === CLIC CSR Registers === */
+#define CSR_NUCLEI_MTVT                0x307
+#define CSR_NUCLEI_MNXTI               0x345
+#define CSR_NUCLEI_MINTSTATUS          0x346
+#define CSR_NUCLEI_MSCRATCHCSW         0x348
+#define CSR_NUCLEI_MSCRATCHCSWL        0x349
+
+/* === P-Extension Registers === */
+#define CSR_NUCLEI_UCODE               0x801
+
+/* WorldGuard CSRs */
+#define CSR_NUCLEI_MLWID               0x390
+#define CSR_NUCLEI_MWIDDELEG           0X748
+#define CSR_NUCLEI_SLWID               0x190
+
+/* === Nuclei custom CSR Registers === */
+#define CSR_NUCLEI_MILM_CTL            0x7C0
+#define CSR_NUCLEI_MDLM_CTL            0x7C1
+#define CSR_NUCLEI_MECC_CODE           0x7C2
+#define CSR_NUCLEI_MNVEC               0x7C3
+#define CSR_NUCLEI_MSUBM               0x7C4
+#define CSR_NUCLEI_MDCAUSE             0x7C9
+#define CSR_NUCLEI_MCACHE_CTL          0x7CA
+#define CSR_NUCLEI_MMISC_CTL           0x7D0
+#define CSR_NUCLEI_MSAVESTATUS         0x7D6
+#define CSR_NUCLEI_MSAVEEPC1           0x7D7
+#define CSR_NUCLEI_MSAVEEPC2           0x7D9
+#define CSR_NUCLEI_MSAVECAUSE1         0x7D8
+#define CSR_NUCLEI_MSAVECAUSE2         0x7DA
+#define CSR_NUCLEI_MSAVEDCAUSE1        0x7DB
+#define CSR_NUCLEI_MSAVEDCAUSE2        0x7DC
+#define CSR_NUCLEI_MTLB_CTL            0x7DD
+#define CSR_NUCLEI_MECC_LOCK           0x7DE
+#define CSR_NUCLEI_MECC_CTRL           0xBC0
+#define CSR_NUCLEI_MECC_STATUS         0xBC4
+#define CSR_NUCLEI_MFP16MODE           0x7E2
+#define CSR_NUCLEI_LSTEPFORC           0x7E9
+#define CSR_NUCLEI_PUSHMSUBM           0x7EB
+#define CSR_NUCLEI_MTVT2               0x7EC
+#define CSR_NUCLEI_JALMNXTI            0x7ED
+#define CSR_NUCLEI_PUSHMCAUSE          0x7EE
+#define CSR_NUCLEI_PUSHMEPC            0x7EF
+#define CSR_NUCLEI_MPPICFG_INFO        0x7F0
+#define CSR_NUCLEI_MFIOCFG_INFO        0x7F1
+#define CSR_NUCLEI_MIRGB_INFO          0x7F7
+#define CSR_NUCLEI_SLEEPVALUE          0x811
+#define CSR_NUCLEI_TXEVT               0x812
+#define CSR_NUCLEI_WFE                 0x810
+#define CSR_NUCLEI_MICFG_INFO          0xFC0
+#define CSR_NUCLEI_MDCFG_INFO          0xFC1
+#define CSR_NUCLEI_MCFG_INFO           0xFC2
+#define CSR_NUCLEI_MTLBCFG_INFO        0xFC3
+
+/* === Nuclei CCM Registers === */
+#define CSR_NUCLEI_CCM_MBEGINADDR      0x7CB
+#define CSR_NUCLEI_CCM_MCOMMAND        0x7CC
+#define CSR_NUCLEI_CCM_MDATA           0x7CD
+#define CSR_NUCLEI_CCM_SUEN            0x7CE
+#define CSR_NUCLEI_CCM_SBEGINADDR      0x5CB
+#define CSR_NUCLEI_CCM_SCOMMAND        0x5CC
+#define CSR_NUCLEI_CCM_SDATA           0x5CD
+#define CSR_NUCLEI_CCM_UBEGINADDR      0x4CB
+#define CSR_NUCLEI_CCM_UCOMMAND        0x4CC
+#define CSR_NUCLEI_CCM_UDATA           0x4CD
+#define CSR_NUCLEI_CCM_FPIPE           0x4CF
+
+//NCDEV
+#define CSR_NUCLEI_MATTRI0_BASE    0x7f3
+#define CSR_NUCLEI_MATTRI0_MASK    0x7f4
+#define CSR_NUCLEI_MATTRI1_BASE    0x7f5
+#define CSR_NUCLEI_MATTRI1_MASK    0x7f6
+#define CSR_NUCLEI_MATTRI2_BASE    0x7f9
+#define CSR_NUCLEI_MATTRI2_MASK    0x7fa
+#define CSR_NUCLEI_MATTRI3_BASE    0x7fb
+#define CSR_NUCLEI_MATTRI3_MASK    0x7fc
+#define CSR_NUCLEI_MATTRI4_BASE    0x7fd
+#define CSR_NUCLEI_MATTRI4_MASK    0x7fe
 
 /* Performance Counters */
 #define CSR_MHPMCOUNTER3    0xb03

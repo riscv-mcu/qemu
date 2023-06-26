@@ -217,15 +217,21 @@ struct CPUArchState {
     uint64_t mie;
     uint64_t mideleg;
 
+    uint32_t exccode;    /* irq id: 0~11  shv: 12 */
+    uint32_t eclic_flag;
+
     target_ulong satp;   /* since: priv-1.10.0 */
     target_ulong stval;
     target_ulong medeleg;
 
     target_ulong stvec;
+    target_ulong stvt; /* clic-spec */
     target_ulong sepc;
     target_ulong scause;
+    target_ulong sintthresh; /* clic-spec */
 
     target_ulong mtvec;
+    target_ulong mtvt;
     target_ulong mepc;
     target_ulong mcause;
     target_ulong mtval;  /* since: priv-1.10.0 */
@@ -237,6 +243,39 @@ struct CPUArchState {
     /* AIA CSRs */
     target_ulong miselect;
     target_ulong siselect;
+
+    target_ulong mnxti;
+    target_ulong mintstatus;
+    target_ulong mintthresh; /* clic-spec */
+    target_ulong mclicbase; /* clic-spec */
+    target_ulong mscratchcsw;
+    target_ulong mscratchcswl;
+
+    /* NMI  CSR*/
+    target_ulong mnvec;
+    target_ulong msubm;
+    target_ulong mdcause;
+    target_ulong mcache_ctl;
+    target_ulong mmisc_ctl;
+    target_ulong msavestatus;
+    target_ulong msaveepc1;
+    target_ulong msavecause1;
+    target_ulong msaveepc2;
+    target_ulong msavecause2;
+    target_ulong msavedcause1;
+    target_ulong msavedcause2;
+    target_ulong pushmsubm;
+    target_ulong mtvt2;
+    target_ulong jalmnxti;
+    target_ulong pushmcause;
+    target_ulong pushmepc;
+
+    target_ulong wfe;
+    target_ulong sleepvalue;
+    target_ulong txevt;
+    target_ulong msmpcfg_info;
+    target_ulong mirgb_info;
+    target_ulong mcfg_info;
 
     /* Hypervisor CSRs */
     target_ulong hstatus;
@@ -317,6 +356,10 @@ struct CPUArchState {
 
     uint64_t vstimecmp;
 
+    /*nuclei timer comparators */
+    uint64_t mtimecmp;
+    uint64_t timecmp;
+
     /* physical memory protection */
     pmp_table_t pmp_state;
     target_ulong mseccfg;
@@ -381,6 +424,12 @@ struct CPUArchState {
     QEMUTimer *stimer; /* Internal timer for S-mode interrupt */
     QEMUTimer *vstimer; /* Internal timer for VS-mode interrupt */
     bool vstime_irq;
+
+    QEMUTimer *mtimer; /* Nuclei Internal timer */
+    QEMUTimer *timer; /* Nuclei Internal timer */
+    void *eclic;
+    void *clic;       /* clic interrupt controller */
+    bool irq_pending;
 
     hwaddr kernel_addr;
     hwaddr fdt_addr;
