@@ -36,7 +36,7 @@
 #include "hw/char/nuclei_uart.h"
 //#include "hw/intc/nuclei_systimer.h"
 #include "hw/gpio/sifive_gpio.h"
-//#include "hw/intc/nuclei_eclic.h"
+#include "hw/intc/nuclei_eclic.h"
 #include "hw/sysbus.h"
 #include "hw/sd/sd.h"
 #include "hw/ssi/sifive_spi.h"

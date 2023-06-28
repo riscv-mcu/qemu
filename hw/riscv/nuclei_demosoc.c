@@ -44,7 +44,6 @@
 #include "hw/pci/pci.h"
 #include "hw/pci-host/gpex.h"
 #include "hw/display/ramfb.h"
-//#include "hw/intc/nuclei_eclic.h"
 #include "hw/riscv/nuclei_demosoc.h"
 #include "hw/ssi/ssi.h"
 
@@ -746,6 +745,13 @@ static void riscv_demosoc_soc_realize(DeviceState *dev, Error **errp)
                                  DEMOSOC_PLIC_CONTEXT_STRIDE,
                                  memmap[DEMOSOC_PLIC].size);
     g_free(plic_hart_config);
+
+    s->eclic = nuclei_eclic_create(memmap[DEMOSOC_ECLIC].base,
+                                   memmap[DEMOSOC_ECLIC].size,
+                                   false, false, true,
+                                   ms->smp.cpus,
+                                   DEMOSOC_INT_MAX,
+                                   DEMOSOC_CLIC_INTCTLBITS);
 
     if(ms->kernel_filename)
     {

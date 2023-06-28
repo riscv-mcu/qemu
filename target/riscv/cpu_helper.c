@@ -594,6 +594,32 @@ void riscv_cpu_set_virt_enabled(CPURISCVState *env, bool enable)
     }
 }
 
+void riscv_cpu_eclic_interrupt(RISCVCPU *cpu, int exccode)
+{
+    CPURISCVState *env = &cpu->env;
+    bool locked = false;
+
+    env->exccode = exccode;
+
+    if (!qemu_mutex_iothread_locked()) {
+        locked = true;
+        qemu_mutex_lock_iothread();
+    }
+
+    if (exccode != -1) {
+    	env->irq_pending = true;
+        cpu_interrupt(CPU(cpu), CPU_INTERRUPT_ECLIC);
+
+    } else {
+    	env->irq_pending = false;
+        cpu_reset_interrupt(CPU(cpu), CPU_INTERRUPT_ECLIC);
+    }
+
+    if (locked) {
+        qemu_mutex_unlock_iothread();
+    }
+}
+
 bool riscv_cpu_two_stage_lookup(int mmu_idx)
 {
     return mmu_idx & TB_FLAGS_PRIV_HYP_ACCESS_MASK;

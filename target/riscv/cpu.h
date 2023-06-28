@@ -31,6 +31,7 @@
 
 #define TCG_GUEST_DEFAULT_MO 0
 
+#define CPU_INTERRUPT_ECLIC CPU_INTERRUPT_TGT_EXT_0
 /*
  * RISC-V-specific extra insn start words:
  * 1: Original instruction opcode
@@ -938,5 +939,7 @@ void riscv_cpu_register_gdb_regs_for_features(CPUState *cs);
 
 uint8_t satp_mode_max_from_map(uint32_t map);
 const char *satp_mode_str(uint8_t satp_mode, bool is_32_bit);
+
+void riscv_cpu_eclic_interrupt(RISCVCPU *cpu, int exccode);
 
 #endif /* RISCV_CPU_H */

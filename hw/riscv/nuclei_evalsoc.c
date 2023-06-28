@@ -44,7 +44,6 @@
 #include "hw/pci/pci.h"
 #include "hw/pci-host/gpex.h"
 #include "hw/display/ramfb.h"
-//#include "hw/intc/nuclei_eclic.h"
 #include "hw/riscv/nuclei_evalsoc.h"
 #include "hw/ssi/ssi.h"
 
@@ -760,6 +759,13 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                                  EVALSOC_PLIC_CONTEXT_STRIDE,
                                  memmap[EVALSOC_PLIC].size);
     g_free(plic_hart_config);
+
+    s->eclic = nuclei_eclic_create(memmap[EVALSOC_ECLIC].base,
+                                   memmap[EVALSOC_ECLIC].size,
+                                   false, false, true,
+                                   ms->smp.cpus,
+                                   EVALSOC_INT_MAX,
+                                   EVALSOC_CLIC_INTCTLBITS);
 
     if(ms->kernel_filename)
     {
