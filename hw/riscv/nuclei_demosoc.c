@@ -755,7 +755,13 @@ static void riscv_demosoc_soc_realize(DeviceState *dev, Error **errp)
 
     if(ms->kernel_filename)
     {
-
+        /* Create and connect UART interrupts to the ECLIC */
+        nuclei_uart_create(sys_mem,
+                        memmap[DEMOSOC_UART0].base,
+                        memmap[DEMOSOC_UART0].size,
+                        serial_hd(0),
+                        nuclei_eclic_get_irq(DEVICE(s->eclic),
+                        DEMOSOC_INT22_IRQn));
     }
     else
     {

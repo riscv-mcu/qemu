@@ -769,7 +769,13 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
 
     if(ms->kernel_filename)
     {
-
+        /* Create and connect UART interrupts to the ECLIC */
+        nuclei_uart_create(sys_mem,
+                        memmap[EVALSOC_UART0].base,
+                        memmap[EVALSOC_UART0].size,
+                        serial_hd(0),
+                        nuclei_eclic_get_irq(DEVICE(s->eclic),
+                        EVALSOC_INT22_IRQn));
     }
     else
     {
