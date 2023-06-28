@@ -2802,7 +2802,7 @@ if have_system
     libfdt = static_library('fdt',
                             build_by_default: false,
                             sources: fdt_files,
-                            include_directories: fdt_inc)
+                            include_directories: fdt_inc, pic:true)
     fdt = declare_dependency(link_with: libfdt,
                              include_directories: fdt_inc)
   endif
@@ -3081,12 +3081,14 @@ endif
 qom_ss = qom_ss.apply(config_host, strict: false)
 libqom = static_library('qom', qom_ss.sources() + genh,
                         dependencies: [qom_ss.dependencies()],
-                        name_suffix: 'fa')
+                        name_suffix: 'fa',
+                           pic:true)
 qom = declare_dependency(link_whole: libqom)
 
 event_loop_base = files('event-loop-base.c')
 event_loop_base = static_library('event-loop-base', sources: event_loop_base + genh,
-                                 build_by_default: true)
+                                 build_by_default: true,
+                           pic:true)
 event_loop_base = declare_dependency(link_whole: event_loop_base,
                                      dependencies: [qom])
 
@@ -3096,7 +3098,8 @@ util_ss.add_all(trace_ss)
 util_ss = util_ss.apply(config_all, strict: false)
 libqemuutil = static_library('qemuutil',
                              sources: util_ss.sources() + stub_ss.sources() + genh,
-                             dependencies: [util_ss.dependencies(), libm, threads, glib, socket, malloc, pixman])
+                             dependencies: [util_ss.dependencies(), libm, threads, glib, socket, malloc, pixman],
+                           pic:true)
 qemuutil = declare_dependency(link_with: libqemuutil,
                               sources: genh + version_res,
                               dependencies: [event_loop_base])
@@ -3316,7 +3319,8 @@ authz_ss = authz_ss.apply(config_host, strict: false)
 libauthz = static_library('authz', authz_ss.sources() + genh,
                           dependencies: [authz_ss.dependencies()],
                           name_suffix: 'fa',
-                          build_by_default: false)
+                          build_by_default: false,
+                           pic:true)
 
 authz = declare_dependency(link_whole: libauthz,
                            dependencies: qom)
@@ -3325,7 +3329,8 @@ crypto_ss = crypto_ss.apply(config_host, strict: false)
 libcrypto = static_library('crypto', crypto_ss.sources() + genh,
                            dependencies: [crypto_ss.dependencies()],
                            name_suffix: 'fa',
-                           build_by_default: false)
+                           build_by_default: false,
+                           pic:true)
 
 crypto = declare_dependency(link_whole: libcrypto,
                             dependencies: [authz, qom])
@@ -3335,13 +3340,15 @@ libio = static_library('io', io_ss.sources() + genh,
                        dependencies: [io_ss.dependencies()],
                        link_with: libqemuutil,
                        name_suffix: 'fa',
-                       build_by_default: false)
+                       build_by_default: false,
+                           pic:true)
 
 io = declare_dependency(link_whole: libio, dependencies: [crypto, qom])
 
 libmigration = static_library('migration', sources: migration_files + genh,
                               name_suffix: 'fa',
-                              build_by_default: false)
+                              build_by_default: false,
+                           pic:true)
 migration = declare_dependency(link_with: libmigration,
                                dependencies: [zlib, qom, io])
 softmmu_ss.add(migration)
@@ -3351,7 +3358,8 @@ libblock = static_library('block', block_ss.sources() + genh,
                           dependencies: block_ss.dependencies(),
                           link_depends: block_syms,
                           name_suffix: 'fa',
-                          build_by_default: false)
+                          build_by_default: false,
+                           pic:true)
 
 block = declare_dependency(link_whole: [libblock],
                            link_args: '@block.syms',
@@ -3361,7 +3369,8 @@ blockdev_ss = blockdev_ss.apply(config_host, strict: false)
 libblockdev = static_library('blockdev', blockdev_ss.sources() + genh,
                              dependencies: blockdev_ss.dependencies(),
                              name_suffix: 'fa',
-                             build_by_default: false)
+                             build_by_default: false,
+                           pic:true)
 
 blockdev = declare_dependency(link_whole: [libblockdev],
                               dependencies: [block, event_loop_base])
@@ -3370,22 +3379,31 @@ qmp_ss = qmp_ss.apply(config_host, strict: false)
 libqmp = static_library('qmp', qmp_ss.sources() + genh,
                         dependencies: qmp_ss.dependencies(),
                         name_suffix: 'fa',
-                        build_by_default: false)
+                        build_by_default: false,
+                           pic:true)
 
 qmp = declare_dependency(link_whole: [libqmp])
 
 libchardev = static_library('chardev', chardev_ss.sources() + genh,
                             name_suffix: 'fa',
                             dependencies: chardev_ss.dependencies(),
-                            build_by_default: false)
+                            build_by_default: false, pic:true)
 
 chardev = declare_dependency(link_whole: libchardev)
 
 hwcore_ss = hwcore_ss.apply(config_host, strict: false)
 libhwcore = static_library('hwcore', sources: hwcore_ss.sources() + genh,
                            name_suffix: 'fa',
-                           build_by_default: false)
+                           build_by_default: false,
+                           pic:true)
+# libhwcore_shared = shared_library('hwcore', sources: hwcore_ss.sources() + genh,
+#                            name_suffix: 'sa',
+#                            build_by_default: false)
+
 hwcore = declare_dependency(link_whole: libhwcore)
+# hwcore_shared = declare_dependency(link_with: libhwcore_shared)
+# common_ss_shared = common_ss
+# common_ss_shared.add(hwcore_shared)
 common_ss.add(hwcore)
 
 ###########
@@ -3407,18 +3425,35 @@ endif
 
 softmmu_ss.add(authz, blockdev, chardev, crypto, io, qmp)
 common_ss.add(qom, qemuutil)
+# common_ss_shared.add(qom, qemuutil)
 
 common_ss.add_all(when: 'CONFIG_SOFTMMU', if_true: [softmmu_ss])
 common_ss.add_all(when: 'CONFIG_USER_ONLY', if_true: user_ss)
+# common_ss_shared.add_all(when: 'CONFIG_SOFTMMU', if_true: [softmmu_ss])
+# common_ss_shared.add_all(when: 'CONFIG_USER_ONLY', if_true: user_ss)
+
+# message('@0@'.format(common_ss))
 
 common_all = common_ss.apply(config_all, strict: false)
+# common_all_shared = common_ss_shared.apply(config_all, strict: false)
+# message('@0@'.format(common_all.sources()))
+
 common_all = static_library('common',
-                            build_by_default: false,
+                            build_by_default: true,
                             sources: common_all.sources() + genh,
                             include_directories: common_user_inc,
                             implicit_include_directories: false,
                             dependencies: common_all.dependencies(),
-                            name_suffix: 'fa')
+                            name_suffix: 'fa', pic:true)
+
+# message('@0@'.format(common_all_shared.dependencies()))
+# common_all_shared = shared_library('common',
+#                             build_by_default: false,
+#                             sources: common_all_shared.sources() + genh,
+#                             include_directories: common_user_inc,
+#                             implicit_include_directories: false,
+#                             dependencies: common_all_shared.dependencies(),
+#                             name_suffix: 'sa')
 
 feature_to_c = find_program('scripts/feature_to_c.sh')
 
@@ -3511,14 +3546,39 @@ foreach target : target_dirs
   arch_srcs += target_specific.sources()
   arch_deps += target_specific.dependencies()
 
-  lib = static_library('qemu-' + target,
+#  message('@0@'.format(objects))
+#  objects_shared = common_all_shared.extract_objects(target_common.sources())
+  
+  # message('@0@'.format(arch_deps))
+  # message('@0@'.format(deps))
+  # message('@0@'.format(link_args))
+
+  lib = shared_library('qemu-' + target,
                  sources: arch_srcs + genh,
                  dependencies: arch_deps,
                  objects: objects,
                  include_directories: target_inc,
                  c_args: c_args,
                  build_by_default: false,
-                 name_suffix: 'fa')
+                 link_depends: [block_syms, qemu_syms] ,
+                 name_suffix: 'so')
+  
+
+  # qemu_share_lib = shared_library('qemu-' + target,
+  #                sources: arch_srcs + genh,
+  #                dependencies: arch_deps,
+  #                objects: objects,
+  #                include_directories: target_inc,
+  #                c_args: c_args,
+  #                build_by_default: true,
+  #                name_suffix: 'sa')
+    emulator_lib = shared_library('qemu-so-' + target,
+                 c_args: c_args,
+                 dependencies: arch_deps + deps,
+                 objects: lib.extract_all_objects(recursive: true),
+                 link_args: link_args,
+                 build_by_default: true,
+                 name_suffix: 'so')
 
   if target.endswith('-softmmu')
     execs = [{
@@ -3558,6 +3618,21 @@ foreach target : target_dirs
       exe_name += '-unsigned'
     endif
 
+    # message('@0@'.format([block_syms, qemu_syms] + exe.get('link_depends', [])))
+
+    # message('@0@'.format(exe['dependencies']))
+    # emulator_lib = shared_library(exe_name,
+    #              sources: [],
+    #              c_args: c_args,
+    #              dependencies: arch_deps + deps + exe['dependencies'] ,
+    #              objects: lib.extract_all_objects(recursive: true),
+    #              link_language: link_language,
+    #              link_depends: [block_syms, qemu_syms] + exe.get('link_depends', []),
+    #              link_args: link_args,
+    #              build_by_default: true,
+    #              name_suffix: 'so')
+
+
     emulator = executable(exe_name, exe['sources'],
                install: true,
                c_args: c_args,
@@ -3567,6 +3642,11 @@ foreach target : target_dirs
                link_depends: [block_syms, qemu_syms] + exe.get('link_depends', []),
                link_args: link_args,
                win_subsystem: exe['win_subsystem'])
+    # message('Check emulator arguments')
+    # message('@0@'.format(arch_deps + deps + exe['dependencies']))
+    # message('@0@'.format(lib.extract_all_objects(recursive: true)))
+    # message('@0@'.format([block_syms, qemu_syms] + exe.get('link_depends', [])))
+    # message('End emulator arguments')
 
     if targetos == 'darwin'
       icon = 'pc-bios/qemu.rsrc'

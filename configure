@@ -295,6 +295,9 @@ bindir="bin"
 skip_meson=no
 vfio_user_server="disabled"
 
+library="no"
+qbox="no"
+
 # The following Meson options are handled manually (still they
 # are included in the automatically generated help message)
 
@@ -701,6 +704,12 @@ for opt do
   case "$opt" in
   --help|-h) show_help=yes
   ;;
+  --library) library=yes
+  ;;
+  --qbox) qbox="yes"
+  ;;
+  --with-tlm2c=*) tlm2cdir="$optarg"
+  ;;
   --version|-V) exec cat "$source_path/VERSION"
   ;;
   --prefix=*) prefix="$optarg"
@@ -900,6 +909,20 @@ for opt do
   ;;
   esac
 done
+
+if [ "$library" != "no" ] && [ "$mingw32" != "yes" ] ; then
+    QEMU_CFLAGS="$QEMU_CFLAGS -fPIC"
+fi
+
+if test "$qbox" = "yes" ; then
+    tlm2cdir=`eval echo $tlm2cdir`
+    if [ ! -e "$tlm2cdir/include/tlm2c" ]; then
+        error_exit "unable to find GreenSocs tlm2c library."                   \
+                   "try to specify the path with: '--with-tlm2c=*'."
+    fi
+    QEMU_CFLAGS="$QEMU_CFLAGS -I$tlm2cdir/include"
+    QEMU_LDFLAGS="$QEMU_LDFLAGS -L$tlm2cdir/lib -ltlm2c"
+fi
 
 # test for any invalid configuration combinations
 if test "$plugins" = "yes" -a "$tcg" = "disabled"; then
@@ -2405,6 +2428,10 @@ if test "$plugins" = "yes" ; then
     echo "CONFIG_PLUGIN=y" >> $config_host_mak
 fi
 
+if test "$qbox" = "yes"; then
+  echo "CONFIG_QBOX=y" >> $config_host_mak
+fi
+
 if test -n "$gdb_bin"; then
     gdb_version=$($gdb_bin --version | head -n 1)
     if version_ge ${gdb_version##* } 9.1; then
@@ -2506,6 +2533,10 @@ if test -n "$gdb_bin"; then
 fi
 if test "$plugins" = "yes" ; then
     echo "CONFIG_PLUGIN=y" >> $config_host_mak
+fi
+
+if test "$library" = "yes" ; then
+    echo "BUILD_LIBRARY=y" >> $config_target_mak
 fi
 
 tcg_tests_targets=
