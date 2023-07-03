@@ -447,7 +447,7 @@ static void demosoc_machine_init(MachineState *machine)
     DemoSoCState *s = RISCV_DEMOSOC_MACHINE(machine);
     MemoryRegion *system_memory = get_system_memory();
     uint32_t start_addr_hi32 = 0x00000000;
-    uint32_t fdt_load_addr;
+    uint32_t fdt_load_addr = 0;
     uint64_t kernel_entry;
     target_ulong firmware_end_addr, kernel_start_addr;
     int i;
@@ -542,12 +542,13 @@ static void demosoc_machine_init(MachineState *machine)
         * if kernel argument is not set.
         */
         kernel_entry = 0;
-    }
 
-    fdt_load_addr = riscv_compute_fdt_addr(memmap[DEMOSOC_DDR].base,
+        fdt_load_addr = riscv_compute_fdt_addr(memmap[DEMOSOC_DDR].base,
                                             machine->ram_size,
                                            machine);
-    riscv_load_fdt(fdt_load_addr, machine->fdt);
+        riscv_load_fdt(fdt_load_addr, machine->fdt);
+    }
+
 
 #if defined(TARGET_RISCV64)
     start_addr_hi32 = start_addr >> 32;
@@ -684,6 +685,7 @@ static void riscv_demosoc_soc_init(Object *obj)
     object_initialize_child(obj, "gpio", &s->gpio, TYPE_SIFIVE_GPIO);
     object_initialize_child(obj, "spi0", &s->spi0, TYPE_SIFIVE_SPI);
     object_initialize_child(obj, "spi2", &s->spi2, TYPE_SIFIVE_SPI);
+    object_initialize_child(obj, "timer", &s->timer, TYPE_NUCLEI_SYSTIMER);
 }
 
 static void riscv_demosoc_soc_realize(DeviceState *dev, Error **errp)
@@ -773,6 +775,14 @@ static void riscv_demosoc_soc_realize(DeviceState *dev, Error **errp)
 
         sifive_uart_create(sys_mem, memmap[DEMOSOC_UART1].base,
                         serial_hd(1), qdev_get_gpio_in(DEVICE(s->plic), DEMOSOC_UART1_IRQ));
+
+        nuclei_systimer_create(memmap[DEMOSOC_TIMER].base,
+                memmap[DEMOSOC_TIMER].size, 0, ms->smp.cpus, s->eclic, DEMOSOC_TIMEBASE_FREQ);
+    }
+
+    if (!sysbus_realize(SYS_BUS_DEVICE(&s->timer), errp))
+    {
+        return;
     }
 
     qdev_prop_set_uint32(DEVICE(&s->gpio), "ngpio", 32);

@@ -71,6 +71,8 @@ typedef struct DemoSoCSoCState {
     MemoryRegion ddr;
     MemoryRegion smp;
 
+    NucLeiSYSTIMERState timer;
+    
     SIFIVEGPIOState gpio;
     SiFiveSPIState spi0;
     SiFiveSPIState spi2;
