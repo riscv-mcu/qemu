@@ -776,6 +776,9 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                         serial_hd(0),
                         nuclei_eclic_get_irq(DEVICE(s->eclic),
                         EVALSOC_INT22_IRQn));
+        
+        nuclei_systimer_create(memmap[EVALSOC_TIMER].base,
+                memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, s->eclic, EVALSOC_TIMEBASE_FREQ);
     }
     else
     {

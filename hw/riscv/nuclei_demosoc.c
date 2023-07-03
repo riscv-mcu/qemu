@@ -762,6 +762,9 @@ static void riscv_demosoc_soc_realize(DeviceState *dev, Error **errp)
                         serial_hd(0),
                         nuclei_eclic_get_irq(DEVICE(s->eclic),
                         DEMOSOC_INT22_IRQn));
+
+        nuclei_systimer_create(memmap[DEMOSOC_TIMER].base,
+                memmap[DEMOSOC_TIMER].size, 0, ms->smp.cpus, s->eclic, DEMOSOC_TIMEBASE_FREQ);
     }
     else
     {
