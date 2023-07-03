@@ -114,7 +114,7 @@ build_linux_qemu:
     - mkdir $CI_PROJECT_DIR/build -p
     - mkdir $CI_PROJECT_DIR/linux_qemu -p
     - cd build
-    - ../configure --disable-werror --prefix=$CI_PROJECT_DIR/linux_qemu --disable-pa --disable-linux-aio --disable-rbd --disable-vnc --disable-sdl --disable-sdl-image --target-list=riscv32-softmmu,riscv64-softmmu && make -j8 && make install
+    - ../configure --prefix=$CI_PROJECT_DIR/linux_qemu --disable-pa --disable-linux-aio --disable-rbd --disable-vnc --disable-sdl --disable-sdl-image --target-list=riscv32-softmmu,riscv64-softmmu && make -j8 && make install
   artifacts:
     paths:
     - $CI_PROJECT_DIR/linux_qemu
@@ -140,7 +140,7 @@ build_windows_qemu:
     - mkdir $CI_PROJECT_DIR/build -p
     - mkdir $CI_PROJECT_DIR/windows_qemu/bin -p
     - cd build
-    - ../configure --disable-werror --cross-prefix=x86_64-w64-mingw32- --target-list=riscv32-softmmu,riscv64-softmmu --prefix=$CI_PROJECT_DIR/windows_qemu/bin && make -j8 && make install 
+    - ../configure --cross-prefix=x86_64-w64-mingw32- --target-list=riscv32-softmmu,riscv64-softmmu --prefix=$CI_PROJECT_DIR/windows_qemu/bin && make -j8 && make install 
     - cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/* $CI_PROJECT_DIR/windows_qemu/bin
   artifacts:
     paths:
