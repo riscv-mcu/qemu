@@ -108,3 +108,6 @@ config LOONGARCH_EXTIOI
 
 config NUCLEI_ECLIC
     bool
+
+config NUCLEI_SYSTIMER
+    bool
