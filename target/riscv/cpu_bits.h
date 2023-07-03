@@ -833,6 +833,10 @@ typedef enum RISCVException {
     RISCV_EXCP_STORE_GUEST_AMO_ACCESS_FAULT = 0x17,
 } RISCVException;
 
+// CLIC AND ECLIC
+#define RISCV_EXCP_INT_CLIC                0x40000000
+#define RISCV_EXCP_INT_ECLIC               0x40000000
+
 #define RISCV_EXCP_INT_FLAG                0x80000000
 #define RISCV_EXCP_INT_MASK                0x7fffffff
 
@@ -875,6 +879,44 @@ typedef enum RISCVException {
 #define SIP_STIP                           MIP_STIP
 #define SIP_SEIP                           MIP_SEIP
 #define SIP_LCOFIP                         MIP_LCOFIP
+
+/* mintstatus 
+   https://github.com/riscv/riscv-fast-interrupt/blob/master/clic.adoc#478-new-interrupt-status-xintstatus-csrs
+    31:24 mil
+    23:16 (reserved) # To follow pattern of others.
+    15: 8 sil if ssclic is supported
+     7: 0 uil if usclic is supported
+*/
+#define MINTSTATUS_MIL                     0xff000000 /* mil[7:0] */
+#define MINTSTATUS_SIL                     0x0000ff00 /* sil[7:0] */
+#define MINTSTATUS_UIL                     0x000000ff /* uil[7:0] */
+
+/* mcause */
+#define MCAUSE_INTERRUPT                   0x80000000 /* INTERRUPT  31*/
+#define MCAUSE_MINHV                       0x40000000 /* minhv */
+#define MCAUSE_MPP                         0x30000000 /* mpp[1:0] */
+#define MCAUSE_MPIE                        0x08000000 /* mpie */
+#define MCAUSE_MPIL                        0x00ff0000 /* mpil[7:0] */
+#define MCAUSE_EXCCODE                     0x00000fff /* exccode[11:0] */
+
+/* sintstatus */
+#define SINTSTATUS_SIL                     0x0000ff00 /* sil[7:0] */
+#define SINTSTATUS_UIL                     0x000000ff /* uil[7:0] */
+
+/* scause */
+#define SCAUSE_SINHV                       0x40000000 /* sinhv */
+#define SCAUSE_SPP                         0x10000000 /* spp */
+#define SCAUSE_SPIE                        0x08000000 /* spie */
+#define SCAUSE_SPIL                        0x00ff0000 /* spil[7:0] */
+#define SCAUSE_EXCCODE                     0x00000fff /* exccode[11:0] */
+
+/* MIE masks */
+#define MIE_SEIE                           (1 << IRQ_S_EXT)
+#define MIE_UEIE                           (1 << IRQ_U_EXT)
+#define MIE_STIE                           (1 << IRQ_S_TIMER)
+#define MIE_UTIE                           (1 << IRQ_U_TIMER)
+#define MIE_SSIE                           (1 << IRQ_S_SOFT)
+#define MIE_USIE                           (1 << IRQ_U_SOFT)
 
 /* MIE masks */
 #define MIE_SEIE                           (1 << IRQ_S_EXT)
