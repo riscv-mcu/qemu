@@ -451,6 +451,24 @@
 #define CSR_NUCLEI_MWIDDELEG           0X748
 #define CSR_NUCLEI_SLWID               0x190
 
+/* windows sunroof register */
+#define CSR_NUCLEI_SATTRI0_BASE        0x5f0
+#define CSR_NUCLEI_SATTRI0_MASK        0x5f1
+#define CSR_NUCLEI_SATTRI1_BASE        0x5f2
+#define CSR_NUCLEI_SATTRI1_MASK        0x5f3
+#define CSR_NUCLEI_SATTRI2_BASE        0x5f4
+#define CSR_NUCLEI_SATTRI2_MASK        0x5f5
+#define CSR_NUCLEI_SATTRI3_BASE        0x5f6
+#define CSR_NUCLEI_SATTRI3_MASK        0x5f7
+#define CSR_NUCLEI_SATTRI4_BASE        0x5f8
+#define CSR_NUCLEI_SATTRI4_MASK        0x5f9
+#define CSR_NUCLEI_SATTRI5_BASE        0x5fa
+#define CSR_NUCLEI_SATTRI5_MASK        0x5fb
+#define CSR_NUCLEI_SATTRI6_BASE        0x5fc
+#define CSR_NUCLEI_SATTRI6_MASK        0x5fd
+#define CSR_NUCLEI_SATTRI7_BASE        0x5fe
+#define CSR_NUCLEI_SATTRI7_MASK        0x5ff
+
 /* === Nuclei custom CSR Registers === */
 #define CSR_NUCLEI_MILM_CTL            0x7C0
 #define CSR_NUCLEI_MDLM_CTL            0x7C1

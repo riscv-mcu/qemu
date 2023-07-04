@@ -4473,6 +4473,23 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_MCFG_INFO]      = { "mcfg_info",       any,    read_zero, write_any},
     [CSR_NUCLEI_MTLBCFG_INFO]      = { "mtlbcfg_info", any,    read_zero, write_any},
 
+    [CSR_NUCLEI_SATTRI0_BASE]      = { "sattri0_base", any,    read_zero, write_any},
+    [CSR_NUCLEI_SATTRI0_MASK]      = { "sattri0_mask", any,    read_zero, write_any},
+    [CSR_NUCLEI_SATTRI1_BASE]      = { "sattri1_base", any,    read_zero, write_any},
+    [CSR_NUCLEI_SATTRI1_MASK]      = { "sattri1_mask", any,    read_zero, write_any},
+    [CSR_NUCLEI_SATTRI2_BASE]      = { "sattri2_base", any,    read_zero, write_any},
+    [CSR_NUCLEI_SATTRI2_MASK]      = { "sattri2_mask", any,    read_zero, write_any},
+    [CSR_NUCLEI_SATTRI3_BASE]      = { "sattri3_base", any,    read_zero, write_any},
+    [CSR_NUCLEI_SATTRI3_MASK]      = { "sattri3_mask", any,    read_zero, write_any},
+    [CSR_NUCLEI_SATTRI4_BASE]      = { "sattri4_base", any,    read_zero, write_any},
+    [CSR_NUCLEI_SATTRI4_MASK]      = { "sattri4_mask", any,    read_zero, write_any},
+    [CSR_NUCLEI_SATTRI5_BASE]      = { "sattri5_base", any,    read_zero, write_any},
+    [CSR_NUCLEI_SATTRI5_MASK]      = { "sattri5_mask", any,    read_zero, write_any},
+    [CSR_NUCLEI_SATTRI6_BASE]      = { "sattri6_base", any,    read_zero, write_any},
+    [CSR_NUCLEI_SATTRI6_MASK]      = { "sattri6_mask", any,    read_zero, write_any},
+    [CSR_NUCLEI_SATTRI7_BASE]      = { "sattri7_base", any,    read_zero, write_any},
+    [CSR_NUCLEI_SATTRI7_MASK]      = { "sattri7_mask", any,    read_zero, write_any},
+
     /* === Nuclei CCM Registers === */
     [CSR_NUCLEI_CCM_MBEGINADDR]      = { "ccm_mbeginaddr", any,    read_zero, write_any},
     [CSR_NUCLEI_CCM_MCOMMAND]        = { "ccm_mcommand",   any,    read_zero, write_any},
