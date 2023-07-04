@@ -2488,11 +2488,23 @@ static void tcg_commit(MemoryListener *listener)
     tlb_flush(cpuas->cpu);
 }
 
+#if defined(CONFIG_QBOX)
+#include "qbox/qboxbase.h"
+extern MemoryRegionOps qbox_mem_ops;
+#endif /* CONFIG_QBOX */
+
 static void memory_map_init(void)
 {
     system_memory = g_malloc(sizeof(*system_memory));
 
+    #if defined(CONFIG_QBOX)
+    memory_region_init_io(system_memory, NULL, &qbox_mem_ops, qbox_get_handle(),
+                          "system", UINT64_MAX);
+    system_memory->priority = -1;
+    #else
     memory_region_init(system_memory, NULL, "system", UINT64_MAX);
+    #endif /* CONFIG_QBOX */
+
     address_space_init(&address_space_memory, system_memory, "memory");
 
     system_io = g_malloc(sizeof(*system_io));

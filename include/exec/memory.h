@@ -1410,6 +1410,22 @@ void memory_region_init_ram_device_ptr(MemoryRegion *mr,
                                        uint64_t size,
                                        void *ptr);
 
+#ifdef CONFIG_QBOX
+/**
+ * memory_region_create_ram_ptr:  Alloc a MemoryRegion and initialize RAM
+ *                                memory region from a user-provided pointer.
+ *
+ * @name: the name of the region.
+ * @size: size of the region.
+ * @offset: offset of this region.
+ * @ptr: memory to be mapped; must contain at least @size bytes.
+ */
+MemoryRegion *memory_region_create_ram_ptr(const char *name,
+                                           uint64_t size,
+                                           uint64_t offset,
+                                           void *ptr);
+#endif
+
 /**
  * memory_region_init_alias: Initialize a memory region that aliases all or a
  *                           part of another memory region.
@@ -2992,6 +3008,13 @@ static inline MemOp devend_memop(enum device_endian end)
     return (end == non_host_endianness) ? MO_BSWAP : 0;
 #endif
 }
+#endif
+
+#ifdef CONFIG_QBOX
+uint64_t qbox_unassigned_mem_read(void *opaque, hwaddr addr, unsigned size);
+
+void qbox_unassigned_mem_write(void *opaque, hwaddr addr,  uint64_t val,
+                          unsigned size);
 #endif
 
 /*

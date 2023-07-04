@@ -40,12 +40,24 @@
  *
  */
 
-#include "qbox/qboxbase.h"
 #include <tlm2c/tlm2c.h>
 #include "qemu/osdep.h" // Required by memory.h 
-#include "qom/cpu.h"
+#include "hw/core/cpu.h"
 #include "exec/memory.h"
 #include "qemu/timer.h"
+#include "qemu/main-loop.h"
+#include "qbox/qboxbase.h"
+#include "qemu-main.h"
+#include "sysemu/sysemu.h"
+
+static QemuThread qbox_iothread;
+void *qemu_iothread_fn(void *opaque);
+
+void qbox_iothread_init(int argc, char **argv, char **envp);
+
+static int gbl_argc;
+static char **gbl_argv;
+static char **gbl_envp;
 
 /*
  * MMIO Read/Write accesses which didn't reach an address space fall in the qbox
@@ -59,7 +71,33 @@ const MemoryRegionOps qbox_mem_ops = {
   .write = qbox_mmio_write,
 };
 
-void iothread_init(int argc, char **argv, char **envp);
+
+void qbox_iothread_init(int argc, char **argv, char **envp)
+{
+  gbl_argc = argc;
+  gbl_argv = argv;
+  gbl_envp = envp;
+
+  qemu_thread_create(&qbox_iothread, "io_thread", qemu_iothread_fn, NULL,
+                       QEMU_THREAD_JOINABLE);
+}
+
+
+void *qemu_iothread_fn(void *opaque)
+{
+    int argc = gbl_argc;
+    char **argv = gbl_argv;
+
+    qemu_init(argc, argv);
+    qbox_init_quantum_timer();
+
+    qemu_main_loop();
+    qemu_cleanup();
+    qbox_exit();
+    exit(0);
+    return NULL;
+}
+
 
 /*
  * Blocking transport for IRQ coming from tlm2c irq_socket.
@@ -346,7 +384,7 @@ static void qbox_init_threads(Model *model)
 
   if (!init) {
     qbox->inited = false;
-    iothread_init(qbox->argc, qbox->argv, NULL);
+    qbox_iothread_init(qbox->argc, qbox->argv, NULL);
   }
 }
 
@@ -466,7 +504,7 @@ void qbox_add_linux_arguments(QBOXBase *qbox)
   }
 }
 
-void qbox_add_aarch64_arguments(QBOXBase *qbox)
+void qbox_add_riscv_arguments(QBOXBase *qbox)
 {
   // default arguments
   qbox_add_argument(qbox, "./toplevel");
