@@ -44,6 +44,8 @@
 #define QBOXBASE_H
 
 #include <stdio.h>
+#include "qemu/osdep.h"
+#include "hw/sysbus.h"
 #include "hw/irq.h"
 
 typedef struct QBOXBase QBOXBase;
@@ -69,6 +71,8 @@ void qbox_export_irq(QBOXBase *qbox, qemu_irq *irq, size_t size);
  */
 void qbox_add_argument(QBOXBase *qbox, const char *argument);
 
+void qbox_add_extra_arguments(QBOXBase *qbox);
+
 /**
  * Add all the standard arguments.
  */
@@ -83,7 +87,7 @@ void qbox_add_linux_arguments(QBOXBase *qbox);
 /**
  * Add all aarch64 related arguments
  */
-void qbox_add_aarch64_arguments(QBOXBase *qbox);
+void qbox_add_riscv_arguments(QBOXBase *qbox);
 
 /*
  * Print all qbox command arguments
