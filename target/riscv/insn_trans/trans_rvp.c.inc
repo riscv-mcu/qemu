@@ -1227,8 +1227,9 @@ static bool
 r_64_ool(DisasContext *ctx, arg_r *a,
          void (* fn)(TCGv_i64, TCGv_ptr, TCGv_i64, TCGv_i64))
 {
-    TCGv t1, t2;
     TCGv_i64 src1, src2, dst;
+    TCGv t1 = tcg_temp_new();
+    TCGv t2 = tcg_temp_new();
 
     REQUIRE_P(ctx);
 
@@ -1236,8 +1237,8 @@ r_64_ool(DisasContext *ctx, arg_r *a,
     src2 = tcg_temp_new_i64();
     dst = tcg_temp_new_i64();
 
-    t1 = get_gpr(ctx, a->rs1, EXT_ZERO);
-    t2 = get_gpr(ctx, a->rs2, EXT_ZERO);
+    tcg_gen_mov_tl(t1, cpu_gpr[a->rs1]);
+    tcg_gen_mov_tl(t2, cpu_gpr[a->rs2]);
     tcg_gen_ext_tl_i64(src1, t1);
     tcg_gen_ext_tl_i64(src2, t2);
 
@@ -1245,6 +1246,8 @@ r_64_ool(DisasContext *ctx, arg_r *a,
     tcg_gen_trunc_i64_tl(t1, dst);
     gen_set_gpr(ctx, a->rd, t1);
 
+    tcg_temp_free(t1);
+    tcg_temp_free(t2);
     tcg_temp_free_i64(src1);
     tcg_temp_free_i64(src2);
     tcg_temp_free_i64(dst);
