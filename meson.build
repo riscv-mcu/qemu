@@ -3396,14 +3396,8 @@ libhwcore = static_library('hwcore', sources: hwcore_ss.sources() + genh,
                            name_suffix: 'fa',
                            build_by_default: false,
                            pic:true)
-# libhwcore_shared = shared_library('hwcore', sources: hwcore_ss.sources() + genh,
-#                            name_suffix: 'sa',
-#                            build_by_default: false)
 
 hwcore = declare_dependency(link_whole: libhwcore)
-# hwcore_shared = declare_dependency(link_with: libhwcore_shared)
-# common_ss_shared = common_ss
-# common_ss_shared.add(hwcore_shared)
 common_ss.add(hwcore)
 
 ###########
@@ -3425,18 +3419,11 @@ endif
 
 softmmu_ss.add(authz, blockdev, chardev, crypto, io, qmp)
 common_ss.add(qom, qemuutil)
-# common_ss_shared.add(qom, qemuutil)
 
 common_ss.add_all(when: 'CONFIG_SOFTMMU', if_true: [softmmu_ss])
 common_ss.add_all(when: 'CONFIG_USER_ONLY', if_true: user_ss)
-# common_ss_shared.add_all(when: 'CONFIG_SOFTMMU', if_true: [softmmu_ss])
-# common_ss_shared.add_all(when: 'CONFIG_USER_ONLY', if_true: user_ss)
-
-# message('@0@'.format(common_ss))
 
 common_all = common_ss.apply(config_all, strict: false)
-# common_all_shared = common_ss_shared.apply(config_all, strict: false)
-# message('@0@'.format(common_all.sources()))
 
 common_all = static_library('common',
                             build_by_default: true,
@@ -3445,15 +3432,6 @@ common_all = static_library('common',
                             implicit_include_directories: false,
                             dependencies: common_all.dependencies(),
                             name_suffix: 'fa', pic:true)
-
-# message('@0@'.format(common_all_shared.dependencies()))
-# common_all_shared = shared_library('common',
-#                             build_by_default: false,
-#                             sources: common_all_shared.sources() + genh,
-#                             include_directories: common_user_inc,
-#                             implicit_include_directories: false,
-#                             dependencies: common_all_shared.dependencies(),
-#                             name_suffix: 'sa')
 
 feature_to_c = find_program('scripts/feature_to_c.sh')
 
@@ -3546,14 +3524,7 @@ foreach target : target_dirs
   arch_srcs += target_specific.sources()
   arch_deps += target_specific.dependencies()
 
-#  message('@0@'.format(objects))
-#  objects_shared = common_all_shared.extract_objects(target_common.sources())
-  
-  # message('@0@'.format(arch_deps))
-  # message('@0@'.format(deps))
-  # message('@0@'.format(link_args))
-
-  lib = shared_library('qemu-' + target,
+  lib = static_library('qemu-' + target,
                  sources: arch_srcs + genh,
                  dependencies: arch_deps,
                  objects: objects,
@@ -3561,18 +3532,11 @@ foreach target : target_dirs
                  c_args: c_args,
                  build_by_default: false,
                  link_depends: [block_syms, qemu_syms] ,
-                 name_suffix: 'so')
+                 name_suffix: 'fa',
+                 pic:true)
   
 
-  # qemu_share_lib = shared_library('qemu-' + target,
-  #                sources: arch_srcs + genh,
-  #                dependencies: arch_deps,
-  #                objects: objects,
-  #                include_directories: target_inc,
-  #                c_args: c_args,
-  #                build_by_default: true,
-  #                name_suffix: 'sa')
-    emulator_lib = shared_library('qemu-so-' + target,
+  qbox_lib = shared_library('qbox-' + target,
                  c_args: c_args,
                  dependencies: arch_deps + deps,
                  objects: lib.extract_all_objects(recursive: true),
@@ -3618,21 +3582,6 @@ foreach target : target_dirs
       exe_name += '-unsigned'
     endif
 
-    # message('@0@'.format([block_syms, qemu_syms] + exe.get('link_depends', [])))
-
-    # message('@0@'.format(exe['dependencies']))
-    # emulator_lib = shared_library(exe_name,
-    #              sources: [],
-    #              c_args: c_args,
-    #              dependencies: arch_deps + deps + exe['dependencies'] ,
-    #              objects: lib.extract_all_objects(recursive: true),
-    #              link_language: link_language,
-    #              link_depends: [block_syms, qemu_syms] + exe.get('link_depends', []),
-    #              link_args: link_args,
-    #              build_by_default: true,
-    #              name_suffix: 'so')
-
-
     emulator = executable(exe_name, exe['sources'],
                install: true,
                c_args: c_args,
@@ -3642,11 +3591,6 @@ foreach target : target_dirs
                link_depends: [block_syms, qemu_syms] + exe.get('link_depends', []),
                link_args: link_args,
                win_subsystem: exe['win_subsystem'])
-    # message('Check emulator arguments')
-    # message('@0@'.format(arch_deps + deps + exe['dependencies']))
-    # message('@0@'.format(lib.extract_all_objects(recursive: true)))
-    # message('@0@'.format([block_syms, qemu_syms] + exe.get('link_depends', [])))
-    # message('End emulator arguments')
 
     if targetos == 'darwin'
       icon = 'pc-bios/qemu.rsrc'
