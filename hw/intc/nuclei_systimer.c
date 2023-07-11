@@ -38,7 +38,6 @@ static uint64_t nuclei_cpu_riscv_read_rtc(void *opaque)
 {
     
     uint64_t timebase_freq = *(uint64_t*)opaque;
-    //printf("timebase_freq is %08x\n", (int)timebase_freq);
     return muldiv64(qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL),
         timebase_freq, NANOSECONDS_PER_SECOND);
 }
@@ -121,7 +120,6 @@ static uint64_t nuclei_clint_read(void *opaque, hwaddr addr, unsigned size)
     uint32_t timebase_f = 0;
     NucLeiSYSTIMERState *clint = NUCLEI_SYSTIMER(opaque);
 
-    //printf("nuclei_clint_read %08x : %08x\n", addr, clint->time_base);
     if (addr >= clint->sip_base &&
         addr < clint->sip_base + (clint->num_harts << 2)) {
         size_t hartid = clint->hartid_base + ((addr - clint->sip_base) >> 2);
@@ -439,7 +437,6 @@ type_init(nuclei_timer_register_types);
 static void nuclei_mtimecmp_cb(void *opaque) {
     RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(0));
     CPURISCVState *env = &cpu->env;
-    // NucLeiSYSTIMERState *s = NUCLEI_SYSTIMER(opaque);
     nuclei_eclic_systimer_cb(((RISCVCPU *)cpu)->env.eclic);
     timer_del(env->mtimer);
 }
