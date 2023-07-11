@@ -702,7 +702,7 @@ static void rv32imacu_nuclei_u_cpu_init(Object *obj)
     set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = true;
 #ifndef CONFIG_USER_ONLY
-    set_satp_mode_max_supported(RISCV_CPU(obj), VM_1_10_SV57);
+    set_satp_mode_max_supported(RISCV_CPU(obj), VM_1_10_SV32);
 #endif
 }
 
@@ -716,7 +716,7 @@ static void rv32imafcu_nuclei_u_cpu_init(Object *obj)
     set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = true;
 #ifndef CONFIG_USER_ONLY
-    set_satp_mode_max_supported(RISCV_CPU(obj), VM_1_10_SV57);
+    set_satp_mode_max_supported(RISCV_CPU(obj), VM_1_10_SV32);
 #endif
 }
 
@@ -730,7 +730,7 @@ static void rv32imafdcu_nuclei_u_cpu_init(Object *obj)
     set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = true;
 #ifndef CONFIG_USER_ONLY
-    set_satp_mode_max_supported(RISCV_CPU(obj), VM_1_10_SV57);
+    set_satp_mode_max_supported(RISCV_CPU(obj), VM_1_10_SV32);
 #endif
 }
 
