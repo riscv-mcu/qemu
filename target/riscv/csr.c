@@ -4058,7 +4058,20 @@ static int write_stvt(CPURISCVState *env, int csrno, target_ulong val)
 
 static int read_mirgb_info(CPURISCVState *env, int csrno, target_ulong *val)
 {
-    *val = env->msmpcfg_info;
+    if(env->mcfg_info & (1 << 16))
+    {
+        *val = env->mirgb_info;
+    }
+    else
+    {
+        *val = env->msmpcfg_info;
+    }
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mcfg_info(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mcfg_info;
     return RISCV_EXCP_NONE;
 }
 
@@ -4095,6 +4108,15 @@ static int write_mscratchcsw(CPURISCVState *env, int csrno, target_ulong val)
 static int rmw_mscratchcsw(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
+    target_ulong t;
+    if(get_field(env->mcause, MCAUSE_MPP)  !=  PRV_M)
+    {
+        t = new_value;
+        *ret_value = env->mscratch;
+        env->mscratch = t;
+    }else{
+        *ret_value =  new_value;
+    }
     return RISCV_EXCP_NONE;
 }
 
@@ -4113,6 +4135,16 @@ static int write_mscratchcswl(CPURISCVState *env, int csrno, target_ulong val)
 static int rmw_mscratchcswl(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
+    target_ulong t;
+    if( (get_field(env->mcause, MCAUSE_MPIL) == 0)
+        != (get_field(env->mintstatus, MINTSTATUS_MIL) == 0))
+    {
+        t = new_value;
+        *ret_value = env->mscratch;
+        env->mscratch = t;
+    }else{
+        *ret_value =  new_value;
+    }
     return RISCV_EXCP_NONE;
 }
 
@@ -4287,7 +4319,7 @@ static int read_mtvt2(CPURISCVState *env, int csrno, target_ulong *val)
     {
         low_bit = 1;
     }
-    *val = ((env->mtvt2 & (target_ulong)(~0x3)) | low_bit);    
+    *val = ((env->mtvt2 & (target_ulong)(~0x3)) | low_bit);
     return RISCV_EXCP_NONE;
 }
 
@@ -4328,6 +4360,20 @@ static int rmw_jalmnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
 static int rmw_pushmcause(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
+    uint64_t notify_addr = 0;
+    uint32_t riscv_addr_size = 4;
+    if (riscv_cpu_mxl(env) == MXL_RV32)
+    {
+    }
+    else
+    {
+        riscv_addr_size = 8;
+    }
+
+    notify_addr = new_value * riscv_addr_size + env->gpr[2];
+
+    cpu_physical_memory_rw(notify_addr, &env->mcause,  riscv_addr_size, 1);
+
     return RISCV_EXCP_NONE;
 }
 
@@ -4625,7 +4671,7 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_MIRGB_INFO]   = { "mirgb_info",    any,    read_mirgb_info, write_any},
     [CSR_NUCLEI_MICFG_INFO]     = { "micfg_info",      any,    read_zero, write_any},
     [CSR_NUCLEI_MDCFG_INFO]     = { "mdcfg_info",      any,    read_zero, write_any},
-    [CSR_NUCLEI_MCFG_INFO]      = { "mcfg_info",       any,    read_zero, write_any},
+    [CSR_NUCLEI_MCFG_INFO]      = { "mcfg_info",       any,    read_mcfg_info, write_any},
     [CSR_NUCLEI_MTLBCFG_INFO]      = { "mtlbcfg_info", any,    read_zero, write_any},
 
     [CSR_NUCLEI_SATTRI0_BASE]      = { "sattri0_base", any,    read_zero, write_any},
