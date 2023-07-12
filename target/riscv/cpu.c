@@ -469,7 +469,6 @@ static void rv64imacu_nuclei_cpu_init(Object *obj)
     register_nuclei_cpu_props(obj);
     set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
-    cpu->cfg.pmp = false;
 }
 
 static void rv64imafcu_nuclei_cpu_init(Object *obj)
@@ -481,7 +480,6 @@ static void rv64imafcu_nuclei_cpu_init(Object *obj)
     register_nuclei_cpu_props(obj);
     set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
-    cpu->cfg.pmp = false;
 }
 
 static void rv64imafdcu_nuclei_cpu_init(Object *obj)
@@ -493,7 +491,6 @@ static void rv64imafdcu_nuclei_cpu_init(Object *obj)
     register_nuclei_cpu_props(obj);
     set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
-    cpu->cfg.pmp = false;
 }
 
 static void rv64imacu_nuclei_u_cpu_init(Object *obj)
@@ -615,7 +612,6 @@ static void rv32iacu_nuclei_cpu_init(Object *obj)
     register_nuclei_cpu_props(obj);
     set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
-    cpu->cfg.pmp = false;
 }
 
 static void rv32eacu_nuclei_cpu_init(Object *obj)
@@ -627,7 +623,6 @@ static void rv32eacu_nuclei_cpu_init(Object *obj)
     register_nuclei_cpu_props(obj);
     set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
-    cpu->cfg.pmp = false;
 }
 
 static void rv32imcu_nuclei_cpu_init(Object *obj)
@@ -639,7 +634,6 @@ static void rv32imcu_nuclei_cpu_init(Object *obj)
     register_nuclei_cpu_props(obj);
     set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
-    cpu->cfg.pmp = false;
 }
 
 static void rv32imacu_nuclei_cpu_init(Object *obj)
@@ -651,7 +645,6 @@ static void rv32imacu_nuclei_cpu_init(Object *obj)
     register_nuclei_cpu_props(obj);
     set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
-    cpu->cfg.pmp = false;
 }
 
 static void rv32emacu_nuclei_cpu_init(Object *obj)
@@ -663,7 +656,6 @@ static void rv32emacu_nuclei_cpu_init(Object *obj)
     register_nuclei_cpu_props(obj);
     set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
-    cpu->cfg.pmp = false;
 }
 
 static void rv32imafcu_nuclei_cpu_init(Object *obj)
@@ -676,7 +668,6 @@ static void rv32imafcu_nuclei_cpu_init(Object *obj)
     register_nuclei_cpu_props(obj);
     set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
-    cpu->cfg.pmp = false;
 }
 
 static void rv32imafdcu_nuclei_cpu_init(Object *obj)
@@ -689,7 +680,6 @@ static void rv32imafdcu_nuclei_cpu_init(Object *obj)
     register_nuclei_cpu_props(obj);
     set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
-    cpu->cfg.pmp = false;
 }
 
 static void rv32imacu_nuclei_u_cpu_init(Object *obj)
