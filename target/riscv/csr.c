@@ -1233,6 +1233,13 @@ static RISCVException read_mhartid(CPURISCVState *env, int csrno,
     return RISCV_EXCP_NONE;
 }
 
+static RISCVException read_shartid(CPURISCVState *env, int csrno,
+                                   target_ulong *val)
+{
+    *val = env->mhartid;
+    return RISCV_EXCP_NONE;
+}
+
 /* Machine Trap Setup */
 
 /* We do not store SD explicitly, only compute it on demand. */
@@ -4770,6 +4777,7 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_MSTATUSH]    = { "mstatush",   any32, read_mstatush,
                           write_mstatush                                   },
 
+    /* Nuclei Customized CSR Registers */
     [CSR_NUCLEI_MTVT] =                { "mtvt", any,  read_mtvt,        write_mtvt        },
     [CSR_NUCLEI_MNXTI] =               { "mnxti", any,  read_mnxti,       write_mnxti, rmw_mnxti},
     [CSR_NUCLEI_MINTSTATUS] =          { "mintstatus", any,  read_mintstatus,  write_mintstatus  },
@@ -4796,6 +4804,7 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_SLEEPVALUE] =          { "sleepvalue", any,  read_sleepvalue,  write_sleepvalue  },
     [CSR_NUCLEI_TXEVT] =               { "txevt", any,  read_txevt,       write_txevt       },
     [CSR_MSCOUNTEREN] =                { "msounteren", any,   read_mscounteren, write_mscounteren },
+    [CSR_NUCLEI_SHARTID] =             { "shartid",   any,   read_shartid   },
 
     /* Machine Trap Handling */
     [CSR_MSCRATCH] = { "mscratch", any,  read_mscratch, write_mscratch,
