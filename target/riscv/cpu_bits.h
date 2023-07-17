@@ -434,6 +434,8 @@
 //IREGION
 #define CSR_MIRGB_INFO          0x7F7
 
+#define CSR_SHARTID             0xDC0
+
 //NCDEV
 #define CSR_MDEVB               0x7F3
 #define CSR_MDEVM               0x7F4

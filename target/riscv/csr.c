@@ -1274,6 +1274,13 @@ static RISCVException read_mhartid(CPURISCVState *env, int csrno,
     return RISCV_EXCP_NONE;
 }
 
+static RISCVException read_shartid(CPURISCVState *env, int csrno,
+                                   target_ulong *val)
+{
+    *val = env->mhartid;
+    return RISCV_EXCP_NONE;
+}
+
 /* Machine Trap Setup */
 
 /* We do not store SD explicitly, only compute it on demand. */
@@ -4829,6 +4836,7 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_WFE] =                 { "wfe", any,  read_wfe,         write_wfe         },
     [CSR_SLEEPVALUE] =          { "sleepvalue", any,  read_sleepvalue,  write_sleepvalue  },
     [CSR_TXEVT] =               { "txevt", any,  read_txevt,       write_txevt       },
+    [CSR_SHARTID]   = { "shartid",   any,   read_shartid   },
 
     //[CSR_MUCOUNTEREN] =         { "mucounteren", any,  read_mucounteren, write_mucounteren },
     [CSR_MSCOUNTEREN] = { "msounteren", any,   read_mscounteren, write_mscounteren },
