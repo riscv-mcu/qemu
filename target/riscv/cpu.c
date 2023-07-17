@@ -1502,7 +1502,8 @@ static char* cpu_get_ext_state(Object *obj, Error **errp)
 static void cpu_set_ext_state(Object *obj, const char *value, Error **errp)
 {
     RISCVCPU *cpu = RISCV_CPU(obj);
-    const size_t slen = strlen(value);
+    /* need to copy full string include terminator char \0 */
+    const size_t slen = strlen(value) + 1;
     char *isa_ext = g_new(char, slen);
     char *subext = NULL;
     int i = 0;
