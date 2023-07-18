@@ -45,6 +45,7 @@
 #include "hw/pci-host/gpex.h"
 #include "hw/display/ramfb.h"
 #include "hw/riscv/nuclei_evalsoc.h"
+#include "hw/misc/nuclei_iregion.h"
 #include "hw/ssi/ssi.h"
 
 #define OTP_SERIAL 1
@@ -79,6 +80,7 @@ static const struct MemmapEntry
     hwaddr base;
     hwaddr size;
 }  evalsoc_memmap[] = {
+    [EVALSOC_IINFO] = { IREGION_BASE,          0x1000 },
     [EVALSOC_DEBUG] = { IREGION_BASE + IREGION_DEBUG_OFS,          0x1000 },
     [EVALSOC_MROM]  = { 0x1000,        0xf000 },
     [EVALSOC_TEST]  = { 0x100000,      0x10000 },
@@ -636,6 +638,9 @@ static void evalsoc_machine_init(MachineState *machine)
                            qdev_get_child_bus(sd_dev, "sd-bus"),
                            &error_fatal);
 
+    bool is_32_bit = riscv_is_32bit(&s->soc.cpus);
+
+    nuclei_iregion_create(memmap[EVALSOC_IINFO].base, is_32_bit);
 }
 
 static void evalsoc_machine_instance_init(Object *obj)

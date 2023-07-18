@@ -107,6 +107,7 @@ config NUCLEI_EVALSOC
     select SIFIVE_PLIC
     select NUCLEI_ECLIC
     select NUCLEI_UART
+    select NUCLEI_IREGION
     select NUCLEI_SYSTIMER
     select SIFIVE_SPI
     select SIFIVE_UART

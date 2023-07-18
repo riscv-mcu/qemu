@@ -104,6 +104,7 @@ typedef struct
     OBJECT_CHECK(EvalSoCState, (obj), TYPE_RISCV_EVALSOC_MACHINE)
 
 enum {
+    EVALSOC_IINFO,
     EVALSOC_DEBUG,
     EVALSOC_MROM,
     EVALSOC_TEST,
