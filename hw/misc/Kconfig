@@ -173,6 +173,9 @@ config MCHP_PFSOC_SYSREG
 config SIFIVE_TEST
     bool
 
+config NUCLEI_IREGION
+    bool
+
 config SIFIVE_E_PRCI
     bool
 
