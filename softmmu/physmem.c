@@ -2498,6 +2498,7 @@ static void memory_map_init(void)
     system_memory = g_malloc(sizeof(*system_memory));
 
     #if defined(CONFIG_QBOX)
+    printf("Initialize system memory using qbox\n");
     memory_region_init_io(system_memory, NULL, &qbox_mem_ops, qbox_get_handle(),
                           "system", UINT64_MAX);
     system_memory->priority = -1;
