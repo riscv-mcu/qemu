@@ -4352,42 +4352,42 @@ static int read_mucounteren(CPURISCVState *env, int csrno, target_ulong *val)
     return RISCV_EXCP_NONE;
 }
 
-int icount_flag = 0;
-int first_run_flag = 0;
-static int write_mucounteren(CPURISCVState *env, int csrno, target_ulong val)
-{
-    extern int use_icount;
-    extern int icount_shift_flag;
-    val = val & 0xffffffff;
-    if(first_run_flag == 0)
-    {
-        if(use_icount)
-        {
-            icount_flag = 1;
-        }
-        first_run_flag = 1;
-    }
+// int icount_flag = 0;
+// int first_run_flag = 0;
+// static int write_mucounteren(CPURISCVState *env, int csrno, target_ulong val)
+// {
+//     extern int use_icount;
+//     extern int icount_shift_flag;
+//     val = val & 0xffffffff;
+//     if(first_run_flag == 0)
+//     {
+//         if(use_icount)
+//         {
+//             icount_flag = 1;
+//         }
+//         first_run_flag = 1;
+//     }
 
-    if(icount_flag)
-    {
-        if(val > 0)
-        {
-            if(!icount_shift_flag)
-            {
-                use_icount = 0;
-            }
-            icount_cnt_flag = 1;
-        }
-        else
-        {
-            icount_cnt_flag = 0;
-            use_icount = 1;
-        }
-    }
+//     if(icount_flag)
+//     {
+//         if(val > 0)
+//         {
+//             if(!icount_shift_flag)
+//             {
+//                 use_icount = 0;
+//             }
+//             icount_cnt_flag = 1;
+//         }
+//         else
+//         {
+//             icount_cnt_flag = 0;
+//             use_icount = 1;
+//         }
+//     }
 
-    env->mcounteren = val;
-    return RISCV_EXCP_NONE;
-}
+//     env->mcounteren = val;
+//     return RISCV_EXCP_NONE;
+// }
 
 
 /* This regiser is replaced with CSR_MCOUNTINHIBIT in 1.11.0 */
