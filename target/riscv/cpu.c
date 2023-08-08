@@ -476,7 +476,7 @@ static void rv64imafcu_nuclei_cpu_init(Object *obj)
     CPURISCVState *env = &RISCV_CPU(obj)->env;
     RISCVCPU *cpu = RISCV_CPU(obj);
 
-    set_misa(env, MXL_RV64, RVI | RVM | RVA | RVC | RVU);
+    set_misa(env, MXL_RV64, RVI | RVM | RVA | RVF | RVC | RVU);
     register_nuclei_cpu_props(obj);
     set_priv_version(env, PRIV_VERSION_1_12_0);
     cpu->cfg.mmu = false;
