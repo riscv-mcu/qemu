@@ -17,6 +17,7 @@ default:
 prepare_tools:
   stage: build
   interruptible: true
+  when: manual
   timeout: 3h
   script:
     # prepare for docker ssh environment
