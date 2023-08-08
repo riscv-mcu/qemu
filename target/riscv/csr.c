@@ -4803,7 +4803,7 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_WFE] =                 { "wfe", any,  read_wfe,         write_wfe         },
     [CSR_NUCLEI_SLEEPVALUE] =          { "sleepvalue", any,  read_sleepvalue,  write_sleepvalue  },
     [CSR_NUCLEI_TXEVT] =               { "txevt", any,  read_txevt,       write_txevt       },
-    [CSR_MSCOUNTEREN] =                { "msounteren", any,   read_mscounteren, write_mscounteren },
+    [CSR_MSCOUNTEREN] =                { "mscounteren", any,   read_mscounteren, write_mscounteren },
     [CSR_NUCLEI_SHARTID] =             { "shartid",   any,   read_shartid   },
 
     /* Machine Trap Handling */
