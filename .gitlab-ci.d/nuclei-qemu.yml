@@ -38,8 +38,6 @@ prepare_tools:
     - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
     - mkdir -p $CI_PROJECT_DIR/prebuilt/
     - cd $CI_PROJECT_DIR/prebuilt/
-    # docs
-    - git clone git@gito.corp.nucleisys.com:software/devtools/qemu.wiki.git
     # gcc, no need to prepare gcc now, this podman image already has gcc
     #- mkdir -p $CI_PROJECT_DIR/prebuilt/gcc
     #- cp $(dirname $(dirname $(which riscv-nuclei-elf-gcc))) gcc/ -r
@@ -126,7 +124,7 @@ build_windows_qemu:
   tags:
     - os::linux
     - env::docker
-  image: 
+  image:
     name: rego.corp.nucleisys.com/software/build-windows-qemu:latest
     entrypoint: ["/bin/sh", "-c"]
   script:
@@ -141,7 +139,7 @@ build_windows_qemu:
     - mkdir $CI_PROJECT_DIR/build -p
     - mkdir $CI_PROJECT_DIR/windows_qemu/bin -p
     - cd build
-    - ../configure --cross-prefix=x86_64-w64-mingw32- --target-list=riscv32-softmmu,riscv64-softmmu --prefix=$CI_PROJECT_DIR/windows_qemu/bin && make -j8 && make install 
+    - ../configure --cross-prefix=x86_64-w64-mingw32- --target-list=riscv32-softmmu,riscv64-softmmu --prefix=$CI_PROJECT_DIR/windows_qemu/bin && make -j8 && make install
     - cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/* $CI_PROJECT_DIR/windows_qemu/bin
   artifacts:
     paths:
@@ -153,7 +151,7 @@ test_sdk:
   when: manual
   interruptible: true
   script:
-    - apt-get -y update --fix-missing 
+    - apt-get -y update --fix-missing
     - apt-get install -y --fix-missing git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libpixman-1-dev autoconf automake libtool flex bison make
     - apt-get install -y python3 python3-pip
     - apt-get install -y software-properties-common
@@ -188,7 +186,7 @@ test_nmsis:
   when: manual
   interruptible: true
   script:
-    - apt-get -y update --fix-missing 
+    - apt-get -y update --fix-missing
     - apt-get install -y --fix-missing git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libpixman-1-dev autoconf automake libtool flex bison make
     - apt-get install -y python3 python3-pip
     - apt-get install -y software-properties-common
@@ -229,12 +227,17 @@ deploy-qemu:
   stage: deploy
   interruptible: true
   variables:
-      QEMU_VER: "2023.06"
+      QEMU_VER: "2023.08"
   script:
     - echo "This job deploy qemu release ${QEMU_VER} from the $CI_COMMIT_BRANCH branch."
     - ls -al
     - apt-get update
     - apt-get -y install zip
+    # clone docs
+    - mkdir -p $CI_PROJECT_DIR/prebuilt
+    - pushd $CI_PROJECT_DIR/prebuilt
+    - git clone git@gito.corp.nucleisys.com:software/devtools/qemu.wiki.git
+    - popd
     - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/nuclei-qemu-版本发布说明.md windows_qemu/readme.md
     - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/nuclei-qemu-版本发布说明.md linux_qemu/readme.md
     - mkdir -p windows_qemu_fold
@@ -244,7 +247,7 @@ deploy-qemu:
     - cp windows_qemu windows_qemu_fold -r
     - cd $CI_PROJECT_DIR/windows_qemu_fold
     - mv windows_qemu qemu
-    - cd qemu 
+    - cd qemu
     - mkdir doc
     - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/NUCLEI-QEMU-用户手册.pdf doc/nuclei_qemu_user_guide.pdf
     - cd ../
@@ -255,7 +258,7 @@ deploy-qemu:
     - cp linux_qemu linux_qemu_fold -r
     - cd $CI_PROJECT_DIR/linux_qemu_fold
     - mv linux_qemu qemu
-    - cd qemu 
+    - cd qemu
     - mkdir doc
     - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/NUCLEI-QEMU-用户手册.pdf doc/nuclei_qemu_user_guide.pdf
     - cd ../
