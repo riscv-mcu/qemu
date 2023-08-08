@@ -288,7 +288,7 @@ target_ulong helper_sret(CPURISCVState *env)
     }
 
     target_ulong retpc = env->sepc;
-    if (!riscv_has_ext(env, RVC) && (retpc & 0x3)) {
+    if (!(riscv_has_ext(env, RVC) || riscv_cpu_cfg(env)->ext_zca) && (retpc & 0x3)) {
         riscv_raise_exception(env, RISCV_EXCP_INST_ADDR_MIS, GETPC());
     }
 
@@ -340,7 +340,7 @@ target_ulong helper_mret(CPURISCVState *env)
     }
 
     target_ulong retpc = env->mepc;
-    if (!riscv_has_ext(env, RVC) && (retpc & 0x3)) {
+    if (!(riscv_has_ext(env, RVC) || riscv_cpu_cfg(env)->ext_zca) && (retpc & 0x3)) {
         riscv_raise_exception(env, RISCV_EXCP_INST_ADDR_MIS, GETPC());
     }
 
