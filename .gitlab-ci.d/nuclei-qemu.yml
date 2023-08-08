@@ -9,7 +9,7 @@ stages:
 
 variables:
   IMAGE: rego.corp.nucleisys.com/software/sdkbuild
-  IMAGE_TAG: "2022.12"
+  IMAGE_TAG: "2022.08"
 
 default:
   interruptible: true
@@ -102,18 +102,23 @@ build_linux_qemu:
   image: rego.corp.nucleisys.com/software/build-linux-qemu:latest
   script:
     - cd $CI_PROJECT_DIR
+    # workaround for clone source code using mirror in gito
     - sed -i 's|https://gitlab.com/qemu-project|https://gito.corp.nucleisys.com/software/qemu|g' .gitmodules
     - git submodule init
     - git submodule sync
     - git submodule update --init
     - git submodule update --remote
     - sync
+    # stash the changes to not make this git repo dirty
+    - git stash
     #build
     - cd $CI_PROJECT_DIR
     - mkdir $CI_PROJECT_DIR/build -p
     - mkdir $CI_PROJECT_DIR/linux_qemu -p
     - cd build
-    - ../configure --prefix=$CI_PROJECT_DIR/linux_qemu --disable-pa --disable-linux-aio --disable-rbd --disable-vnc --disable-sdl --disable-sdl-image --target-list=riscv32-softmmu,riscv64-softmmu && make -j8 && make install
+    - ../configure --prefix=$CI_PROJECT_DIR/linux_qemu --disable-pa --disable-linux-aio --disable-rbd --disable-vnc --disable-sdl --disable-sdl-image --target-list=riscv32-softmmu,riscv64-softmmu
+    - make -j8
+    - make install
   artifacts:
     paths:
     - $CI_PROJECT_DIR/linux_qemu
@@ -128,18 +133,23 @@ build_windows_qemu:
     name: rego.corp.nucleisys.com/software/build-windows-qemu:latest
     entrypoint: ["/bin/sh", "-c"]
   script:
+    # workaround for clone source code using mirror in gito
     - sed -i 's|https://gitlab.com/qemu-project|https://gito.corp.nucleisys.com/software/qemu|g' .gitmodules
     - git submodule init
     - git submodule sync
     - git submodule update --init
     - git submodule update --remote
-    #- git submodule update --remote
     - sync
+    # stash the changes to not make this git repo dirty
+    - git stash
     # build
     - mkdir $CI_PROJECT_DIR/build -p
     - mkdir $CI_PROJECT_DIR/windows_qemu/bin -p
     - cd build
-    - ../configure --cross-prefix=x86_64-w64-mingw32- --target-list=riscv32-softmmu,riscv64-softmmu --prefix=$CI_PROJECT_DIR/windows_qemu/bin && make -j8 && make install
+    - ../configure --cross-prefix=x86_64-w64-mingw32- --target-list=riscv32-softmmu,riscv64-softmmu --prefix=$CI_PROJECT_DIR/windows_qemu/bin
+    - make -j8
+    - make install
+    # copy necessary dlls required by qemu
     - cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/* $CI_PROJECT_DIR/windows_qemu/bin
   artifacts:
     paths:
