@@ -1326,21 +1326,19 @@ static void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
     }
     if (cpu->cfg.ext_xxldspn3x) {
         cpu->cfg.ext_xxldspn2x = true;
-        cpu->cfg.ext_xxldspn1x = true;
-        cpu->cfg.ext_p = true;
     }
 
     if (cpu->cfg.ext_xxldspn2x) {
         cpu->cfg.ext_xxldspn1x = true;
-        cpu->cfg.ext_p = true;
     }
 
     if (cpu->cfg.ext_xxldspn1x) {
-        cpu->cfg.ext_p = true;
+        cpu->cfg.ext_xxldsp = true;
     }
 
     if (cpu->cfg.ext_xxldsp) {
         cpu->cfg.ext_p = true;
+        cpu->cfg.ext_psfoperand = true;
     }
 
     if (cpu->cfg.ext_p) {
