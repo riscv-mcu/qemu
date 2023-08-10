@@ -5266,24 +5266,14 @@ RVPR_ACC_D(dkmada32, 1, 8);
 static inline void do_dkmaxda32(CPURISCVState *env, void *vd, void *va,
                             void *vb, void *vc, uint8_t i)
 {
-    int32_t *d = vd;
-    int32_t *c = vc;
+    int64_t *d = vd;
+    int64_t *c = vc;
     int32_t *a = va, *b = vb;
-    int64_t p1, p2, p3;
+    int64_t p1, p2;
+
     p1 = (int64_t)a[i] * b[i + 1];
     p2 = (int64_t)a[i + 1] * b[i];
-    d[H4(i)] = saddu32(env, 0, p1 + p2, c[H4(i)]);
-    p3 = (int32_t)(p1 + p2) +  c[H4(i)];
-
-
-    if((p3 < (int32_t)p1) || (p3 < (int32_t)p2))
-    {
-        d[H4(i + 1)] = sadd32(env, 0, (p1 + p2) >> 32, c[H4(i + 1)]) + 1;
-    }
-    else
-    {
-        d[H4(i + 1)] = sadd32(env, 0, (p1 + p2) >> 32, c[H4(i + 1)]); 
-    }
+    d[H8(i)] = sadd64(env, 0, p1 + p2, c[H8(i)]);
 }
 
 RVPR_ACC_D(dkmaxda32, 1, 8);
