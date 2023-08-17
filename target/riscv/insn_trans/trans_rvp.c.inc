@@ -133,7 +133,39 @@ static inline bool r_ool_d(DisasContext *ctx, arg_r *a, gen_helper_rvp_r_d *fn)
     tcg_gen_extrh_i64_i32(d1, dst);
     gen_set_gpr(ctx, a->rd, d0);
     gen_set_gpr(ctx, a->rd + 1, d1);
+    return true;
+#endif
+}
 
+static inline bool r_ool_d64_s64_s32_d(DisasContext *ctx, arg_r *a,
+                    void (* fn)(TCGv_i64, TCGv_ptr, TCGv_i64, TCGv_i32))
+{
+#ifdef TARGET_RISCV64
+    return true;
+#else
+    TCGv a0, a1, a2, d0, d1;
+    TCGv_i64 src1, dst;
+    TCGv_i32 src2;
+
+    a0 = get_gpr(ctx, a->rs1, EXT_ZERO);
+    a1 = get_gpr(ctx, a->rs1 + 1, EXT_ZERO);
+    a2 = get_gpr(ctx, a->rs2, EXT_ZERO);
+
+    src1 = tcg_temp_new_i64();
+    src2 = tcg_temp_new_i32();
+    dst = tcg_temp_new_i64();
+
+    tcg_gen_concat_i32_i64(src1, a0, a1);
+    tcg_gen_trunc_tl_i32(src2, a2);
+
+    fn(dst, cpu_env, src1, src2);
+
+    d0 = dest_gpr(ctx, a->rd);
+    d1 = dest_gpr(ctx, a->rd + 1);
+    tcg_gen_extrl_i64_i32(d0, dst);
+    tcg_gen_extrh_i64_i32(d1, dst);
+    gen_set_gpr(ctx, a->rd, d0);
+    gen_set_gpr(ctx, a->rd + 1, d1);
     return true;
 #endif
 }
@@ -156,6 +188,20 @@ static bool trans_##NAME(DisasContext *s, arg_r *a)     \
 {                                                       \
     REQUIRE_XXLDSPN2X(s);                               \
     return r_ool_d(s, a, gen_helper_##NAME);            \
+}
+
+#define GEN_RVP_R_OOL_D64_S64_S32_D_N1(NAME)            \
+static bool trans_##NAME(DisasContext *s, arg_r *a)     \
+{                                                       \
+    REQUIRE_XXLDSPN1X(s);                               \
+    return r_ool_d64_s64_s32_d(s, a, gen_helper_##NAME);\
+}
+
+#define GEN_RVP_R_OOL_D64_S64_S32_D_N2(NAME)            \
+static bool trans_##NAME(DisasContext *s, arg_r *a)     \
+{                                                       \
+    REQUIRE_XXLDSPN2X(s);                               \
+    return r_ool_d64_s64_s32_d(s, a, gen_helper_##NAME);\
 }
 
 GEN_RVP_R_OOL(radd16);
@@ -529,8 +575,8 @@ GEN_RVP_R_OOL_D_N1(dkhm8);
 GEN_RVP_R_OOL_D_N1(dkhm16);
 GEN_RVP_R2_OOL_D_N1(dkabs8);
 GEN_RVP_R2_OOL_D_N1(dkabs16);
-GEN_RVP_R_OOL_D_N1(dkslra8);
-GEN_RVP_R_OOL_D_N1(dkslra16);
+GEN_RVP_R_OOL_D64_S64_S32_D_N1(dkslra8);
+GEN_RVP_R_OOL_D64_S64_S32_D_N1(dkslra16);
 GEN_RVP_R_OOL_D_N1(dkadd8);
 GEN_RVP_R_OOL_D_N1(dkadd16);
 GEN_RVP_R_OOL_D_N1(dksub8);
@@ -543,7 +589,7 @@ GEN_RVP_R_OOL_D_N2(dsmmulu);
 GEN_RVP_R_OOL_D_N2(dkwmmul);
 GEN_RVP_R_OOL_D_N2(dkwmmulu);
 GEN_RVP_R2_OOL_D_N2(dkabs32);
-GEN_RVP_R_OOL_D_N2(dkslra32);
+GEN_RVP_R_OOL_D64_S64_S32_D_N2(dkslra32);
 GEN_RVP_R_OOL_D_N2(dkadd32);
 GEN_RVP_R_OOL_D_N2(dksub32);
 GEN_RVP_R_OOL_D_N2(dradd16);

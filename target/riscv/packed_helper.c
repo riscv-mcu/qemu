@@ -58,6 +58,19 @@ rvprd(CPURISCVState *env, uint64_t a, uint64_t b,
     return result;
 }
 
+static inline uint64_t
+rvprd_d64_s64_s32(CPURISCVState *env, uint64_t a, uint32_t b,
+     uint8_t step, uint8_t size, PackedFn3i *fn)
+{
+    int i, passes = sizeof(uint64_t) / size;
+    uint64_t result = 0;
+
+    for (i = 0; i < passes; i += step) {
+        fn(env, &result, &a, &b, i);
+    }
+    return result;
+}
+
 #define RVPR(NAME, STEP, SIZE)                                  \
 target_ulong HELPER(NAME)(CPURISCVState *env, target_ulong a,   \
                           target_ulong b)                       \
@@ -70,6 +83,13 @@ uint64_t HELPER(NAME)(CPURISCVState *env, uint64_t a,            \
                           uint64_t b)                            \
 {                                                                \
     return rvprd(env, a, b, STEP, SIZE, (PackedFn3i *)do_##NAME);\
+}
+
+#define RVPRD_D64_S64_S32(NAME, STEP, SIZE)                                  \
+uint64_t HELPER(NAME)(CPURISCVState *env, uint64_t a,            \
+                          uint32_t b)                            \
+{                                                                \
+    return rvprd_d64_s64_s32(env, a, b, STEP, SIZE, (PackedFn3i *)do_##NAME);\
 }
 
 static inline int32_t hadd32(int32_t a, int32_t b)
@@ -246,6 +266,7 @@ static inline void do_dsmmul(CPURISCVState *env, void *vd, void *va,
 {
     int32_t *d = vd, *a = va, *b = vb;
     d[i] = (int64_t)a[i] * b[i] >> 32;
+    d[i+1] = (int64_t)a[i+1] * b[i+1] >> 32;
 }
 
 RVPRD(dsmmul, 1, 8);
@@ -255,6 +276,7 @@ static inline void do_dsmmulu(CPURISCVState *env, void *vd, void *va,
 {
     int32_t *d = vd, *a = va, *b = vb;
     d[i] = ((int64_t)a[i] * b[i] + (uint32_t)INT32_MIN) >> 32;
+    d[i+1] = ((int64_t)a[i+1] * b[i+1] + (uint32_t)INT32_MIN) >> 32;
 }
 
 RVPRD(dsmmulu, 1, 8);
@@ -270,6 +292,12 @@ static inline void do_dkwmmul(CPURISCVState *env, void *vd, void *va,
         d[i] = (int64_t)a[i] * b[i] >> 31;
     }
 
+    if (a[i+1] == INT32_MIN && b[i+1] == INT32_MIN) {
+        env->vxsat = 0x1;
+        d[i+1] = INT32_MAX;
+    } else {
+        d[i+1] = (int64_t)a[i+1] * b[i+1] >> 31;
+    }
 }
 
 RVPRD(dkwmmul, 1, 8);
@@ -285,6 +313,12 @@ static inline void do_dkwmmulu(CPURISCVState *env, void *vd, void *va,
         d[i] = ((int64_t)a[i] * b[i] + (1ull << 30)) >> 31;
     }
 
+    if (a[i+1] == INT32_MIN && b[i+1] == INT32_MIN) {
+        env->vxsat = 0x1;
+        d[i+1] = INT32_MAX;
+    } else {
+        d[i+1] = ((int64_t)a[i+1] * b[i+1] + (1ull << 30)) >> 31;
+    }
 }
 
 RVPRD(dkwmmulu, 1, 8);
@@ -1361,7 +1395,7 @@ static inline void do_dkslra16(CPURISCVState *env, void *vd, void *va,
     }
 }
 
-RVPRD(dkslra16, 1, 2);
+RVPRD_D64_S64_S32(dkslra16, 1, 2);
 
 static inline void do_kslra16_u(CPURISCVState *env, void *vd, void *va,
                                 void *vb, uint8_t i)
@@ -1480,7 +1514,7 @@ static inline void do_dkslra8(CPURISCVState *env, void *vd, void *va,
     }
 }
 
-RVPRD(dkslra8, 1, 1);
+RVPRD_D64_S64_S32(dkslra8, 1, 1);
 
 static inline void do_kslra8_u(CPURISCVState *env, void *vd, void *va,
                                void *vb, uint8_t i)
@@ -4410,7 +4444,7 @@ static inline void do_dkslra32(CPURISCVState *env, void *vd, void *va,
     }
 }
 
-RVPRD(dkslra32, 1, 4);
+RVPRD_D64_S64_S32(dkslra32, 1, 4);
 
 static inline void do_umin32(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
