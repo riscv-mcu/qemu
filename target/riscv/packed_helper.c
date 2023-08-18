@@ -2232,22 +2232,6 @@ static inline void do_dredsa16(CPURISCVState *env, void *vd, void *va, uint8_t i
 
 RVPR2D_D32_S64(dredsa16, 1, 8);
 
-static inline void do_dreda32(CPURISCVState *env, void *vd, void *va, uint8_t i)
-{
-    int32_t *d = vd, *a = va;
-    d[i] = a[i] + a[i + 1];
-}
-
-RVPR2D_D32_S64(dreda32, 1, 8);
-
-static inline void do_dreds32(CPURISCVState *env, void *vd, void *va, uint8_t i)
-{
-    int32_t *d = vd, *a = va;
-    d[i] = a[i] - a[i + 1];
-}
-
-RVPR2D_D32_S64(dreds32, 1, 8);
-
 static inline void do_clrs8(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
     int8_t *d = vd, *a = va;
