@@ -2281,6 +2281,15 @@ static inline void do_swap8(CPURISCVState *env, void *vd, void *va, uint8_t i)
 
 RVPR2(swap8, 2, 1);
 
+static inline void do_swap16(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int16_t *d = vd, *a = va;
+    d[H1(i)] = a[H1(i + 1)];
+    d[H1(i + 1)] = a[H1(i)];
+}
+
+RVPR2(swap16, 2, 2);
+
 /* 8-bit Unpacking Instructions */
 static inline void
 do_sunpkd810(CPURISCVState *env, void *vd, void *va, uint8_t i)

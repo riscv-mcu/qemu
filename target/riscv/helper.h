@@ -1244,6 +1244,7 @@ DEF_HELPER_2(clrs8, tl, env, tl)
 DEF_HELPER_2(clz8, tl, env, tl)
 DEF_HELPER_2(clo8, tl, env, tl)
 DEF_HELPER_2(swap8, tl, env, tl)
+DEF_HELPER_2(swap16, tl, env, tl)
 
 DEF_HELPER_2(sunpkd810, tl, env, tl)
 DEF_HELPER_2(sunpkd820, tl, env, tl)
