@@ -581,10 +581,9 @@ r2_d64_s64_ool(DisasContext *ctx, arg_r2 *a,
     return true;
 }
 
-#define GEN_RVP_R2_D64_S64_OOL_N1(NAME)                \
+#define GEN_RVP_R2_D64_S64_OOL(NAME)                \
 static bool trans_##NAME(DisasContext *s, arg_r2 *a)   \
 {                                                      \
-    REQUIRE_XXLDSPN1X(s);                              \
     return r2_d64_s64_ool(s, a, gen_helper_##NAME);    \
 }
 
@@ -628,14 +627,14 @@ GEN_RVP_R2_OOL(clo8);
 GEN_RVP_R2_OOL(swap8);
 GEN_RVP_R2_OOL(swap16);
 
-GEN_RVP_R2_OOL_N1(expd80);
-GEN_RVP_R2_OOL_N1(expd81);
-GEN_RVP_R2_OOL_N1(expd82);
-GEN_RVP_R2_OOL_N1(expd83);
-GEN_RVP_R2_D64_S64_OOL_N1(expd84);
-GEN_RVP_R2_D64_S64_OOL_N1(expd85);
-GEN_RVP_R2_D64_S64_OOL_N1(expd86);
-GEN_RVP_R2_D64_S64_OOL_N1(expd87);
+GEN_RVP_R2_OOL(expd80);
+GEN_RVP_R2_OOL(expd81);
+GEN_RVP_R2_OOL(expd82);
+GEN_RVP_R2_OOL(expd83);
+GEN_RVP_R2_D64_S64_OOL(expd84);
+GEN_RVP_R2_D64_S64_OOL(expd85);
+GEN_RVP_R2_D64_S64_OOL(expd86);
+GEN_RVP_R2_D64_S64_OOL(expd87);
 
 GEN_RVP_R_OOL_D_N1(dkhm8);
 GEN_RVP_R_OOL_D_N1(dkhm16);
