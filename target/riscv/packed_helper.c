@@ -71,6 +71,19 @@ rvprd_d64_s64_s32(CPURISCVState *env, uint64_t a, uint32_t b,
     return result;
 }
 
+static inline uint32_t
+rvprd_d32_s64_s64(CPURISCVState *env, uint64_t a, uint64_t b,
+     uint8_t step, uint8_t size, PackedFn3i *fn)
+{
+    int i, passes = sizeof(uint64_t) / size;
+    uint32_t result = 0;
+
+    for (i = 0; i < passes; i += step) {
+        fn(env, &result, &a, &b, i);
+    }
+    return result;
+}
+
 #define RVPR(NAME, STEP, SIZE)                                  \
 target_ulong HELPER(NAME)(CPURISCVState *env, target_ulong a,   \
                           target_ulong b)                       \
@@ -90,6 +103,13 @@ uint64_t HELPER(NAME)(CPURISCVState *env, uint64_t a,            \
                           uint32_t b)                            \
 {                                                                \
     return rvprd_d64_s64_s32(env, a, b, STEP, SIZE, (PackedFn3i *)do_##NAME);\
+}
+
+#define RVPRD_D32_S64_S64(NAME, STEP, SIZE)                      \
+uint32_t HELPER(NAME)(CPURISCVState *env, uint64_t a,            \
+                          uint64_t b)                            \
+{                                                                \
+    return rvprd_d32_s64_s64(env, a, b, STEP, SIZE, (PackedFn3i *)do_##NAME);\
 }
 
 static inline int32_t hadd32(int32_t a, int32_t b)
@@ -2008,6 +2028,24 @@ uint64_t HELPER(NAME)(CPURISCVState *env, uint64_t a1)            \
     return rvpr2d(env, a1, STEP, SIZE, (PackedFn2i *)do_##NAME);  \
 }
 
+static inline uint32_t rvpr2d_d32_s64(CPURISCVState *env, uint64_t a,
+                                 uint8_t step, uint8_t size, PackedFn2i *fn)
+{
+    int i, passes = sizeof(uint64_t) / size;
+    uint32_t result;
+    for (i = 0; i < passes; i += step)
+    {
+        fn(env, &result, &a, i);
+    }
+    return result;
+}
+
+#define RVPR2D_D32_S64(NAME, STEP, SIZE)                          \
+uint32_t HELPER(NAME)(CPURISCVState *env, uint64_t a1)            \
+{                                                                 \
+    return rvpr2d_d32_s64(env, a1, STEP, SIZE, (PackedFn2i *)do_##NAME);  \
+}
+
 static inline void do_kabs16(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
     int16_t *d = vd, *a = va;
@@ -2183,7 +2221,7 @@ static inline void do_dredas16(CPURISCVState *env, void *vd, void *va, uint8_t i
     d[i + 1] = a[i + 2] + a[i + 3];
 }
 
-RVPR2D(dredas16, 1, 8);
+RVPR2D_D32_S64(dredas16, 1, 8);
 
 static inline void do_dredsa16(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
@@ -2192,7 +2230,7 @@ static inline void do_dredsa16(CPURISCVState *env, void *vd, void *va, uint8_t i
     d[i + 1] = a[i + 2] - a[i + 3];
 }
 
-RVPR2D(dredsa16, 1, 8);
+RVPR2D_D32_S64(dredsa16, 1, 8);
 
 static inline void do_dreda32(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
@@ -2200,7 +2238,7 @@ static inline void do_dreda32(CPURISCVState *env, void *vd, void *va, uint8_t i)
     d[i] = a[i] + a[i + 1];
 }
 
-RVPR2D(dreda32, 1, 8);
+RVPR2D_D32_S64(dreda32, 1, 8);
 
 static inline void do_dreds32(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
@@ -2208,8 +2246,7 @@ static inline void do_dreds32(CPURISCVState *env, void *vd, void *va, uint8_t i)
     d[i] = a[i] - a[i + 1];
 }
 
-RVPR2D(dreds32, 1, 8);
-
+RVPR2D_D32_S64(dreds32, 1, 8);
 
 static inline void do_clrs8(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
@@ -5702,7 +5739,7 @@ static inline void do_dsma32_u(CPURISCVState *env, void *vd, void *va,
     d[i] = (int32_t)(((int64_t)a[i] * b[i] + (int64_t)a[i + 1] * b[i + 1] + 0x80000000LL) >> 32);
 }
 
-RVPRD(dsma32_u, 1, 8);
+RVPRD_D32_S64_S64(dsma32_u, 1, 8);
 
 static inline void do_dsmxs32_u(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
@@ -5711,7 +5748,7 @@ static inline void do_dsmxs32_u(CPURISCVState *env, void *vd, void *va,
     d[i] = (int32_t)(((int64_t)a[i + 1] * b[i] - (int64_t)a[i] * b[i + 1] + 0x80000000LL) >> 32);
 }
 
-RVPRD(dsmxs32_u, 1, 8);
+RVPRD_D32_S64_S64(dsmxs32_u, 1, 8);
 
 static inline void do_dsmxa32_u(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
@@ -5720,7 +5757,7 @@ static inline void do_dsmxa32_u(CPURISCVState *env, void *vd, void *va,
     d[i] = (int32_t)(((int64_t)a[i + 1] * b[i] + (int64_t)a[i] * b[i + 1] + 0x80000000LL) >> 32);
 }
 
-RVPRD(dsmxa32_u, 1, 8);
+RVPRD_D32_S64_S64(dsmxa32_u, 1, 8);
 
 static inline void do_dsms32_u(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
@@ -5729,7 +5766,7 @@ static inline void do_dsms32_u(CPURISCVState *env, void *vd, void *va,
     d[i] = (int32_t)(((int64_t)a[i] * b[i] - (int64_t)a[i + 1] * b[i + 1] + 0x80000000LL) >> 32);
 }
 
-RVPRD(dsms32_u, 1, 8);
+RVPRD_D32_S64_S64(dsms32_u, 1, 8);
 
 static inline void do_dsmalbb(CPURISCVState *env, void *vd, void *va,
                              void *vb, void *vc, uint8_t i)

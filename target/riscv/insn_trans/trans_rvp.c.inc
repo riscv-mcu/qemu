@@ -170,6 +170,32 @@ static inline bool r_ool_d64_s64_s32_d(DisasContext *ctx, arg_r *a,
 #endif
 }
 
+static inline bool r_ool_d32_s64_s64_d(DisasContext *ctx, arg_r *a,
+                    void (* fn)(TCGv_i32, TCGv_ptr, TCGv_i64, TCGv_i64))
+{
+#ifdef TARGET_RISCV64
+    return true;
+#else
+    TCGv a0, a1, a2, a3, dst;
+    TCGv_i64 src1, src2;
+
+    a0 = get_gpr(ctx, a->rs1, EXT_ZERO);
+    a1 = get_gpr(ctx, a->rs1 + 1, EXT_ZERO);
+    a2 = get_gpr(ctx, a->rs2, EXT_ZERO);
+    a3 = get_gpr(ctx, a->rs2 + 1, EXT_ZERO);
+    dst = dest_gpr(ctx, a->rd);
+
+    src1 = tcg_temp_new_i64();
+    src2 = tcg_temp_new_i64();
+
+    tcg_gen_concat_i32_i64(src1, a0, a1);
+    tcg_gen_concat_i32_i64(src2, a2, a3);
+    fn(dst, cpu_env, src1, src2);
+    gen_set_gpr(ctx, a->rd, dst);
+    return true;
+#endif
+}
+
 #define GEN_RVP_R_OOL(NAME)                            \
 static bool trans_##NAME(DisasContext *s, arg_r *a)    \
 {                                                      \
@@ -202,6 +228,13 @@ static bool trans_##NAME(DisasContext *s, arg_r *a)     \
 {                                                       \
     REQUIRE_XXLDSPN2X(s);                               \
     return r_ool_d64_s64_s32_d(s, a, gen_helper_##NAME);\
+}
+
+#define GEN_RVP_R_OOL_D32_S64_S64_D_N3(NAME)            \
+static bool trans_##NAME(DisasContext *s, arg_r *a)     \
+{                                                       \
+    REQUIRE_XXLDSPN3X(s);                               \
+    return r_ool_d32_s64_s64_d(s, a, gen_helper_##NAME);\
 }
 
 GEN_RVP_R_OOL(radd16);
@@ -488,6 +521,31 @@ r2_ool_d(DisasContext *ctx, arg_r2 *a,
 #endif
 }
 
+static bool
+r2_ool_d32_s64_d(DisasContext *ctx, arg_r2 *a,
+       void (* fn)(TCGv_i32, TCGv_ptr, TCGv_i64))
+{
+#ifdef TARGET_RISCV64
+    return true;
+#else
+    TCGv a0, a1, dst;
+    TCGv_i64 src;
+
+    a0 = get_gpr(ctx, a->rs1, EXT_ZERO);
+    a1 = get_gpr(ctx, a->rs1 + 1, EXT_ZERO);
+    dst = dest_gpr(ctx, a->rd);
+
+    src = tcg_temp_new_i64();
+    dst = tcg_temp_new_i32();
+
+    tcg_gen_concat_i32_i64(src, a0, a1);
+    fn(dst, cpu_env, src);
+    gen_set_gpr(ctx, a->rd, dst);
+
+    return true;
+#endif
+}
+
 #define GEN_RVP_R2_OOL(NAME)                           \
 static bool trans_##NAME(DisasContext *s, arg_r2 *a)   \
 {                                                      \
@@ -542,6 +600,13 @@ static bool trans_##NAME(DisasContext *s, arg_r2 *a)    \
 {                                                       \
     REQUIRE_XXLDSPN2X(s);                               \
     return r2_ool_d(s, a, gen_helper_##NAME);           \
+}
+
+#define GEN_RVP_R2_OOL_D32_S64_D_N2(NAME)               \
+static bool trans_##NAME(DisasContext *s, arg_r2 *a)    \
+{                                                       \
+    REQUIRE_XXLDSPN2X(s);                               \
+    return r2_ool_d32_s64_d(s, a, gen_helper_##NAME);   \
 }
 
 GEN_RVP_R2_OOL(kabs16);
@@ -817,14 +882,14 @@ GEN_RVP_R_ACC_OOL_D_N3(dsmada16);
 GEN_RVP_R_ACC_OOL_D_N3(dsmaxda16);
 GEN_RVP_R_ACC_OOL_D_N3(dksms32_u);
 GEN_RVP_R_ACC_OOL_D_N3(dmada32);
-GEN_RVP_R2_OOL_D_N2(dredas16);
-GEN_RVP_R2_OOL_D_N2(dredsa16);
-GEN_RVP_R2_OOL_D_N2(dreda32);
-GEN_RVP_R2_OOL_D_N2(dreds32);
-GEN_RVP_R_OOL_D_N2(dsma32_u);
-GEN_RVP_R_OOL_D_N2(dsmxs32_u);
-GEN_RVP_R_OOL_D_N2(dsmxa32_u);
-GEN_RVP_R_OOL_D_N2(dsms32_u);
+GEN_RVP_R2_OOL_D32_S64_D_N2(dredas16);
+GEN_RVP_R2_OOL_D32_S64_D_N2(dredsa16);
+GEN_RVP_R2_OOL_D32_S64_D_N2(dreda32);
+GEN_RVP_R2_OOL_D32_S64_D_N2(dreds32);
+GEN_RVP_R_OOL_D32_S64_S64_D_N3(dsma32_u);
+GEN_RVP_R_OOL_D32_S64_S64_D_N3(dsmxs32_u);
+GEN_RVP_R_OOL_D32_S64_S64_D_N3(dsmxa32_u);
+GEN_RVP_R_OOL_D32_S64_S64_D_N3(dsms32_u);
 GEN_RVP_R_ACC_OOL_D_N3(dsmalbb);
 GEN_RVP_R_ACC_OOL_D_N3(dsmalbt);
 GEN_RVP_R_ACC_OOL_D_N3(dsmaltt);
