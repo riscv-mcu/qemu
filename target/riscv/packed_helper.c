@@ -2212,7 +2212,7 @@ static inline void do_dkclip64(CPURISCVState *env, void *vd, void *va, uint8_t i
     }
 }
 
-RVPR2D(dkclip64, 1, 8);
+RVPR2D_D32_S64(dkclip64, 1, 8);
 
 static inline void do_dredas16(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
@@ -5064,6 +5064,27 @@ uint64_t HELPER(NAME)(CPURISCVState *env, uint64_t a,          \
     return rvpr_acc_d(env, a, b, c, STEP, SIZE, (PackedFn4i *)do_##NAME);\
 }
 
+static inline uint32_t
+rvpr_acc_d32(CPURISCVState *env, uint64_t a,
+         uint64_t b, uint64_t c,
+         uint8_t step, uint8_t size, PackedFn4i *fn)
+{
+    int i, passes = sizeof(uint64_t) / size;
+    uint32_t result = 0;
+
+    for (i = 0; i < passes; i += step) {
+        fn(env, &result, &a, &b, &c, i);
+    }
+    return result;
+}
+
+#define RVPR_ACC_D32(NAME, STEP, SIZE)                                     \
+uint32_t HELPER(NAME)(CPURISCVState *env, uint64_t a,          \
+                          uint64_t b, uint64_t c)              \
+{                                                                      \
+    return rvpr_acc_d32(env, a, b, c, STEP, SIZE, (PackedFn4i *)do_##NAME);\
+}
+
 static inline void do_dkmmac(CPURISCVState *env, void *vd, void *va,
                             void *vb, void *vc, uint8_t i)
 {
@@ -5270,7 +5291,7 @@ static inline void do_dumaqa(CPURISCVState *env, void *vd, void *va,
 RVPR_ACC_D(dumaqa, 1, 4);
 
 static inline void do_dkmda32(CPURISCVState *env, void *vd, void *va,
-                            void *vb, void *vc, uint8_t i)
+                            void *vb, uint8_t i)
 {
     int64_t *d = vd;
     int32_t *a = va, *b = vb;
@@ -5284,10 +5305,10 @@ static inline void do_dkmda32(CPURISCVState *env, void *vd, void *va,
     }
 }
 
-RVPR_ACC_D(dkmda32, 1, 8);
+RVPRD(dkmda32, 1, 8);
 
 static inline void do_dkmxda32(CPURISCVState *env, void *vd, void *va,
-                            void *vb, void *vc, uint8_t i)
+                            void *vb, uint8_t i)
 {
     int64_t *d = vd;
     int32_t *a = va, *b = vb;
@@ -5301,7 +5322,7 @@ static inline void do_dkmxda32(CPURISCVState *env, void *vd, void *va,
     }
 }
 
-RVPR_ACC_D(dkmxda32, 1, 8);
+RVPRD(dkmxda32, 1, 8);
 
 static inline void do_dkmada32(CPURISCVState *env, void *vd, void *va,
                             void *vb, void *vc, uint8_t i)
@@ -5429,7 +5450,7 @@ static inline void do_dkmsxda32(CPURISCVState *env, void *vd, void *va,
 RVPR_ACC_D(dkmsxda32, 1, 8);
 
 static inline void do_dsmds32(CPURISCVState *env, void *vd, void *va,
-                            void *vb, void *vc, uint8_t i)
+                            void *vb, uint8_t i)
 {
     int64_t *d = vd;
     int32_t *a = va, *b = vb;
@@ -5437,10 +5458,10 @@ static inline void do_dsmds32(CPURISCVState *env, void *vd, void *va,
          (int64_t)a[H4(i)] * b[H4(i)];
 }
 
-RVPR_ACC_D(dsmds32, 1, 8);
+RVPRD(dsmds32, 1, 8);
 
 static inline void do_dsmdrs32(CPURISCVState *env, void *vd, void *va,
-                            void *vb, void *vc, uint8_t i)
+                            void *vb, uint8_t i)
 {
     int64_t *d = vd;
     int32_t *a = va, *b = vb;
@@ -5448,10 +5469,10 @@ static inline void do_dsmdrs32(CPURISCVState *env, void *vd, void *va,
          (int64_t)a[H4(i + 1)] * b[H4(i + 1)];
 }
 
-RVPR_ACC_D(dsmdrs32, 1, 8);
+RVPRD(dsmdrs32, 1, 8);
 
 static inline void do_dsmxds32(CPURISCVState *env, void *vd, void *va,
-                            void *vb, void *vc, uint8_t i)
+                            void *vb, uint8_t i)
 {
     int64_t *d = vd;
     int32_t *a = va, *b = vb;
@@ -5459,7 +5480,7 @@ static inline void do_dsmxds32(CPURISCVState *env, void *vd, void *va,
          (int64_t)a[H4(i)] * b[H4(i + 1)];
 }
 
-RVPR_ACC_D(dsmxds32, 1, 8);
+RVPRD(dsmxds32, 1, 8);
 
 static inline void do_dsmalda(CPURISCVState *env, void *vd, void *va,
                             void *vb, void *vc, uint8_t i)
@@ -5679,7 +5700,7 @@ static inline void do_dsmada16(CPURISCVState *env, void *vd, void *va,
            a[i + 3] * b[i + 3];
 }
 
-RVPR_ACC_D(dsmada16, 1, 8);
+RVPR_ACC_D32(dsmada16, 1, 8);
 
 static inline void do_dsmaxda16(CPURISCVState *env, void *vd, void *va,
                              void *vb, void *vc, uint8_t i)
@@ -5694,7 +5715,7 @@ static inline void do_dsmaxda16(CPURISCVState *env, void *vd, void *va,
            a[i + 3] * b[i + 2]);
 }
 
-RVPR_ACC_D(dsmaxda16, 1, 8);
+RVPR_ACC_D32(dsmaxda16, 1, 8);
 
 static inline void do_dksms32_u(CPURISCVState *env, void *vd, void *va,
                              void *vb, void *vc, uint8_t i)
@@ -5723,7 +5744,7 @@ static inline void do_dmada32(CPURISCVState *env, void *vd, void *va,
     d[i] = (int32_t)((((int64_t)c[i] << 32) + (int64_t)a[i] * b[i + 1] + (int64_t)a[i + 1] * b[i]) >> 32);
 }
 
-RVPR_ACC_D(dmada32, 1, 8);
+RVPR_ACC_D32(dmada32, 1, 8);
 
 static inline void do_dsma32_u(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
