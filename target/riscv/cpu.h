@@ -293,6 +293,9 @@ struct CPUArchState {
     /* NMI  CSR*/
     target_ulong mnvec;
     target_ulong msubm;
+    target_ulong mstack_ctrl;
+    target_ulong mstack_bound;
+    target_ulong mstack_base;
     target_ulong mdcause;
     target_ulong mcache_ctl;
     target_ulong mmisc_ctl;

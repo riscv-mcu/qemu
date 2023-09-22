@@ -4183,6 +4183,42 @@ static int write_msubm(CPURISCVState *env, int csrno, target_ulong val)
     return RISCV_EXCP_NONE;
 }
 
+static int read_mstack_ctrl(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mstack_ctrl;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mstack_ctrl(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mstack_ctrl = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mstack_bound(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mstack_bound;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mstack_bound(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mstack_bound = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mstack_base(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mstack_base;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mstack_base(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mstack_base = val;
+    return RISCV_EXCP_NONE;
+}
+
 static int read_mdcause(CPURISCVState *env, int csrno, target_ulong *val)
 {
     *val = env->mdcause;
@@ -4788,6 +4824,9 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_MSCRATCHCSWL] =        { "mscratchcswl", any,  read_mscratchcswl, write_mscratchcswl,  rmw_mscratchcswl},
     [CSR_NUCLEI_MNVEC] =               { "mnvec", any,  read_mnvec,       write_mnvec       },
     [CSR_NUCLEI_MSUBM] =               { "msubm", any,  read_msubm,       write_msubm       },
+    [CSR_NUCLEI_MSTACK_CTRL] =         { "mstack_ctrl", any,  read_mstack_ctrl, write_mstack_ctrl },
+    [CSR_NUCLEI_MSTACK_BOUND] =        { "mstack_bound", any,  read_mstack_bound, write_mstack_bound },
+    [CSR_NUCLEI_MSTACK_BASE] =         { "mstack_base", any,  read_mstack_base, write_mstack_base },
     [CSR_NUCLEI_MDCAUSE] =             { "mdcause", any,  read_mdcause,     write_mdcause     },
     [CSR_NUCLEI_MCACHE_CTL] =          { "mcache_ctl", any,  read_mcache_ctl,  write_mcache_ctl  },
     [CSR_NUCLEI_MMISC_CTL] =           { "mmisc_ctl", any,  read_mmisc_ctl,   write_mmisc_ctl   },

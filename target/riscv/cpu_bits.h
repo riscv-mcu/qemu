@@ -482,6 +482,9 @@
 #define CSR_NUCLEI_MECC_CODE           0x7C2
 #define CSR_NUCLEI_MNVEC               0x7C3
 #define CSR_NUCLEI_MSUBM               0x7C4
+#define CSR_NUCLEI_MSTACK_CTRL         0x7C6
+#define CSR_NUCLEI_MSTACK_BOUND        0x7C7
+#define CSR_NUCLEI_MSTACK_BASE         0x7C8
 #define CSR_NUCLEI_MDCAUSE             0x7C9
 #define CSR_NUCLEI_MCACHE_CTL          0x7CA
 #define CSR_NUCLEI_MMISC_CTL           0x7D0
