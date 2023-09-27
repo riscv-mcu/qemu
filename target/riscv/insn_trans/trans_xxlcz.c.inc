@@ -254,10 +254,10 @@ static bool trans_xl_addibne(DisasContext *ctx, arg_xl_addibne *a)
         default:
         return true;
     }
-    gen_helper_xl_addibne(cpu_pc, dest, rs1, tcg_constant_i32(scale), tcg_constant_i32(((-((a->imm) | 0xfffffe00)) - 1) << 1), tcg_constant_i32(ctx->base.pc_next));
+    gen_helper_xl_addibne(cpu_pc, dest, rs1, tcg_constant_i32(scale), tcg_constant_i32((((int) ~((a->imm) << 1) + 1)&0x3FF)), tcg_constant_i32(ctx->base.pc_next));
     tcg_gen_addi_tl(dest, dest, scale);
     gen_set_gpr(ctx, a->rd, dest);
-   
+
     tcg_gen_lookup_and_goto_ptr();
     return true;
     
