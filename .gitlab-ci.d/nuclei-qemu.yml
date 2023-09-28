@@ -9,7 +9,7 @@ stages:
 
 variables:
   IMAGE: rego.corp.nucleisys.com/software/sdkbuild
-  IMAGE_TAG: "2023.08-dev"
+  IMAGE_TAG: "2023.09.28"
 
 default:
   interruptible: true
@@ -238,9 +238,8 @@ test_nmsis:
 deploy-qemu:
   stage: deploy
   interruptible: true
-  variables:
-      QEMU_VER: "2023.08"
   script:
+    - export QEMU_VER=$(date +%Y.%m.%d)
     - echo "This job deploy qemu release ${QEMU_VER} from the $CI_COMMIT_BRANCH branch."
     - ls -al
     # prepare for docker ssh environment
