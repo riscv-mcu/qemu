@@ -300,6 +300,6 @@ deploy-qemu:
   artifacts:
     name: "qemu_deploy_${CI_COMMIT_SHORT_SHA}"
     paths:
-    - $CI_PROJECT_DIR/nuclei-qemu-${QEMU_VER}-win32-x64.zip
-    - $CI_PROJECT_DIR/nuclei-qemu-${QEMU_VER}-linux-x64.tar.gz
+    - $CI_PROJECT_DIR/nuclei-qemu-*-win32-x64.zip
+    - $CI_PROJECT_DIR/nuclei-qemu-*-linux-x64.tar.gz
     - $CI_PROJECT_DIR/Documents
