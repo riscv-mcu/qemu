@@ -1182,12 +1182,6 @@ static void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         }
     }
 
-    // If zca/zcb/zcf/zcd/zcmp/zcmt enabled, extension c should be disabled for nuclei processor
-    if (cpu->cfg.ext_zca || cpu->cfg.ext_zcb || cpu->cfg.ext_zcf || \
-        cpu->cfg.ext_zcd || cpu->cfg.ext_zcmp || cpu->cfg.ext_zcmt) {
-        cpu->cfg.ext_c = false;
-    }
-
     if (cpu->cfg.ext_c) {
         cpu->cfg.ext_zca = true;
         if (cpu->cfg.ext_f && env->misa_mxl_max == MXL_RV32) {
@@ -1196,6 +1190,14 @@ static void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         if (cpu->cfg.ext_d) {
             cpu->cfg.ext_zcd = true;
         }
+    }
+
+    // If zcmp/zcmt enabled, zcd should be disabled for nuclei processor
+    // misa.c should not be set
+    // see https://github.com/riscv/riscv-code-size-reduction/issues/144#issuecomment-1034370915
+    if (cpu->cfg.ext_zcmp || cpu->cfg.ext_zcmt) {
+        cpu->cfg.ext_c = false;
+        cpu->cfg.ext_zcd = false;
     }
 
     if (env->misa_mxl_max != MXL_RV32 && cpu->cfg.ext_zcf) {
