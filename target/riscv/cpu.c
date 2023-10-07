@@ -1193,10 +1193,12 @@ static void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
     }
 
     // If zcmp/zcmt enabled, zcd should be disabled for nuclei processor
-    // misa.c should not be set
+    // misa.c should not be set when zcd is not enabled when d ext present
     // see https://github.com/riscv/riscv-code-size-reduction/issues/144#issuecomment-1034370915
     if (cpu->cfg.ext_zcmp || cpu->cfg.ext_zcmt) {
-        cpu->cfg.ext_c = false;
+        if (cpu->cfg.ext_d) { // when zcm*+d extesnion enabled, ext_c should be disabled
+            cpu->cfg.ext_c = false;
+        }
         cpu->cfg.ext_zcd = false;
     }
 
