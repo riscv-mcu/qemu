@@ -579,7 +579,12 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
             cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zcf), true);
         }
         if (riscv_has_ext(env, RVD)) {
-            cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zcd), true);
+            // If zcmp/zcmt enabled, zcd should be disabled for nuclei processor
+            if (cpu->cfg.ext_zcmp || cpu->cfg.ext_zcmt) {
+                cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zcd), false);
+            } else {
+                cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zcd), true);
+            }
         }
     }
 

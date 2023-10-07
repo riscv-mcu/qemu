@@ -33,9 +33,7 @@
 
 #define REQUIRE_ZCD_OR_DC(ctx) do { \
     if (!ctx->cfg_ptr->ext_zcd) { \
-        if (!has_ext(ctx, RVD) || !has_ext(ctx, RVC)) { \
-            return false; \
-        } \
+        return false; \
     } \
 } while (0)
 
