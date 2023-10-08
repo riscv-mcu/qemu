@@ -638,7 +638,7 @@ static void demosoc_machine_class_init(ObjectClass *oc, void *data)
 {
     MachineClass *mc = MACHINE_CLASS(oc);
 
-    mc->desc = "Nuclei RISC-V DemoSoC, support Nuclei RISC-V 200/300/600/900 series processors";
+    mc->desc = "(Deprecated)Nuclei RISC-V DemoSoC, support Nuclei RISC-V 200/300/600/900 series processors";
     mc->init = demosoc_machine_init;
     mc->max_cpus = 16;
     mc->min_cpus = 1;
