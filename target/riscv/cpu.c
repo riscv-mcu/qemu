@@ -1172,11 +1172,6 @@ static void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         }
     }
 
-    // if xxlcz is enabled, it means full zce enabled
-    if (cpu->cfg.ext_xxlcz) {
-        cpu->cfg.ext_zce = true;
-    }
-
     if (cpu->cfg.ext_zce) {
         cpu->cfg.ext_zca = true;
         cpu->cfg.ext_zcb = true;
