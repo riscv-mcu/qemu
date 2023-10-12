@@ -468,7 +468,7 @@ static void evalsoc_machine_init(MachineState *machine)
     MemoryRegion *system_memory = get_system_memory();
     uint32_t start_addr_hi32 = 0x00000000;
     uint32_t fdt_load_addr = 0;
-    uint64_t kernel_entry;
+    uint64_t kernel_entry = 0;
     target_ulong firmware_end_addr, kernel_start_addr;
     int i;
     DriveInfo *dinfo;
@@ -542,7 +542,7 @@ static void evalsoc_machine_init(MachineState *machine)
         firmware_end_addr = (target_ulong)(-1);
     }
 
-    if (machine->kernel_filename)
+    if (machine->firmware == NULL)
     {
         if (firmware_end_addr != (target_ulong)(-1)) {
             kernel_start_addr = riscv_calc_kernel_start_addr(&s->soc.cpus,
@@ -551,8 +551,11 @@ static void evalsoc_machine_init(MachineState *machine)
             kernel_start_addr = start_addr;
         }
 
-        kernel_entry = riscv_load_kernel(machine, &s->soc.cpus,
+        if(machine->kernel_filename)
+        {
+            kernel_entry = riscv_load_kernel(machine, &s->soc.cpus,
                                          kernel_start_addr, true, NULL);
+        }
 
         if (machine->initrd_filename) {
             riscv_load_initrd(machine, kernel_entry);
@@ -781,7 +784,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                                    EVALSOC_INT_MAX,
                                    EVALSOC_CLIC_INTCTLBITS);
 
-    if(ms->kernel_filename)
+    if (ms->firmware == NULL)
     {
         /* Create and connect UART interrupts to the ECLIC */
         nuclei_uart_create(sys_mem,
