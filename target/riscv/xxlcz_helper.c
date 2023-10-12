@@ -258,7 +258,7 @@ target_ulong HELPER(xl_addibne)(target_ulong rd, target_ulong rs1, uint32_t scal
     return val;
 }
 
-target_ulong HELPER(xl_addrchk)(target_ulong a, target_ulong b, uint32_t index, uint32_t pc)
+target_ulong HELPER(xl_addrchk)(target_ulong a, target_ulong b, int32_t index, uint32_t pc)
 {
     target_ulong val = pc;
 
@@ -269,7 +269,7 @@ target_ulong HELPER(xl_addrchk)(target_ulong a, target_ulong b, uint32_t index, 
     return val;
 }
 
-target_ulong HELPER(xl_bezm)(target_ulong a, target_ulong b, uint32_t index, uint32_t pc)
+target_ulong HELPER(xl_bezm)(target_ulong a, target_ulong b, int32_t index, uint32_t pc)
 {
     uint8_t *p = (uint8_t *)&a;
     uint8_t i = 0;
