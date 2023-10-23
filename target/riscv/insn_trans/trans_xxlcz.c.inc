@@ -457,3 +457,122 @@ static bool trans_xl_ffnz(DisasContext *ctx, arg_xl_ffnz *a)
     REQUIRE_XXLCZ(ctx);
     return gen_unary(ctx, a, EXT_NONE, gen_helper_xl_ffnz);
 }
+
+static bool trans_xl_flh(DisasContext *ctx, arg_xl_flh *a)
+{
+    TCGv_i64 dest;
+    TCGv t0;
+
+    REQUIRE_FPU;
+    REQUIRE_ZFHMIN(ctx);
+    REQUIRE_XXLCZ(ctx);
+
+    decode_save_opc(ctx);
+    t0 = get_gpr(ctx, a->rs1, EXT_NONE);
+
+    dest = cpu_fpr[a->rd];
+    tcg_gen_qemu_ld_i64(dest, t0, ctx->mem_idx, MO_TEUW);
+    gen_nanbox_h(dest, dest);
+
+    tcg_gen_addi_tl(t0, t0, a->imm << 1);
+    gen_set_gpr(ctx, a->rs1, t0);
+
+    mark_fs_dirty(ctx);
+    return true;
+}
+
+static bool trans_xl_flw(DisasContext *ctx, arg_xl_flw *a)
+{
+    TCGv_i64 dest;
+    TCGv addr;
+
+    REQUIRE_FPU;
+    REQUIRE_EXT(ctx, RVF);
+    REQUIRE_XXLCZ(ctx);
+
+    decode_save_opc(ctx);
+    addr = get_address(ctx, a->rs1, 0);
+    dest = cpu_fpr[a->rd];
+    tcg_gen_qemu_ld_i64(dest, addr, ctx->mem_idx, MO_TEUL);
+    gen_nanbox_s(dest, dest);
+
+    tcg_gen_addi_tl(addr, addr, a->imm << 2);
+    gen_set_gpr(ctx, a->rs1, addr);
+
+    mark_fs_dirty(ctx);
+    return true;
+}
+
+static bool trans_xl_fld(DisasContext *ctx, arg_xl_fld *a)
+{
+    TCGv addr;
+
+    REQUIRE_FPU;
+    REQUIRE_EXT(ctx, RVD);
+    REQUIRE_XXLCZ(ctx);
+
+    decode_save_opc(ctx);
+    addr = get_address(ctx, a->rs1, 0);
+    tcg_gen_qemu_ld_i64(cpu_fpr[a->rd], addr, ctx->mem_idx, MO_TEUQ);
+
+    tcg_gen_addi_tl(addr, addr, a->imm << 3);
+    gen_set_gpr(ctx, a->rs1, addr);
+
+    mark_fs_dirty(ctx);
+    return true;
+}
+
+static bool trans_xl_fsh(DisasContext *ctx, arg_xl_fsh *a)
+{
+    TCGv t0;
+
+    REQUIRE_FPU;
+    REQUIRE_ZFHMIN(ctx);
+    REQUIRE_XXLCZ(ctx);
+
+    decode_save_opc(ctx);
+    t0 = get_gpr(ctx, a->rs1, EXT_NONE);
+
+    tcg_gen_qemu_st_i64(cpu_fpr[a->rs2], t0, ctx->mem_idx, MO_TEUW);
+
+    tcg_gen_addi_tl(t0, t0, a->imm << 1);
+    gen_set_gpr(ctx, a->rs1, t0);
+
+    return true;
+}
+
+static bool trans_xl_fsw(DisasContext *ctx, arg_xl_fsw *a)
+{
+    TCGv addr;
+
+    REQUIRE_FPU;
+    REQUIRE_EXT(ctx, RVF);
+    REQUIRE_XXLCZ(ctx);
+
+    decode_save_opc(ctx);
+    addr = get_address(ctx, a->rs1, 0);
+    tcg_gen_qemu_st_i64(cpu_fpr[a->rs2], addr, ctx->mem_idx, MO_TEUL);
+
+    tcg_gen_addi_tl(addr, addr, a->imm << 2);
+    gen_set_gpr(ctx, a->rs1, addr);
+
+    return true;
+}
+
+static bool trans_xl_fsd(DisasContext *ctx, arg_xl_fsd *a)
+{
+    TCGv addr;
+
+    REQUIRE_FPU;
+    REQUIRE_EXT(ctx, RVD);
+    REQUIRE_XXLCZ(ctx);
+
+    decode_save_opc(ctx);
+    addr = get_address(ctx, a->rs1, a->imm);
+    tcg_gen_qemu_st_i64(cpu_fpr[a->rs2], addr, ctx->mem_idx, MO_TEUQ);
+
+    tcg_gen_addi_tl(addr, addr, a->imm << 3);
+    gen_set_gpr(ctx, a->rs1, addr);
+
+    return true;
+}
