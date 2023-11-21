@@ -71,6 +71,19 @@ rvprd_d64_s64_s32(CPURISCVState *env, uint64_t a, uint32_t b,
     return result;
 }
 
+static inline uint64_t
+rvprd_d64_s32_s32(CPURISCVState *env, uint32_t a, uint32_t b,
+     uint8_t step, uint8_t size, PackedFn3i *fn)
+{
+    int i, passes = sizeof(uint64_t) / size;
+    uint64_t result = 0;
+
+    for (i = 0; i < passes; i += step) {
+        fn(env, &result, &a, &b, i);
+    }
+    return result;
+}
+
 static inline uint32_t
 rvprd_d32_s64_s64(CPURISCVState *env, uint64_t a, uint64_t b,
      uint8_t step, uint8_t size, PackedFn3i *fn)
@@ -98,11 +111,18 @@ uint64_t HELPER(NAME)(CPURISCVState *env, uint64_t a,            \
     return rvprd(env, a, b, STEP, SIZE, (PackedFn3i *)do_##NAME);\
 }
 
-#define RVPRD_D64_S64_S32(NAME, STEP, SIZE)                                  \
+#define RVPRD_D64_S64_S32(NAME, STEP, SIZE)                      \
 uint64_t HELPER(NAME)(CPURISCVState *env, uint64_t a,            \
                           uint32_t b)                            \
 {                                                                \
     return rvprd_d64_s64_s32(env, a, b, STEP, SIZE, (PackedFn3i *)do_##NAME);\
+}
+
+#define RVPRD_D64_S32_S32(NAME, STEP, SIZE)                      \
+uint64_t HELPER(NAME)(CPURISCVState *env, uint32_t a,            \
+                          uint32_t b)                            \
+{                                                                \
+    return rvprd_d64_s32_s32(env, a, b, STEP, SIZE, (PackedFn3i *)do_##NAME);\
 }
 
 #define RVPRD_D32_S64_S64(NAME, STEP, SIZE)                      \
@@ -557,6 +577,16 @@ static inline void do_dpkbt32(CPURISCVState *env, void *vd, void *va,
 }
 
 RVPRD(dpkbt32, 1, 8);
+
+static inline void do_dpack32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = b[i];
+    d[i+1] = a[i];
+}
+
+RVPRD_D64_S32_S32(dpack32, 1, 8);
 
 static inline void do_dpktt32(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
@@ -2231,6 +2261,106 @@ static inline void do_dredsa16(CPURISCVState *env, void *vd, void *va, uint8_t i
 }
 
 RVPR2D_D32_S64(dredsa16, 1, 8);
+
+static inline void do_dsunpkd810(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int16_t *d = vd;
+    int8_t *a = va;
+    d[i * 2] = a[i * 4];
+    d[i * 2 + 1] = a[i * 4 + 1];
+}
+
+RVPR2D(dsunpkd810, 1, 4);
+
+static inline void do_dsunpkd820(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int16_t *d = vd;
+    int8_t *a = va;
+    d[i * 2] = a[i * 4];
+    d[i * 2 + 1] = a[i * 4 + 2];
+}
+
+RVPR2D(dsunpkd820, 1, 4);
+
+static inline void do_dsunpkd830(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int16_t *d = vd;
+    int8_t *a = va;
+    d[i * 2] = a[i * 4];
+    d[i * 2 + 1] = a[i * 4 + 3];
+}
+
+RVPR2D(dsunpkd830, 1, 4);
+
+static inline void do_dsunpkd831(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int16_t *d = vd;
+    int8_t *a = va;
+    d[i * 2] = a[i * 4 + 1];
+    d[i * 2 + 1] = a[i * 4 + 3];
+}
+
+RVPR2D(dsunpkd831, 1, 4);
+
+static inline void do_dsunpkd832(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int16_t *d = vd;
+    int8_t *a = va;
+    d[i * 2] = a[i * 4 + 2];
+    d[i * 2 + 1] = a[i * 4 + 3];
+}
+
+RVPR2D(dsunpkd832, 1, 4);
+
+static inline void do_dzunpkd810(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    uint16_t *d = vd;
+    uint8_t *a = va;
+    d[i * 2] = a[i * 4];
+    d[i * 2 + 1] = a[i * 4 + 1];
+}
+
+RVPR2D(dzunpkd810, 1, 4);
+
+static inline void do_dzunpkd820(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    uint16_t *d = vd;
+    uint8_t *a = va;
+    d[i * 2] = a[i * 4];
+    d[i * 2 + 1] = a[i * 4 + 2];
+}
+
+RVPR2D(dzunpkd820, 1, 4);
+
+static inline void do_dzunpkd830(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    uint16_t *d = vd;
+    uint8_t *a = va;
+    d[i * 2] = a[i * 4];
+    d[i * 2 + 1] = a[i * 4 + 3];
+}
+
+RVPR2D(dzunpkd830, 1, 4);
+
+static inline void do_dzunpkd831(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    uint16_t *d = vd;
+    uint8_t *a = va;
+    d[i * 2] = a[i * 4 + 1];
+    d[i * 2 + 1] = a[i * 4 + 3];
+}
+
+RVPR2D(dzunpkd831, 1, 4);
+
+static inline void do_dzunpkd832(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    uint16_t *d = vd;
+    uint8_t *a = va;
+    d[i * 2] = a[i * 4 + 2];
+    d[i * 2 + 1] = a[i * 4 + 3];
+}
+
+RVPR2D(dzunpkd832, 1, 4);
 
 static inline void do_clrs8(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {

@@ -170,6 +170,38 @@ static inline bool r_ool_d64_s64_s32_d(DisasContext *ctx, arg_r *a,
 #endif
 }
 
+static inline bool r_ool_d64_s32_s32_d(DisasContext *ctx, arg_r *a,
+                    void (* fn)(TCGv_i64, TCGv_ptr, TCGv_i32, TCGv_i32))
+{
+#ifdef TARGET_RISCV64
+    return true;
+#else
+    TCGv a0, a1, d0, d1;
+    TCGv_i64 dst;
+    TCGv_i32 src1, src2;
+
+    a0 = get_gpr(ctx, a->rs1, EXT_ZERO);
+    a1 = get_gpr(ctx, a->rs2, EXT_ZERO);
+
+    src1 = tcg_temp_new_i32();
+    src2 = tcg_temp_new_i32();
+    dst = tcg_temp_new_i64();
+
+    tcg_gen_trunc_tl_i32(src1, a0);
+    tcg_gen_trunc_tl_i32(src2, a1);
+
+    fn(dst, cpu_env, src1, src2);
+
+    d0 = dest_gpr(ctx, a->rd);
+    d1 = dest_gpr(ctx, a->rd + 1);
+    tcg_gen_extrl_i64_i32(d0, dst);
+    tcg_gen_extrh_i64_i32(d1, dst);
+    gen_set_gpr(ctx, a->rd, d0);
+    gen_set_gpr(ctx, a->rd + 1, d1);
+    return true;
+#endif
+}
+
 static inline bool r_ool_d32_s64_s64_d(DisasContext *ctx, arg_r *a,
                     void (* fn)(TCGv_i32, TCGv_ptr, TCGv_i64, TCGv_i64))
 {
@@ -235,6 +267,13 @@ static bool trans_##NAME(DisasContext *s, arg_r *a)     \
 {                                                       \
     REQUIRE_XXLDSPN2X(s);                               \
     return r_ool_d64_s64_s32_d(s, a, gen_helper_##NAME);\
+}
+
+#define GEN_RVP_R_OOL_D64_S32_S32_D_N2(NAME)            \
+static bool trans_##NAME(DisasContext *s, arg_r *a)     \
+{                                                       \
+    REQUIRE_XXLDSPN2X(s);                               \
+    return r_ool_d64_s32_s32_d(s, a, gen_helper_##NAME);\
 }
 
 #define GEN_RVP_R_OOL_D32_S64_S64_D_N3(NAME)            \
@@ -715,6 +754,17 @@ GEN_RVP_R2_OOL_D32_S64_D_N2(dkclip64);
 GEN_RVP_SHIFTI_D_N2(dsclip8);
 GEN_RVP_SHIFTI_D_N2(dsclip16);
 GEN_RVP_SHIFTI_D_N2(dsclip32);
+GEN_RVP_R_OOL_D64_S32_S32_D_N2(dpack32);
+GEN_RVP_R2_OOL_D_N2(dsunpkd810);
+GEN_RVP_R2_OOL_D_N2(dsunpkd820);
+GEN_RVP_R2_OOL_D_N2(dsunpkd830);
+GEN_RVP_R2_OOL_D_N2(dsunpkd831);
+GEN_RVP_R2_OOL_D_N2(dsunpkd832);
+GEN_RVP_R2_OOL_D_N2(dzunpkd810);
+GEN_RVP_R2_OOL_D_N2(dzunpkd820);
+GEN_RVP_R2_OOL_D_N2(dzunpkd830);
+GEN_RVP_R2_OOL_D_N2(dzunpkd831);
+GEN_RVP_R2_OOL_D_N2(dzunpkd832);
 
 /* 8-bit Unpacking Instructions */
 GEN_RVP_R2_OOL(sunpkd810);
