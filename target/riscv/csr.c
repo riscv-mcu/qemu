@@ -2380,6 +2380,15 @@ static int rmw_mnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
     int clic_priv, clic_il, clic_irq;
     bool ready;
     CPUState *cs = env_cpu(env);
+
+    // If in debug mode, directly return
+    if (env->debugger) {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+        return RISCV_EXCP_NONE;
+    }
+
     if (write_mask) {
         env->mstatus |= new_value & (write_mask & 0b11111);
     }
@@ -2793,6 +2802,15 @@ static int rmw_snxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
     int clic_priv, clic_il, clic_irq;
     bool ready;
     CPUState *cs = env_cpu(env);
+
+    // If in debug mode, directly return
+    if (env->debugger) {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+        return RISCV_EXCP_NONE;
+    }
+
     if (write_mask) {
         env->mstatus |= new_value & (write_mask & 0b11111);
     }
@@ -4344,11 +4362,17 @@ static int rmw_pushmsubm(CPURISCVState *env, int csrno, target_ulong *ret_value,
 {
     uint64_t notify_addr = 0;
     uint32_t riscv_addr_size = 4;
-    if (riscv_cpu_mxl(env) == MXL_RV32)
-    {
+
+    // If in debug mode, directly return
+    if (env->debugger) {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+        return RISCV_EXCP_NONE;
     }
-    else
-    {
+
+    if (riscv_cpu_mxl(env) == MXL_RV32) {
+    } else {
         riscv_addr_size = 8;
     }
 
@@ -4362,8 +4386,7 @@ static int rmw_pushmsubm(CPURISCVState *env, int csrno, target_ulong *ret_value,
 static int read_mtvt2(CPURISCVState *env, int csrno, target_ulong *val)
 {
     int low_bit = 0;
-    if(env->mtvt2 & 0x01)
-    {
+    if (env->mtvt2 & 0x01) {
         low_bit = 1;
     }
     *val = ((env->mtvt2 & (target_ulong)(~0x3)) | low_bit);
@@ -4381,12 +4404,17 @@ static int rmw_jalmnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
 {
     target_ulong addr;
 
-    uint32_t riscv_addr_size = 4;
-    if (riscv_cpu_mxl(env) == MXL_RV32)
-    {
+    // If in debug mode, directly return
+    if (env->debugger) {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+        return RISCV_EXCP_NONE;
     }
-    else
-    {
+
+    uint32_t riscv_addr_size = 4;
+    if (riscv_cpu_mxl(env) == MXL_RV32) {
+    } else {
         riscv_addr_size = 8;
     }
 
@@ -4398,8 +4426,9 @@ static int rmw_jalmnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
         *ret_value = addr;
         env->mstatus = set_field(env->mstatus, MSTATUS_MIE, 1);
         riscv_cpu_eclic_int_handler_start(env->eclic, env->mcause & 0x3ff);
-    } else
+    } else {
         *ret_value = env->pc + riscv_addr_size;
+    }
 
     return RISCV_EXCP_NONE;
 }
@@ -4409,11 +4438,17 @@ static int rmw_pushmcause(CPURISCVState *env, int csrno, target_ulong *ret_value
 {
     uint64_t notify_addr = 0;
     uint32_t riscv_addr_size = 4;
-    if (riscv_cpu_mxl(env) == MXL_RV32)
-    {
+
+    // If in debug mode, directly return
+    if (env->debugger) {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+        return RISCV_EXCP_NONE;
     }
-    else
-    {
+
+    if (riscv_cpu_mxl(env) == MXL_RV32) {
+    } else {
         riscv_addr_size = 8;
     }
 
@@ -4430,11 +4465,16 @@ static int rmw_pushmepc(CPURISCVState *env, int csrno, target_ulong *ret_value,
     uint64_t notify_addr = 0;
     uint32_t riscv_addr_size = 4;
 
-    if (riscv_cpu_mxl(env) == MXL_RV32)
-    {
+    // If in debug mode, directly return
+    if (env->debugger) {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+        return RISCV_EXCP_NONE;
     }
-    else
-    {
+
+    if (riscv_cpu_mxl(env) == MXL_RV32) {
+    } else {
         riscv_addr_size = 8;
     }
 
