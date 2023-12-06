@@ -36,7 +36,6 @@ int hart_numbers = 0;
 
 static uint64_t nuclei_cpu_riscv_read_rtc(void *opaque)
 {
-    
     uint64_t timebase_freq = *(uint64_t*)opaque;
     return muldiv64(qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL),
         timebase_freq, NANOSECONDS_PER_SECOND);
@@ -463,6 +462,7 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_ba
     if(eclic != NULL)
     {
         //env->features |= (1ULL << RISCV_FEATURE_ECLIC);
+        riscv_cpu_set_rdtime_fn(env, nuclei_cpu_riscv_read_rtc, &(s->timebase_freq));
         env->mtimer = timer_new_ns(QEMU_CLOCK_VIRTUAL,
                                     &nuclei_mtimecmp_cb, cpu);
         env->mtimecmp = 0;
