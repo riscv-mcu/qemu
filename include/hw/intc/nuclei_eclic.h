@@ -74,24 +74,24 @@ typedef struct NucLeiECLICState
     uint32_t eclic_mmode_base;
     uint64_t mclicbase;
     /* config */
-    uint32_t sources_id;
-    uint8_t cliccfg;   /*  nlbits(1~4) */
-    uint32_t clicinfo; /*  NUM_INTERRUPT(0~12)  VERSION(13~20) CLICINTCTLBITS(21~24) */
-    uint8_t mth;       /* mth(0~7) */
-    uint8_t *clicintip;
-    uint8_t *clicintie;
-    uint8_t *clicintattr; /* shv(0) trig(1~2)*/
-    uint8_t *clicintctl;  /*  level (cliccfg.nlbits) priority( (CLICINTCTLBITS - cliccfg.nlbits)*/
-    ECLICPendingInterrupt *clicintlist;
+    uint8_t cliccfg[32];   /*  nlbits(1~4) */
+    uint32_t clicinfo[32]; /*  NUM_INTERRUPT(0~12)  VERSION(13~20) CLICINTCTLBITS(21~24) */
+    uint8_t mth[32];       /* mth(0~7) */
+    uint8_t clicintip[4096][32];
+    uint8_t clicintie[4096][32];
+    uint8_t clicintattr[4096][32]; /* shv(0) trig(1~2)*/
+    uint8_t clicintctl[4096][32];  /*  level (cliccfg.nlbits) priority( (CLICINTCTLBITS - cliccfg.nlbits)*/
+    ECLICPendingInterrupt clicintlist[4096][32];
+
     uint32_t *exccode;
     uint32_t aperture_size;
 
     QLIST_HEAD(, ECLICPendingInterrupt)
-    pending_list;
+    pending_list[32];
     size_t active_count;
 
     /* ECLIC IRQ handlers */
-    qemu_irq *irqs;
+    qemu_irq irqs[4096][32];
 
 } NucLeiECLICState;
 
@@ -122,9 +122,9 @@ enum
 DeviceState *nuclei_eclic_create(hwaddr addr, uint32_t aperture_size, bool prv_s, bool prv_u, bool vector,
                                uint32_t num_harts, uint32_t num_sources,
                                uint8_t clicintctlbits);
-qemu_irq nuclei_eclic_get_irq(DeviceState *dev, int irq);
+qemu_irq nuclei_eclic_get_irq(DeviceState *dev, int irq, int hartid);
 void nuclei_eclic_systimer_cb(DeviceState *dev);
-void riscv_cpu_eclic_int_handler_start(void *eclic_ptr, int irq);
+void riscv_cpu_eclic_int_handler_start(void *eclic_ptr, int irq, int hartid);
 
 #endif
 

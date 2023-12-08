@@ -807,7 +807,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                         memmap[EVALSOC_UART0].size,
                         serial_hd(0),
                         nuclei_eclic_get_irq(DEVICE(s->eclic),
-                        EVALSOC_INT22_IRQn));
+                        EVALSOC_INT22_IRQn, ms->smp.cpus));
         
         nuclei_systimer_create(memmap[EVALSOC_TIMER].base + iregion_addr,
                 memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, s->eclic, EVALSOC_TIMEBASE_FREQ);

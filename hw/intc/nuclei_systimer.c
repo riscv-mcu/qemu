@@ -468,8 +468,10 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_ba
         env->mtimecmp = 0;
 
         s->eclic = eclic;
-        s->soft_irq =&(NUCLEI_ECLIC(eclic)->irqs[Internal_SysTimerSW_IRQn]);
-        s->timer_irq = &(NUCLEI_ECLIC(eclic)->irqs[Internal_SysTimer_IRQn]);
+        for (i = 0; i < num_harts; i++) {
+            s->soft_irq =&(NUCLEI_ECLIC(eclic)->irqs[Internal_SysTimerSW_IRQn][i]);
+            s->timer_irq = &(NUCLEI_ECLIC(eclic)->irqs[Internal_SysTimer_IRQn][i]);
+        }
     }
     else
     {
