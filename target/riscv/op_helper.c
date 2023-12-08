@@ -273,12 +273,13 @@ target_ulong helper_sret(CPURISCVState *env)
     target_ulong prev_priv, prev_virt;
 
     if (riscv_intc_is_clic_mode(env)) {
+        CPUState *cs = env_cpu(env);
         target_ulong spil = get_field(env->scause, SCAUSE_SPIL);
         env->mintstatus = set_field(env->mintstatus, MINTSTATUS_SIL, spil);
         env->scause = set_field(env->scause, SCAUSE_SPIE, 0);
         env->scause = set_field(env->scause, SCAUSE_SPP, PRV_U);
         bql_lock();
-        nuclei_eclic_next_interrupt(env->eclic);
+        nuclei_eclic_next_interrupt(env->eclic, cs->cpu_index);
         bql_unlock();
     }
 
@@ -384,8 +385,9 @@ target_ulong helper_mret(CPURISCVState *env)
     }
 
     if (riscv_intc_is_clic_mode(env)) {
+        CPUState *cs = env_cpu(env);
         bql_lock();
-        nuclei_eclic_next_interrupt(env->eclic);
+        nuclei_eclic_next_interrupt(env->eclic, cs->cpu_index);
         bql_unlock();
     }
 

@@ -1998,7 +1998,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     env->two_stage_indirect_lookup = false;
 
     if (eclic_flag && mode)
-        riscv_cpu_eclic_int_handler_start(env->eclic, cause & 0x3ff);
+        riscv_cpu_eclic_int_handler_start(env->eclic, cause & 0x3ff, env->mhartid);
 
 #endif
     cs->exception_index = RISCV_EXCP_NONE; /* mark handled to qemu */
