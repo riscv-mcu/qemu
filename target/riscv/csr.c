@@ -5404,7 +5404,7 @@ static int rmw_jalmnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
         env->gpr[5] = env->pc + riscv_addr_size;  //link reg
         *ret_value = addr;
         env->mstatus = set_field(env->mstatus, MSTATUS_MIE, 1);
-        riscv_cpu_eclic_int_handler_start(env->eclic, env->mcause & 0x3ff);
+        riscv_cpu_eclic_int_handler_start(env->eclic, env->mcause & 0x3ff, env->mhartid);
     } else
         *ret_value = env->pc + riscv_addr_size;
 #endif
@@ -5481,7 +5481,7 @@ static int write_sleepvalue(CPURISCVState *env, int csrno, target_ulong val)
 {
     env->sleepvalue = val;
 #if !defined(CONFIG_USER_ONLY)
-    riscv_cpu_eclic_int_handler_start(env->eclic, env->mcause & val);
+    riscv_cpu_eclic_int_handler_start(env->eclic, env->mcause & val, env->mhartid);
 #endif
     return RISCV_EXCP_NONE;
 }
