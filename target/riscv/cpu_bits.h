@@ -544,6 +544,19 @@
 #define CSR_NUCLEI_MATTRI4_BASE    0x7fd
 #define CSR_NUCLEI_MATTRI4_MASK    0x7fe
 
+/* === Nuclei N100 TIMER */
+#define CSR_NUCLEI_MSIP            0xBD8
+#define CSR_NUCLEI_MTIMECMP        0xBD9
+#define CSR_NUCLEI_MTIME           0xBDA
+#define CSR_NUCLEI_MSTOP           0xBDB
+
+/* === Nuclei N100 IRQC */
+#define CSR_NUCLEI_IRQCIP          0xBD0
+#define CSR_NUCLEI_IRQCIE          0xBD1
+#define CSR_NUCLEI_IRQCLVL         0xBD2
+#define CSR_NUCLEI_IRQCEDGE        0xBD3
+#define CSR_NUCLEI_IRQCINFO        0xBD4
+
 /* Performance Counters */
 #define CSR_MHPMCOUNTER3    0xb03
 #define CSR_MHPMCOUNTER4    0xb04

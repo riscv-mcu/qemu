@@ -4887,6 +4887,16 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_TXEVT] =               { "txevt", any,  read_txevt,       write_txevt       },
     [CSR_MSCOUNTEREN] =                { "mscounteren", any,   read_mscounteren, write_mscounteren },
     [CSR_NUCLEI_SHARTID] =             { "shartid",   any,   read_shartid   },
+    /* TODO N100 CSR, not really implemented, just some stubs and not implemented */
+    [CSR_NUCLEI_MSIP] =                { "msip",   any,   read_zero, write_ignore   },
+    [CSR_NUCLEI_MTIME] =               { "mtime",   any,   read_time, write_ignore   },
+    [CSR_NUCLEI_MTIMECMP] =            { "mtimecmp",   any,   read_zero, write_ignore   },
+    [CSR_NUCLEI_MSTOP] =               { "mstop",   any,   read_zero, write_ignore   },
+    [CSR_NUCLEI_IRQCIP] =              { "irqcip",   any,   read_zero, write_ignore   },
+    [CSR_NUCLEI_IRQCIE] =              { "irqcie",   any,   read_zero, write_ignore   },
+    [CSR_NUCLEI_IRQCLVL] =             { "irqclvl",   any,   read_zero, write_ignore   },
+    [CSR_NUCLEI_IRQCEDGE] =            { "irqcedge",   any,   read_zero, write_ignore   },
+    [CSR_NUCLEI_IRQCINFO] =            { "irqcinfo",   any,   read_zero, write_ignore   },
 
     /* Machine Trap Handling */
     [CSR_MSCRATCH] = { "mscratch", any,  read_mscratch, write_mscratch,
