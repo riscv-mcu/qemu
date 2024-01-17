@@ -319,7 +319,7 @@ void riscv_cpu_register_gdb_regs_for_features(CPUState *cs)
         gdb_register_coprocessor(cs, riscv_gdb_get_fpu, riscv_gdb_set_fpu,
                                  32, "riscv-32bit-fpu.xml", 0);
     }
-    if (env->misa_ext & RVV) {
+    if ((env->misa_ext & RVV) || (cpu->cfg.ext_zve32f)) {
         int base_reg = cs->gdb_num_regs;
         gdb_register_coprocessor(cs, riscv_gdb_get_vector, riscv_gdb_set_vector,
                                  ricsv_gen_dynamic_vector_xml(cs, base_reg),
