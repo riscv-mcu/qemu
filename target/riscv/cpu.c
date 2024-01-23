@@ -144,6 +144,15 @@ static const struct isa_ext_data isa_edata_arr[] = {
     ISA_EXT_DATA_ENTRY(xxldspn2x, true, PRIV_VERSION_1_12_0, ext_xxldspn2x),
     ISA_EXT_DATA_ENTRY(xxldspn3x, true, PRIV_VERSION_1_12_0, ext_xxldspn3x),
     ISA_EXT_DATA_ENTRY(xxlcz, true, PRIV_VERSION_1_12_0, ext_xxlcz),
+    ISA_EXT_DATA_ENTRY(xxlczpstinc, true, PRIV_VERSION_1_12_0, ext_xxlczpstinc),
+    ISA_EXT_DATA_ENTRY(xxlczbmrk, true, PRIV_VERSION_1_12_0, ext_xxlczbmrk),
+    ISA_EXT_DATA_ENTRY(xxlczbitop, true, PRIV_VERSION_1_12_0, ext_xxlczbitop),
+    ISA_EXT_DATA_ENTRY(xxlczslet, true, PRIV_VERSION_1_12_0, ext_xxlczslet),
+    ISA_EXT_DATA_ENTRY(xxlczabs, true, PRIV_VERSION_1_12_0, ext_xxlczabs),
+    ISA_EXT_DATA_ENTRY(xxlczmac, true, PRIV_VERSION_1_12_0, ext_xxlczmac),
+    ISA_EXT_DATA_ENTRY(xxlczbri, true, PRIV_VERSION_1_12_0, ext_xxlczbri),
+    ISA_EXT_DATA_ENTRY(xxlczbitrev, true, PRIV_VERSION_1_12_0, ext_xxlczbitrev),
+    ISA_EXT_DATA_ENTRY(xxlczgp, true, PRIV_VERSION_1_12_0, ext_xxlczgp),
 };
 
 static bool isa_ext_is_enabled(RISCVCPU *cpu,
@@ -1385,6 +1394,19 @@ static void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         }
         set_vext_version(env, vext_version);
     }
+
+    if (cpu->cfg.ext_xxlcz) {
+        cpu->cfg.ext_xxlczpstinc = true;
+        cpu->cfg.ext_xxlczbmrk = true;
+        cpu->cfg.ext_xxlczbitop = true;
+        cpu->cfg.ext_xxlczslet = true;
+        cpu->cfg.ext_xxlczabs = true;
+        cpu->cfg.ext_xxlczmac = true;
+        cpu->cfg.ext_xxlczbri = true;
+        cpu->cfg.ext_xxlczbitrev = true;
+        cpu->cfg.ext_xxlczgp = true;
+    }
+    
     if (cpu->cfg.ext_xxldspn3x) {
         cpu->cfg.ext_xxldspn2x = true;
     }
@@ -1863,6 +1885,15 @@ static Property riscv_cpu_extensions[] = {
 
     /* Nuclei custom xxclz extension */
     DEFINE_PROP_BOOL("x-xxlcz", RISCVCPU, cfg.ext_xxlcz, false),
+    DEFINE_PROP_BOOL("x-xxlczpstinc", RISCVCPU, cfg.ext_xxlczpstinc, false),
+    DEFINE_PROP_BOOL("x-xxlczbmrk", RISCVCPU, cfg.ext_xxlczbmrk, false),
+    DEFINE_PROP_BOOL("x-xxlczbitop", RISCVCPU, cfg.ext_xxlczbitop, false),
+    DEFINE_PROP_BOOL("x-xxlczslet", RISCVCPU, cfg.ext_xxlczslet, false),
+    DEFINE_PROP_BOOL("x-xxlczabs", RISCVCPU, cfg.ext_xxlczabs, false),
+    DEFINE_PROP_BOOL("x-xxlczmac", RISCVCPU, cfg.ext_xxlczmac, false),
+    DEFINE_PROP_BOOL("x-xxlczbri", RISCVCPU, cfg.ext_xxlczbri, false),
+    DEFINE_PROP_BOOL("x-xxlczbitrev", RISCVCPU, cfg.ext_xxlczbitrev, false),
+    DEFINE_PROP_BOOL("x-xxlczgp", RISCVCPU, cfg.ext_xxlczgp, false),
 
     /* ePMP 0.9.3 */
     DEFINE_PROP_BOOL("x-epmp", RISCVCPU, cfg.epmp, false),

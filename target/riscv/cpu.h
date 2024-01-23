@@ -596,6 +596,15 @@ struct RISCVCPUConfig {
     bool ext_ssaia;
     bool ext_sscofpmf;
     bool ext_xxlcz;
+    bool ext_xxlczpstinc;
+    bool ext_xxlczbmrk;
+    bool ext_xxlczbitop;
+    bool ext_xxlczslet;
+    bool ext_xxlczabs;
+    bool ext_xxlczmac;
+    bool ext_xxlczbri;
+    bool ext_xxlczbitrev;
+    bool ext_xxlczgp;
     bool rvv_ta_all_1s;
     bool rvv_ma_all_1s;
 

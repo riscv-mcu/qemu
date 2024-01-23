@@ -139,6 +139,15 @@ static bool has_xthead_p(DisasContext *ctx  __attribute__((__unused__)))
            ctx->cfg_ptr->ext_xtheadmempair || ctx->cfg_ptr->ext_xtheadsync;
 }
 
+static bool has_xxlcz_p(DisasContext *ctx  __attribute__((__unused__)))
+{
+    return ctx->cfg_ptr->ext_xxlcz || ctx->cfg_ptr->ext_xxlczpstinc ||
+    ctx->cfg_ptr->ext_xxlczbmrk || ctx->cfg_ptr->ext_xxlczbitop ||
+    ctx->cfg_ptr->ext_xxlczslet || ctx->cfg_ptr->ext_xxlczabs ||
+    ctx->cfg_ptr->ext_xxlczmac || ctx->cfg_ptr->ext_xxlczbri ||
+    ctx->cfg_ptr->ext_xxlczbitrev || ctx->cfg_ptr->ext_xxlczgp;
+}
+
 #define MATERIALISE_EXT_PREDICATE(ext)  \
     static bool has_ ## ext ## _p(DisasContext *ctx)    \
     { \
@@ -146,7 +155,6 @@ static bool has_xthead_p(DisasContext *ctx  __attribute__((__unused__)))
     }
 
 MATERIALISE_EXT_PREDICATE(XVentanaCondOps);
-MATERIALISE_EXT_PREDICATE(xxlcz);
 MATERIALISE_EXT_PREDICATE(p);
 
 #ifdef TARGET_RISCV32
