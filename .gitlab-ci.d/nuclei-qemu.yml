@@ -100,23 +100,54 @@ prepare_tools:
     paths:
     - $CI_PROJECT_DIR/prebuilt
 
-build_linux_qemu:
+.build_job_template: &build_job_template_default
   stage: build
+  timeout: 1h
   interruptible: true
+  # https://docs.gitlab.com/ee/ci/yaml/index.html#retrywhen
+  retry:
+    max: 2
+    when:
+      # ERROR: Job failed (system failure): Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running? (docker.go:534:120s)
+      - runner_system_failure
+  before_script:
+    # check toolchain repo status
+    - uname -a
+    - free -m
+    - cd $CI_PROJECT_DIR
+    - |
+        echo "INFO: Show current repo status"
+        git status --ignored=matching || true
+        git submodule || true
+        # show also untracked files
+        git submodule foreach git status --ignored=matching || true
+    # workaround for clone source code using mirror in gito
+    - sed -i 's|https://gitlab.com/qemu-project|https://gito.corp.nucleisys.com/software/qemu|g' .gitmodules
+    - |
+        echo "INFO: Try to full clone source code now!"
+        git submodule update --force --init --remote
+        git submodule foreach git reset --hard || true
+        for i in $(seq 1 5); do
+            git submodule update --force --recursive --init --remote && break || {
+                echo "Attemp $i failed, retrying..."
+                git submodule foreach git reset --hard || true
+                sleep 1
+            }
+        done
+        # reset changes to default HEAD
+        git reset --hard || true
+        git status
+        git submodule
+    - echo "INFO: Source code is ready!"
+
+build_linux_qemu:
+  <<: *build_job_template_default
   tags:
     - os::linux
     - env::docker
   image: rego.corp.nucleisys.com/software/build-linux-qemu:latest
   script:
-    - cd $CI_PROJECT_DIR
-    # workaround for clone source code using mirror in gito
-    - sed -i 's|https://gitlab.com/qemu-project|https://gito.corp.nucleisys.com/software/qemu|g' .gitmodules
-    - git submodule update --force --init --remote
-    # reset changes to default HEAD
-    - git reset --hard
-    - git status
-    - git submodule
-    #build
+    # build
     - cd $CI_PROJECT_DIR
     - mkdir $CI_PROJECT_DIR/build -p
     - mkdir $CI_PROJECT_DIR/linux_qemu -p
@@ -128,11 +159,10 @@ build_linux_qemu:
   artifacts:
     name: "qemu_linux_${CI_COMMIT_SHORT_SHA}"
     paths:
-    - $CI_PROJECT_DIR/linux_qemu
+      - $CI_PROJECT_DIR/linux_qemu
 
 build_windows_qemu:
-  stage: build
-  interruptible: true
+  <<: *build_job_template_default
   tags:
     - os::linux
     - env::docker
@@ -140,13 +170,6 @@ build_windows_qemu:
     name: rego.corp.nucleisys.com/software/build-windows-qemu:latest
     entrypoint: ["/bin/sh", "-c"]
   script:
-    # workaround for clone source code using mirror in gito
-    - sed -i 's|https://gitlab.com/qemu-project|https://gito.corp.nucleisys.com/software/qemu|g' .gitmodules
-    - git submodule update --force --init --remote
-    # reset changes to default HEAD
-    - git reset --hard
-    - git status
-    - git submodule
     # build
     - mkdir $CI_PROJECT_DIR/build -p
     - mkdir $CI_PROJECT_DIR/windows_qemu/bin -p
@@ -160,7 +183,7 @@ build_windows_qemu:
   artifacts:
     name: "qemu_windows_${CI_COMMIT_SHORT_SHA}"
     paths:
-    - $CI_PROJECT_DIR/windows_qemu
+      - $CI_PROJECT_DIR/windows_qemu
 
 test_sdk:
   stage: test
