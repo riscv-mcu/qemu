@@ -278,8 +278,9 @@ make_qemu_zip:
     - mkdir doc
     - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/NUCLEI-QEMU-用户手册.pdf doc/nuclei_qemu_user_guide.pdf
     - cd ../
-    - tar -zcvf nuclei-qemu-${QEMU_VER}-linux-x64.tar.gz qemu
+    - tar -zcf nuclei-qemu-${QEMU_VER}-linux-x64.tar.gz qemu
     - cp nuclei-qemu-${QEMU_VER}-linux-x64.tar.gz $CI_PROJECT_DIR/
+    - cd ${CI_PROJECT_DIR}
     # docs
     - mkdir $CI_PROJECT_DIR/Documents
     - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/*pdf $CI_PROJECT_DIR/Documents -r
@@ -323,7 +324,7 @@ deploy-qemu:
     - job: make_qemu_zip
       artifacts: true
   script:
-    - export QEMU_VER=$(cat $VERSION)
+    - export QEMU_VER=$(cat VERSION)
     - shareloc="/home/share/devtools/qemu"
     - echo "This job deploy qemu release ${QEMU_VER} to share environment $shareloc in 30s, you can cancel this job, if you click it wrongly"
     - sleep 30
