@@ -124,6 +124,7 @@ build_linux_qemu:
     - ../configure --prefix=$CI_PROJECT_DIR/linux_qemu --disable-pa --disable-linux-aio --disable-rbd --disable-vnc --disable-sdl --disable-sdl-image --target-list=riscv32-softmmu,riscv64-softmmu
     - make -j8
     - make install
+    - echo "Linux qemu is successfully built, but not stripped"
   artifacts:
     name: "qemu_linux_${CI_COMMIT_SHORT_SHA}"
     paths:
@@ -155,6 +156,7 @@ build_windows_qemu:
     - make install
     # copy necessary dlls required by qemu
     - cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/* $CI_PROJECT_DIR/windows_qemu/bin
+    - echo "Windows qemu is successfully built, but not stripped"
   artifacts:
     name: "qemu_windows_${CI_COMMIT_SHORT_SHA}"
     paths:
@@ -263,6 +265,15 @@ make_qemu_zip:
     - cd $CI_PROJECT_DIR
     - mv windows_qemu windows_qemu_workdir/qemu
     - cd $CI_PROJECT_DIR/windows_qemu_workdir/qemu
+    - |
+        szbefore=$(du -sh . | cut -f1)
+        echo "Try to strip windows qemu, size is $szbefore"
+        for fnd in `find . -type f \( -executable -o -name "*.so*" \) 2>/dev/null`; do
+            echo "Try to strip $fnd"
+            strip --strip-unneeded $fnd 2> /dev/null || true
+        done
+        szafter=$(du -sh . | cut -f1)
+        echo "Windows qemu size stripped from $szbefore to $szafter"
     - mkdir doc
     - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/NUCLEI-QEMU-用户手册.pdf doc/nuclei_qemu_user_guide.pdf
     - cd ../
@@ -272,6 +283,15 @@ make_qemu_zip:
     - cd $CI_PROJECT_DIR
     - mv linux_qemu linux_qemu_workdir/qemu
     - cd $CI_PROJECT_DIR/linux_qemu_workdir/qemu
+    - |
+        szbefore=$(du -sh . | cut -f1)
+        echo "Try to strip linux qemu, size is $szbefore"
+        for fnd in `find . -type f \( -executable -o -name "*.so*" \) 2>/dev/null`; do
+            echo "Try to strip $fnd"
+            strip --strip-unneeded $fnd 2> /dev/null || true
+        done
+        szafter=$(du -sh . | cut -f1)
+        echo "Linux qemu size stripped from $szbefore to $szafter"
     - echo "Check Nuclei QEMU ${QEMU_VER} version"
     - ./bin/qemu-system-riscv32 --version
     - ldd ./bin/qemu-system-riscv32
@@ -303,7 +323,7 @@ make_qemu_zip:
         cat *.sha
         popd
         popd
-    - echo "Nuclei Qemu zip successfully made, please download it from job artifacts"
+    - echo "Nuclei qemu stripped zip successfully made, please download it from job artifacts"
   tags:
     - env::shell
     - user::xl_ci
@@ -364,7 +384,7 @@ link-qemu:
     - job: deploy-qemu
       artifacts: true
   script:
-    - export QEMU_VER=${cat VERSION}
+    - export QEMU_VER=$(cat VERSION)
     - shareloc="/home/share/devtools/qemu/linux64"
     - echo "This job link qemu release ${QEMU_VER} to latest in share environment $shareloc in 30s, you can cancel this job, if you click it wrongly"
     - sleep 30
