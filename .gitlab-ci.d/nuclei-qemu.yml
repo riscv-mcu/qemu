@@ -120,16 +120,19 @@ prepare_tools:
         git submodule || true
         # show also untracked files
         git submodule foreach git status --ignored=matching || true
+        # clean up this repo
+        git clean -ffdx || true
+        git submodule foreach --recursive git clean -xfdf || true
     # workaround for clone source code using mirror in gito
     - sed -i 's|https://gitlab.com/qemu-project|https://gito.corp.nucleisys.com/software/qemu|g' .gitmodules
     - |
         echo "INFO: Try to full clone source code now!"
         git submodule update --force --init --remote
-        git submodule foreach git reset --hard || true
+        git submodule foreach --recursive git reset --hard || true
         for i in $(seq 1 5); do
             git submodule update --force --recursive --init --remote && break || {
                 echo "Attemp $i failed, retrying..."
-                git submodule foreach git reset --hard || true
+                git submodule foreach --recursive git reset --hard || true
                 sleep 1
             }
         done
