@@ -131,14 +131,14 @@ prepare_tools:
         echo "Just update submodule without recursive"
         git submodule update --force --init --remote
         git submodule foreach --recursive git reset --hard || true
-        echo "Try to update submodule recursively"
-        for i in $(seq 1 2); do
-            git submodule update --force --recursive --init --remote && break || {
-                echo "Attemp $i failed, retrying..."
-                git submodule foreach --recursive git reset --hard || true
-                sleep 1
-            }
-        done
+        #echo "Try to update submodule recursively"
+        #for i in $(seq 1 2); do
+        #    git submodule update --force --recursive --init --remote && break || {
+        #        echo "Attemp $i failed, retrying..."
+        #        git submodule foreach --recursive git reset --hard || true
+        #        sleep 1
+        #    }
+        #done
         # reset changes to default HEAD
         git reset --hard || true
         git status
