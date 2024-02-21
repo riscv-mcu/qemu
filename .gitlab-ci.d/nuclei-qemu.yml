@@ -138,7 +138,7 @@ prepare_tools:
         git reset --hard || true
         git status
         git submodule
-    - echo "INFO: Source code is ready!"
+    - echo "Nuclei Qemu Source code is ready!"
 
 build_linux_qemu:
   <<: *build_job_template_default
