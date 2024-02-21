@@ -430,7 +430,7 @@ link-qemu:
       rm -f $shareloc/latest
       pushd $shareloc
       echo "Do symbolic link ${QEMU_VER} -> latest"
-      ln -s ${QEMU_ER} latest
+      ln -s ${QEMU_VER} latest
       popd
       echo "Check Latest Qemu Version"
       $shareloc/latest/bin/qemu-system-riscv32 --version
