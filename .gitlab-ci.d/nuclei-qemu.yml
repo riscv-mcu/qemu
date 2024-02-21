@@ -396,6 +396,7 @@ deploy-qemu:
         $shareloc/linux64/${QEMU_VER}/bin/qemu-system-riscv32 --version
         echo "Copy ${qemu_deploy_zip} to ${shareloc}/deploy/"
         mv ${qemu_deploy_zip} ${shareloc}/deploy/
+        ls -lht ${shareloc}/deploy/
     - echo "Qemu successfully deployed to share environment $shareloc/${QEMU_VER}"
   tags:
     - env::shell
