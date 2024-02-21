@@ -133,11 +133,11 @@ prepare_tools:
         git submodule init
         git submodule sync
         git submodule foreach git remote -v
-        git submodule update --force --init --remote
+        git submodule update --force --init
         git submodule foreach --recursive git reset --hard || true
         #echo "Try to update submodule recursively"
         #for i in $(seq 1 2); do
-        #    git submodule update --force --recursive --init --remote && break || {
+        #    git submodule update --force --recursive --init && break || {
         #        echo "Attemp $i failed, retrying..."
         #        git submodule foreach --recursive git reset --hard || true
         #        sleep 1
