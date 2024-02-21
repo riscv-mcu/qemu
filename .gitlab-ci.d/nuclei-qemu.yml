@@ -129,6 +129,10 @@ prepare_tools:
     - |
         echo "INFO: Try to full clone source code now!"
         echo "Just update submodule without recursive"
+        # sync submodule url first due to submodule url modified
+        git submodule init
+        git submodule sync
+        git submodule foreach git remote -v
         git submodule update --force --init --remote
         git submodule foreach --recursive git reset --hard || true
         #echo "Try to update submodule recursively"
@@ -141,6 +145,7 @@ prepare_tools:
         #done
         # reset changes to default HEAD
         git reset --hard || true
+        git submodule sync
         git status
         git submodule status --recursive || true
     - echo "Nuclei Qemu Source code is ready!"
