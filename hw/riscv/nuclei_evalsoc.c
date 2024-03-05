@@ -810,7 +810,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                         EVALSOC_INT22_IRQn, ms->smp.cpus));
         
         nuclei_systimer_create(memmap[EVALSOC_TIMER].base + iregion_addr,
-                memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, s->eclic, EVALSOC_TIMEBASE_FREQ);
+                memmap[EVALSOC_TIMER].size, false, 0, ms->smp.cpus, s->eclic, EVALSOC_TIMEBASE_FREQ);
     }
     else
     {
@@ -821,7 +821,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                         serial_hd(1), qdev_get_gpio_in(DEVICE(s->plic), EVALSOC_UART1_IRQ));
 
         nuclei_systimer_create(memmap[EVALSOC_TIMER].base + iregion_addr,
-                memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, NULL, EVALSOC_TIMEBASE_FREQ);
+                memmap[EVALSOC_TIMER].size, false, 0, ms->smp.cpus, NULL, EVALSOC_TIMEBASE_FREQ);
     }
 
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->timer), errp))

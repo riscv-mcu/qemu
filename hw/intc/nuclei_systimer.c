@@ -128,9 +128,9 @@ static uint64_t nuclei_clint_read(void *opaque, hwaddr addr, unsigned size)
     uint32_t timebase_f = 0;
     NucLeiSYSTIMERState *clint = NUCLEI_SYSTIMER(opaque);
 
-    if (addr >= clint->sip_base &&
-        addr < clint->sip_base + (clint->num_harts << 2)) {
-        size_t hartid = clint->hartid_base + ((addr - clint->sip_base) >> 2);
+    if (addr >= clint->msip_base &&
+        addr < clint->msip_base + (clint->num_harts << 2)) {
+        size_t hartid = clint->hartid_base + ((addr - clint->msip_base) >> 2);
         CPUState *cpu = qemu_get_cpu(hartid);
         CPURISCVState *env = cpu ? cpu->env_ptr : NULL;
         if (!env) {
@@ -141,10 +141,10 @@ static uint64_t nuclei_clint_read(void *opaque, hwaddr addr, unsigned size)
             error_report("clint: invalid read: %08x", (uint32_t)addr);
             return 0;
         }
-    } else if (addr >= clint->timecmp_base &&
-        addr < clint->timecmp_base + (clint->num_harts << 3)) {
+    } else if (addr >= clint->mtimecmp_base &&
+        addr < clint->mtimecmp_base + (clint->num_harts << 3)) {
         size_t hartid = clint->hartid_base +
-            ((addr - clint->timecmp_base) >> 3);
+            ((addr - clint->mtimecmp_base) >> 3);
         CPUState *cpu = qemu_get_cpu(hartid);
         CPURISCVState *env = cpu ? cpu->env_ptr : NULL;
         if (!env) {
@@ -161,11 +161,11 @@ static uint64_t nuclei_clint_read(void *opaque, hwaddr addr, unsigned size)
             error_report("clint: invalid read: %08x", (uint32_t)addr);
             return 0;
         }
-    } else if (addr == clint->time_base) {
+    } else if (addr == clint->mtime_base) {
         /* time_lo */
         timebase_f = clint->timebase_freq;
         return nuclei_cpu_riscv_read_rtc(&timebase_f) & 0xFFFFFFFF;
-    } else if (addr == clint->time_base + 4) {
+    } else if (addr == clint->mtime_base + 4) {
         /* time_hi */
         timebase_f = (clint->timebase_freq);
         return (nuclei_cpu_riscv_read_rtc(&(timebase_f))>> 32) & 0xFFFFFFFF;
@@ -181,9 +181,9 @@ static void nuclei_clint_write(void *opaque, hwaddr addr, uint64_t value,
 {
     NucLeiSYSTIMERState *clint = NUCLEI_SYSTIMER(opaque);
 
-    if (addr >= clint->sip_base &&
-        addr < clint->sip_base + (clint->num_harts << 2)) {
-        size_t hartid = clint->hartid_base + ((addr - clint->sip_base) >> 2);
+    if (addr >= clint->msip_base &&
+        addr < clint->msip_base + (clint->num_harts << 2)) {
+        size_t hartid = clint->hartid_base + ((addr - clint->msip_base) >> 2);
         CPUState *cpu = qemu_get_cpu(hartid);
         CPURISCVState *env = cpu ? cpu->env_ptr : NULL;
         if (!env) {
@@ -206,10 +206,10 @@ static void nuclei_clint_write(void *opaque, hwaddr addr, uint64_t value,
             error_report("clint: invalid sip write: %08x", (uint32_t)addr);
         }
         return;
-    } else if (addr >= clint->timecmp_base &&
-        addr < clint->timecmp_base + (clint->num_harts << 3)) {
+    } else if (addr >= clint->mtimecmp_base &&
+        addr < clint->mtimecmp_base + (clint->num_harts << 3)) {
         size_t hartid = clint->hartid_base +
-            ((addr - clint->timecmp_base) >> 3);
+            ((addr - clint->mtimecmp_base) >> 3);
         CPUState *cpu = qemu_get_cpu(hartid);
         CPURISCVState *env = cpu ? cpu->env_ptr : NULL;
        if (!env) {
@@ -229,11 +229,11 @@ static void nuclei_clint_write(void *opaque, hwaddr addr, uint64_t value,
             error_report("clint: invalid timecmp write: %08x", (uint32_t)addr);
         }
         return;
-    } else if (addr == clint->time_base) {
+    } else if (addr == clint->mtime_base) {
         /* time_lo */
         error_report("clint: time_lo write not implemented");
         return;
-    } else if (addr == clint->time_base + 4) {
+    } else if (addr == clint->mtime_base + 4) {
         /* time_hi */
         error_report("clint: time_hi write not implemented");
         return;
@@ -249,8 +249,10 @@ static void nuclei_timer_reset(DeviceState *dev)
     s->mtime_hi = 0x0;
     s->mtimecmp_lo = 0xFFFFFFFF;
     s->mtimecmp_hi = 0xFFFFFFFF;
-    s->mstop = 0x0;
-    s->mstop = 0x0;
+    s->mtime_srw_ctrl = 0x0;
+    s->msftrst = 0x0;
+    s->mtimectl = 0x0;
+    s->msip = 0x0;
 }
 
 static uint64_t nuclei_timer_read(void *opaque, hwaddr offset,
@@ -258,6 +260,10 @@ static uint64_t nuclei_timer_read(void *opaque, hwaddr offset,
 {
     uint64_t timebase_f = 0;
     NucLeiSYSTIMERState *s = NUCLEI_SYSTIMER(opaque);
+
+    if(s->prv_s && (s->mtime_srw_ctrl & 0x1))
+        return 0;
+
     if(offset >= NUCLEI_SYSTIMER_CLINT_MSIP_HART0)
     {
         return nuclei_clint_read(opaque, offset, size);
@@ -268,7 +274,7 @@ static uint64_t nuclei_timer_read(void *opaque, hwaddr offset,
 
     switch (offset) {
     case NUCLEI_SYSTIMER_REG_MTIMELO:
-        if(s->mstop)
+        if(s->mtimectl)
         {
             value = 0;
         }
@@ -282,7 +288,7 @@ static uint64_t nuclei_timer_read(void *opaque, hwaddr offset,
         }
         break;
     case NUCLEI_SYSTIMER_REG_MTIMEHI:
-        if(s->mstop)
+        if(s->mtimectl)
         {
             value = 0;
         }
@@ -299,10 +305,13 @@ static uint64_t nuclei_timer_read(void *opaque, hwaddr offset,
         s->mtimecmp_hi = (env->mtimecmp >> 32) & 0xFFFFFFFF;
         value = s->mtimecmp_hi;
         break;
+    case NUCLEI_SYSTIMER_REG_MTIMER_SRW_CTRL:
+        value = s->mtime_srw_ctrl;
+        break;
     case NUCLEI_SYSTIMER_REG_MSFTRST:
         break;
-    case NUCLEI_SYSTIMER_REG_MSTOP:
-        value = s->mstop;
+    case NUCLEI_SYSTIMER_REG_MTIMECTL:
+        value = s->mtimectl;
         break;
     case NUCLEI_SYSTIMER_REG_MSIP:
         value = s->msip;
@@ -320,6 +329,10 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
     NucLeiSYSTIMERState *s = NUCLEI_SYSTIMER(opaque);
     CPUState *cpu = qemu_get_cpu(nuclei_systimer_get_current_cpu(s));
     CPURISCVState *env = cpu ? cpu->env_ptr : NULL;
+
+    if(s->prv_s && (s->mtime_srw_ctrl & 0x1))
+        return;
+
     if(offset >= NUCLEI_SYSTIMER_CLINT_MSIP_HART0)
     {
         return nuclei_clint_write(opaque, offset, value, size);
@@ -348,12 +361,15 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
         //env->mtimecmp  |= ((value << 32)&0xFFFFFFFF);
         nuclei_timer_update_compare(s);
         break;
+    case NUCLEI_SYSTIMER_REG_MTIMER_SRW_CTRL:
+        s->mtime_srw_ctrl = value;
+        break;
     case NUCLEI_SYSTIMER_REG_MSFTRST:
-        if (!(value & 0x80000000) == 0)
+        if (value == 0x80000a5f)
             nuclei_timer_reset((DeviceState *)s);
         break;
-    case NUCLEI_SYSTIMER_REG_MSTOP:
-        s->mstop = value;
+    case NUCLEI_SYSTIMER_REG_MTIMECTL:
+        s->mtimectl = value;
         break;
     case NUCLEI_SYSTIMER_REG_MSIP:
         s->msip = value;
@@ -380,11 +396,13 @@ static const MemoryRegionOps nuclei_timer_ops = {
 };
 
 static Property nuclei_systimer_properties[] = {
+    DEFINE_PROP_BOOL("prv-s", NucLeiSYSTIMERState, prv_s, false),
     DEFINE_PROP_UINT32("hartid-base", NucLeiSYSTIMERState, hartid_base, 0),
     DEFINE_PROP_UINT32("num-harts", NucLeiSYSTIMERState, num_harts, 0),
-    DEFINE_PROP_UINT32("sip-base", NucLeiSYSTIMERState, sip_base, 0),
-    DEFINE_PROP_UINT32("timecmp-base", NucLeiSYSTIMERState, timecmp_base, 0),
-    DEFINE_PROP_UINT32("time-base", NucLeiSYSTIMERState, time_base, 0),
+    DEFINE_PROP_UINT32("msip-base", NucLeiSYSTIMERState, msip_base, 0),
+    DEFINE_PROP_UINT32("mtimecmp-base", NucLeiSYSTIMERState, mtimecmp_base, 0),
+    DEFINE_PROP_UINT32("mtime-base", NucLeiSYSTIMERState, mtime_base, 0),
+    DEFINE_PROP_UINT32("ssip-base", NucLeiSYSTIMERState, ssip_base, 0),
     DEFINE_PROP_UINT32("aperture-size", NucLeiSYSTIMERState, aperture_size, 0),
     DEFINE_PROP_UINT64("timebase-freq", NucLeiSYSTIMERState, timebase_freq, 0),
     DEFINE_PROP_END_OF_LIST(),
@@ -400,14 +418,17 @@ static void nuclei_timer_realize(DeviceState *dev, Error **errp)
     if( s->hartid_base == 0)
          s->hartid_base = 0;
 
-    if( s->sip_base == 0)
-         s->sip_base = NUCLEI_SIP_BASE;
+    if( s->msip_base == 0)
+         s->msip_base = NUCLEI_MSIP_BASE;
 
-    if( s->timecmp_base == 0)
-         s->timecmp_base = NUCLEI_TIMECMP_BASE;
+    if( s->mtimecmp_base == 0)
+         s->mtimecmp_base = NUCLEI_MTIMECMP_BASE;
 
-    if( s->time_base == 0)
-         s->time_base = NUCLEI_TIME_BASE;
+    if( s->mtime_base == 0)
+         s->mtime_base = NUCLEI_MTIME_BASE;
+
+    if( s->ssip_base == 0)
+         s->ssip_base = NUCLEI_SSIP_BASE;
 
     if( s->num_harts == 0)
     {
@@ -449,19 +470,20 @@ static void nuclei_mtimecmp_cb(void *opaque) {
     timer_del(env->mtimer);
 }
 
-DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_base, uint32_t num_harts,
-        DeviceState *eclic,
-        uint32_t timebase_freq)
+DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, bool prv_s, uint32_t hartid_base,
+                                    uint32_t num_harts, DeviceState *eclic, uint32_t timebase_freq)
 {
     hart_numbers = num_harts;
     int i = 0;
 
     DeviceState *dev = qdev_new(TYPE_NUCLEI_SYSTIMER);
+    qdev_prop_set_bit(dev, "prv-s", prv_s);
     qdev_prop_set_uint32(dev, "hartid-base", hartid_base);
     qdev_prop_set_uint32(dev, "num-harts", num_harts);
-    qdev_prop_set_uint32(dev, "sip-base", NUCLEI_SIP_BASE);
-    qdev_prop_set_uint32(dev, "timecmp-base", NUCLEI_TIMECMP_BASE);
-    qdev_prop_set_uint32(dev, "time-base", NUCLEI_TIME_BASE);
+    qdev_prop_set_uint32(dev, "msip-base", NUCLEI_MSIP_BASE);
+    qdev_prop_set_uint32(dev, "mtimecmp-base", NUCLEI_MTIMECMP_BASE);
+    qdev_prop_set_uint32(dev, "mtime-base", NUCLEI_MTIME_BASE);
+    qdev_prop_set_uint32(dev, "ssip-base", NUCLEI_SSIP_BASE);
     qdev_prop_set_uint32(dev, "aperture-size", size);
     qdev_prop_set_uint32(dev, "timebase-freq", timebase_freq);
     NucLeiSYSTIMERState *s = NUCLEI_SYSTIMER(dev);

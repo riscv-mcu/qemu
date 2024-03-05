@@ -37,7 +37,7 @@
 #define NUCLEI_SYSTIMER_REG_MTIMECMPHI          (0x000C)
 #define NUCLEI_SYSTIMER_REG_MTIMER_SRW_CTRL     (0xFEC)
 #define NUCLEI_SYSTIMER_REG_MSFTRST             (0xFF0)
-#define NUCLEI_SYSTIMER_REG_MSTOP               (0xFF8)
+#define NUCLEI_SYSTIMER_REG_MTIMECTL            (0xFF8)
 #define NUCLEI_SYSTIMER_REG_MSIP                (0xFFC)
 
 #define NUCLEI_SYSTIMER_CLINT_MSIP_HART0        (0x1000)
@@ -46,6 +46,8 @@ typedef struct NucLeiSYSTIMERState
 {
     /*< private >*/
     SysBusDevice parent_obj;
+
+    bool prv_s;
 
     /*< public >*/
     MemoryRegion iomem;
@@ -58,14 +60,17 @@ typedef struct NucLeiSYSTIMERState
     uint32_t mtime_hi;
     uint32_t mtimecmp_lo;
     uint32_t mtimecmp_hi;
-    uint32_t mstop;
+    uint32_t mtime_srw_ctrl;
+    uint32_t msftrst;
+    uint32_t mtimectl;
     uint32_t msip;
 
     uint32_t hartid_base;
     uint32_t num_harts;
-    uint32_t sip_base;
-    uint32_t timecmp_base;
-    uint32_t time_base;
+    uint32_t msip_base;
+    uint32_t mtimecmp_base;
+    uint32_t mtime_base;
+    uint32_t ssip_base;
     uint32_t aperture_size;
     uint64_t timebase_freq;
 
@@ -75,12 +80,13 @@ typedef struct NucLeiSYSTIMERState
 #define  EVALSOC_TIMEBASE_FREQ      (32768)
 
 enum {
-    NUCLEI_SIP_BASE     = 0x1000,
-    NUCLEI_TIMECMP_BASE = 0x5000,
-    NUCLEI_TIME_BASE    = 0xCFF8
+    NUCLEI_MSIP_BASE     = 0x1000,
+    NUCLEI_MTIMECMP_BASE = 0x5000,
+    NUCLEI_MTIME_BASE    = 0xCFF8,
+    NUCLEI_SSIP_BASE     = 0xD000
 };
 
-DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_base, uint32_t num_harts,
-                                    DeviceState *eclic, uint32_t timebase_freq);
+DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, bool prv_s, uint32_t hartid_base,
+                                    uint32_t num_harts, DeviceState *eclic, uint32_t timebase_freq);
 
 #endif

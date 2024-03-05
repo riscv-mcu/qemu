@@ -769,7 +769,7 @@ static void riscv_demosoc_soc_realize(DeviceState *dev, Error **errp)
                         DEMOSOC_INT22_IRQn, ms->smp.cpus));
 
         nuclei_systimer_create(memmap[DEMOSOC_TIMER].base,
-                memmap[DEMOSOC_TIMER].size, 0, ms->smp.cpus, s->eclic, DEMOSOC_TIMEBASE_FREQ);
+                memmap[DEMOSOC_TIMER].size, false, 0, ms->smp.cpus, s->eclic, DEMOSOC_TIMEBASE_FREQ);
     }
     else
     {
@@ -780,7 +780,7 @@ static void riscv_demosoc_soc_realize(DeviceState *dev, Error **errp)
                         serial_hd(1), qdev_get_gpio_in(DEVICE(s->plic), DEMOSOC_UART1_IRQ));
 
         nuclei_systimer_create(memmap[DEMOSOC_TIMER].base,
-                memmap[DEMOSOC_TIMER].size, 0, ms->smp.cpus, NULL, DEMOSOC_TIMEBASE_FREQ);
+                memmap[DEMOSOC_TIMER].size, false, 0, ms->smp.cpus, NULL, DEMOSOC_TIMEBASE_FREQ);
     }
 
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->timer), errp))
