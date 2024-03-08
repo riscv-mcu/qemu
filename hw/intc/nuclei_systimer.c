@@ -38,7 +38,7 @@ static inline int nuclei_systimer_get_current_cpu(NucLeiSYSTIMERState *s)
 {
     if (s->num_harts > 1)
     {
-        return current_cpu->cpu_index;
+        return current_cpu ? current_cpu->cpu_index : 0;
     }
     return 0;
 }

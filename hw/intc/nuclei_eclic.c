@@ -53,7 +53,7 @@ static inline int nuclei_eclic_get_current_cpu(NucLeiECLICState *eclic)
 {
     if (eclic->num_harts > 1)
     {
-        return current_cpu->cpu_index;
+        return current_cpu ? current_cpu->cpu_index : 0;
     }
     return 0;
 }

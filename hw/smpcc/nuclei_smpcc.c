@@ -69,7 +69,7 @@ static uint64_t nuclei_smpcc_get_clm_size(NucLeiSMPCCState *smpcc)
 static uint64_t nuclei_smpcc_read(void *opaque, hwaddr addr, unsigned size)
 {
     NucLeiSMPCCState *smpcc = opaque;
-    CPURISCVState *env = current_cpu->env_ptr;
+    CPURISCVState *env = current_cpu ? current_cpu->env_ptr : NULL;
 
     uint64_t value = 0;
 
@@ -88,13 +88,13 @@ static uint64_t nuclei_smpcc_read(void *opaque, hwaddr addr, unsigned size)
         value = smpcc->smp_enb;
         break;
     case 0x10:
-        if (env->priv == PRV_M)
+        if ((!env) || (env->priv == PRV_M))
         {
             value = smpcc->cc_ctrl;
         }
         break;
     case 0x14:
-        if (env->priv == PRV_M)
+        if ((!env) || (env->priv == PRV_M))
         {
             value = smpcc->cc_mcmd;
         }
@@ -121,11 +121,11 @@ static uint64_t nuclei_smpcc_read(void *opaque, hwaddr addr, unsigned size)
         value = smpcc->clint_err_status[(addr - 0x40) / 8];
         break;
     case 0xc0:
-        if ((smpcc->cc_ctrl & 0x200) && (env->priv == PRV_S))
+        if ((!env) || ((smpcc->cc_ctrl & 0x200) && (env->priv >= PRV_S)))
             value = smpcc->cc_scmd;
         break;
     case 0xc4:
-        if ((smpcc->cc_ctrl & 0x400) && (env->priv == PRV_U))
+        if (smpcc->cc_ctrl & 0x400)
             value = smpcc->cc_ucmd;
         break;
     case 0xc8:
@@ -147,8 +147,8 @@ static uint64_t nuclei_smpcc_read(void *opaque, hwaddr addr, unsigned size)
         value = smpcc->ns_rg[(addr - 0x100) / 8];
         break;
     case 0x180 ... 0x1bc:
-        if (((smpcc->cc_ctrl & 0x200) && (env->priv == PRV_S))
-            || ((smpcc->cc_ctrl & 0x400) && (env->priv == PRV_U)))
+        if ((!env) || ((smpcc->cc_ctrl & 0x200) && (env->priv >= PRV_S))
+            || (smpcc->cc_ctrl & 0x400))
             value = smpcc->smp_pmon_sel[(addr - 0x180) / 4];
         break;
     case 0x1c0 ... 0x23c:
@@ -173,7 +173,7 @@ static void nuclei_smpcc_write(void *opaque, hwaddr addr, uint64_t value,
                                unsigned size)
 {
     NucLeiSMPCCState *smpcc = opaque;
-    CPURISCVState *env = current_cpu->env_ptr;
+    CPURISCVState *env = current_cpu ? current_cpu->env_ptr : NULL;
     uint32_t clm_size = 0;
 
     switch (addr)
@@ -194,13 +194,13 @@ static void nuclei_smpcc_write(void *opaque, hwaddr addr, uint64_t value,
         smpcc->smp_enb = value;
         break;
     case 0x10:
-        if (env->priv == PRV_M)
+        if ((!env) || (env->priv == PRV_M))
         {
             smpcc->cc_ctrl = nuclei_smpcc_update_cc_ctrl(smpcc, value);
         }
         break;
     case 0x14:
-        if (env->priv != PRV_M)
+        if ((!env) || (env->priv != PRV_M))
             break;
         smpcc->cc_mcmd = value;
         uint64_t cmd_code = value & 0x1f;
@@ -255,11 +255,11 @@ static void nuclei_smpcc_write(void *opaque, hwaddr addr, uint64_t value,
         smpcc->clint_err_status[(addr - 0x40) / 8] = value;
         break;
     case 0xc0:
-        if ((smpcc->cc_ctrl & 0x200) && (env->priv == PRV_S))
+        if ((!env) || ((smpcc->cc_ctrl & 0x200) && (env->priv >= PRV_S)))
             smpcc->cc_scmd = value;
         break;
     case 0xc4:
-        if ((smpcc->cc_ctrl & 0x400) && (env->priv == PRV_U))
+        if (smpcc->cc_ctrl & 0x400)
             smpcc->cc_ucmd = value;
         break;
     case 0xc8:
@@ -286,8 +286,8 @@ static void nuclei_smpcc_write(void *opaque, hwaddr addr, uint64_t value,
         smpcc->ns_rg[(addr - 0x100) / 8] = value;
         break;
     case 0x180 ... 0x1bc:
-        if (((smpcc->cc_ctrl & 0x200) && (env->priv == PRV_S))
-            || ((smpcc->cc_ctrl & 0x400) && (env->priv == PRV_U)))
+        if ((!env) || ((smpcc->cc_ctrl & 0x200) && (env->priv >= PRV_S))
+            || (smpcc->cc_ctrl & 0x400))
             smpcc->smp_pmon_sel[(addr - 0x180) / 4] = value;
         break;
     case 0x1c0 ... 0x23c:
