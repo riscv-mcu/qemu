@@ -110,3 +110,4 @@ config NUCLEI_EVALSOC
     select NUCLEI_CIDU
     select NUCLEI_UART
     select NUCLEI_SMPCC
+    select NUCLEI_IREGION
