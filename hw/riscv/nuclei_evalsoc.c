@@ -56,8 +56,7 @@
 #define BIOS_FILENAME "opensbi-riscv64-generic-fw_dynamic.bin"
 #endif
 
-#define IREGION_BASE         0x18000000
-
+static uint32_t iregion_addr = 0x18000000;
 
 #define EVALSOC_DDR_BASE     0x80000000
 #define EVALSOC_ILM_ADDR     0x80000000
@@ -80,22 +79,23 @@ static const struct MemmapEntry
     hwaddr base;
     hwaddr size;
 }  evalsoc_memmap[] = {
-    [EVALSOC_IINFO] = { IREGION_BASE,          0x1000 },
-    [EVALSOC_DEBUG] = { IREGION_BASE + IREGION_DEBUG_OFS,          0x1000 },
-    [EVALSOC_MROM]  = { 0x1000,        0xf000 },
-    [EVALSOC_TEST]  = { 0x100000,      0x10000 },
-    [EVALSOC_TIMER] = { IREGION_BASE + IREGION_TIMER_OFS,          0x10000 },
-    [EVALSOC_PLIC]  = { IREGION_BASE + IREGION_PLIC_OFS,           0x4000000},
-    [EVALSOC_ECLIC] = { IREGION_BASE + IREGION_ECLIC_OFS,          0x10000 },
-    [EVALSOC_GPIO]  = { 0x10012000,    0x1000 },
-    [EVALSOC_UART0] = { 0x10013000,    0x1000 },
-    [EVALSOC_QSPI0] = { 0x10014000,    0x1000 },
-    [EVALSOC_UART1] = { 0x10023000,    0x1000 },
-    [EVALSOC_QSPI1] = { 0x10024000,    0x1000 },
-    [EVALSOC_QSPI2] = { 0x10034000,    0x1000 },
-    [EVALSOC_SMP]   = { IREGION_BASE + IREGION_SMP_OFS,           0x00001000 },
-    [EVALSOC_XIP]   = { 0x20000000,    0x20000000},
-    [EVALSOC_DDR]   = { EVALSOC_DDR_BASE,    0x80000000 },
+    [EVALSOC_IINFO] = { 0,                      0x1000 },
+    [EVALSOC_MROM]  = { 0x1000,                 0xf000 },
+    [EVALSOC_TEST]  = { 0x100000,               0x10000 },
+    [EVALSOC_GPIO]  = { 0x10012000,             0x1000 },
+    [EVALSOC_UART0] = { 0x10013000,             0x1000 },
+    [EVALSOC_QSPI0] = { 0x10014000,             0x1000 },
+    [EVALSOC_UART1] = { 0x10023000,             0x1000 },
+    [EVALSOC_QSPI1] = { 0x10024000,             0x1000 },
+    [EVALSOC_QSPI2] = { 0x10034000,             0x1000 },
+    [EVALSOC_XIP]   = { 0x20000000,             0x20000000},
+    [EVALSOC_DEBUG] = { IREGION_DEBUG_OFS,               0x1000 },
+    [EVALSOC_TIMER] = { IREGION_TIMER_OFS,               0x10000 },
+    [EVALSOC_CLINT] = { IREGION_TIMER_OFS + 0x1000,      0xF000 },//MTIME in CLINT mode
+    [EVALSOC_PLIC]  = { IREGION_PLIC_OFS,                0x4000000 },
+    [EVALSOC_ECLIC] = { IREGION_ECLIC_OFS,               0x10000 },
+    [EVALSOC_SMP]   = { IREGION_SMP_OFS,                 0x1000 },
+    [EVALSOC_DDR]   = { EVALSOC_DDR_BASE,                0x80000000 },
 };
 
 static void riscv_load_initrd(MachineState *machine, uint64_t kernel_entry)
@@ -249,7 +249,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     }
 
     nodename = g_strdup_printf("/soc/clint@%lx",
-                               (long)memmap[EVALSOC_TIMER].base + 0x1000);
+                               (long)memmap[EVALSOC_CLINT].base + iregion_addr);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "riscv,clint0");
     // qemu_fdt_setprop(fdt, nodename, "interrupts-extended",
@@ -258,11 +258,11 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     g_free(nodename);
 
     nodename = g_strdup_printf("/soc/timer@%lx",
-                               (long)memmap[EVALSOC_TIMER].base);
+                               (long)memmap[EVALSOC_TIMER].base + iregion_addr);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,timer0");
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           0x0, memmap[EVALSOC_TIMER].base,
+                           0x0, memmap[EVALSOC_TIMER].base + iregion_addr,
                            0x0, memmap[EVALSOC_TIMER].size);
     g_free(nodename);
 
@@ -281,7 +281,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
 
     plic_phandle = phandle++;
     nodename = g_strdup_printf("/soc/interrupt-controller@%lx",
-                               (long)memmap[EVALSOC_PLIC].base);
+                               (long)memmap[EVALSOC_PLIC].base + iregion_addr);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_cell(fdt, nodename, "#interrupt-cells", 1);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "riscv,plic0");
@@ -289,7 +289,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     qemu_fdt_setprop(fdt, nodename, "interrupts-extended",
                      cells, (ms->smp.cpus * 4 ) * sizeof(uint32_t));
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           0x0, memmap[EVALSOC_PLIC].base,
+                           0x0, memmap[EVALSOC_PLIC].base + iregion_addr,
                            0x0, memmap[EVALSOC_PLIC].size);
     qemu_fdt_setprop_cell(fdt, nodename, "riscv,ndev", 0x35);
     qemu_fdt_setprop_cell(fdt, nodename, "phandle", plic_phandle);
@@ -463,8 +463,12 @@ update_bootargs:
 static void evalsoc_machine_init(MachineState *machine)
 {
     const struct MemmapEntry *memmap = evalsoc_memmap;
-    target_ulong start_addr = memmap[EVALSOC_DDR].base;
     EvalSoCState *s = RISCV_EVALSOC_MACHINE(machine);
+    if(s->iregion != 0xffffffff)
+    {
+        iregion_addr = s->iregion;
+    }
+    target_ulong start_addr = memmap[EVALSOC_DDR].base;
     MemoryRegion *system_memory = get_system_memory();
     uint32_t start_addr_hi32 = 0x00000000;
     uint32_t fdt_load_addr = 0;
@@ -494,7 +498,7 @@ static void evalsoc_machine_init(MachineState *machine)
     memory_region_init_ram(&s->soc.smp, NULL, "riscv.evalsoc.ram.smp",
         memmap[EVALSOC_SMP].size, &error_fatal);
     memory_region_add_subregion(system_memory, 
-        memmap[EVALSOC_SMP].base, &s->soc.smp);
+        memmap[EVALSOC_SMP].base + iregion_addr, &s->soc.smp);
 
     memory_region_init_ram(&s->soc.xip_mem, NULL, "riscv.evalsoc.flashxip",
         memmap[EVALSOC_XIP].size, &error_fatal);
@@ -502,13 +506,18 @@ static void evalsoc_machine_init(MachineState *machine)
         memmap[EVALSOC_XIP].base, &s->soc.xip_mem);
 
     for (i = 0; i < machine->smp.cpus; i ++) {
-        s->soc.cpus.harts[i].env.msmpcfg_info = (memmap[EVALSOC_SMP].base & ~(1<<10)) | 0xF;
+        s->soc.cpus.harts[i].env.msmpcfg_info = ((memmap[EVALSOC_SMP].base + iregion_addr) & ~(1<<10)) | 0xF;
     }
 
     //iregion
     for (i = 0; i < machine->smp.cpus; i ++) {
-        s->soc.cpus.harts[i].env.mcfg_info = 1 << 16;
-        s->soc.cpus.harts[i].env.mirgb_info = (IREGION_BASE & ~(1<<10)) | 0xF;;
+        if(machine->smp.cpus > 1)
+        {
+            s->soc.cpus.harts[i].env.mcfg_info |= 1 << 11;
+        }
+        // note: The iregion function is optional and cannot be forced to be set.
+        s->soc.cpus.harts[i].env.mcfg_info |= 1 << 16;
+        s->soc.cpus.harts[i].env.mirgb_info = (iregion_addr & ~(1<<10)) | 0xF;;
     }
     /* load/create device tree */
     if (machine->dtb) {
@@ -643,12 +652,19 @@ static void evalsoc_machine_init(MachineState *machine)
 
     bool is_32_bit = riscv_is_32bit(&s->soc.cpus);
 
-    nuclei_iregion_create(memmap[EVALSOC_IINFO].base, is_32_bit);
+    nuclei_iregion_create(memmap[EVALSOC_IINFO].base + iregion_addr, is_32_bit);
 }
 
 static void evalsoc_machine_instance_init(Object *obj)
 {
+    EvalSoCState *s = RISCV_EVALSOC_MACHINE(obj);
 
+    s->iregion = 0xffffffff;
+
+    object_property_add_uint32_ptr(obj, "iregion", &s->iregion,
+                                   OBJ_PROP_FLAG_READWRITE);
+    object_property_set_description(obj, "iregion",
+                                    "Set iregion");
 }
 
 static char* evalsoc_machine_get_download(Object *obj, Error **errp)
@@ -681,7 +697,6 @@ static void evalsoc_machine_class_init(ObjectClass *oc, void *data)
                                           "Set on to tell QEMU's ROM to jump to "
                                           "download mode. Otherwise QEMU will jump to flash base address, aka download=flashxip"
                                           "nuclei support these download modes(flashxip,flash,ilm,ddr,sram)");
-
 }
 
 static const TypeInfo evalsoc_machine_typeinfo = {
@@ -764,7 +779,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         plic_hart_config_len -= (strlen(EVALSOC_PLIC_HART_CONFIG) + 1);
     }
     /* MMIO */
-    s->plic = sifive_plic_create(memmap[EVALSOC_PLIC].base,
+    s->plic = sifive_plic_create(memmap[EVALSOC_PLIC].base + iregion_addr,
                                  plic_hart_config, ms->smp.cpus, 0,
                                  EVALSOC_PLIC_NUM_SOURCES,
                                  EVALSOC_PLIC_NUM_PRIORITIES,
@@ -777,7 +792,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                                  memmap[EVALSOC_PLIC].size);
     g_free(plic_hart_config);
 
-    s->eclic = nuclei_eclic_create(memmap[EVALSOC_ECLIC].base,
+    s->eclic = nuclei_eclic_create(memmap[EVALSOC_ECLIC].base + iregion_addr,
                                    memmap[EVALSOC_ECLIC].size,
                                    false, false, true,
                                    ms->smp.cpus,
@@ -794,7 +809,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                         nuclei_eclic_get_irq(DEVICE(s->eclic),
                         EVALSOC_INT22_IRQn));
         
-        nuclei_systimer_create(memmap[EVALSOC_TIMER].base,
+        nuclei_systimer_create(memmap[EVALSOC_TIMER].base + iregion_addr,
                 memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, s->eclic, EVALSOC_TIMEBASE_FREQ);
     }
     else
@@ -805,7 +820,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         sifive_uart_create(sys_mem, memmap[EVALSOC_UART1].base,
                         serial_hd(1), qdev_get_gpio_in(DEVICE(s->plic), EVALSOC_UART1_IRQ));
 
-        nuclei_systimer_create(memmap[EVALSOC_TIMER].base,
+        nuclei_systimer_create(memmap[EVALSOC_TIMER].base + iregion_addr,
                 memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, NULL, EVALSOC_TIMEBASE_FREQ);
     }
 

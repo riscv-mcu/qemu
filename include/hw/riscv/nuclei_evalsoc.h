@@ -93,6 +93,7 @@ typedef struct
     int fdt_size;
 
     const char *download;
+    uint32_t iregion;
     /*< public >*/
     EvalSoCSoCState soc;
     uint32_t msel;
@@ -109,6 +110,7 @@ enum {
     EVALSOC_MROM,
     EVALSOC_TEST,
     EVALSOC_TIMER,
+    EVALSOC_CLINT,
     EVALSOC_PLIC,
     EVALSOC_ECLIC,
     EVALSOC_GPIO,

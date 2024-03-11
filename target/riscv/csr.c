@@ -4093,6 +4093,8 @@ static int read_mirgb_info(CPURISCVState *env, int csrno, target_ulong *val)
     }
     else
     {
+        /* Previously there is a CSR named msmpcfg_info using this CSR ID, as SMP configuration information is inside the
+           IREGION, so msmpcfg_info is discarded.*/
         *val = env->msmpcfg_info;
     }
     return RISCV_EXCP_NONE;
