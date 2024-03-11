@@ -2289,6 +2289,7 @@ static const TypeInfo riscv_cpu_type_infos[] = {
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX900,     rv64imacu_nuclei_u_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX900F,    rv64imafcu_nuclei_u_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX900FD,   rv64imafdcu_nuclei_u_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_UX1000FD,  rv64imafdcu_nuclei_u_cpu_init),
 #endif
 };
 
