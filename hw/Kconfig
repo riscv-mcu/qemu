@@ -32,6 +32,7 @@ source pci/Kconfig
 source remote/Kconfig
 source rtc/Kconfig
 source scsi/Kconfig
+source smpcc/Kconfig
 source sd/Kconfig
 source sensor/Kconfig
 source smbios/Kconfig
