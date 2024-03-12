@@ -1,0 +1,2 @@
+config NUCLEI_SMPCC
+    bool

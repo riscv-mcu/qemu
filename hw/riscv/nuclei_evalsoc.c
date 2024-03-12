@@ -495,11 +495,6 @@ static void evalsoc_machine_init(MachineState *machine)
     memory_region_add_subregion(system_memory, memmap[EVALSOC_DDR].base,
                                 &s->soc.ddr);
 
-    memory_region_init_ram(&s->soc.smp, NULL, "riscv.evalsoc.ram.smp",
-        memmap[EVALSOC_SMP].size, &error_fatal);
-    memory_region_add_subregion(system_memory, 
-        memmap[EVALSOC_SMP].base + iregion_addr, &s->soc.smp);
-
     memory_region_init_ram(&s->soc.xip_mem, NULL, "riscv.evalsoc.flashxip",
         memmap[EVALSOC_XIP].size, &error_fatal);
     memory_region_add_subregion(system_memory, 
@@ -738,6 +733,14 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     EvalSoCSoCState *s = RISCV_EVALSOC_SOC(dev);
     const struct MemmapEntry *memmap = evalsoc_memmap;
     MemoryRegion *sys_mem = get_system_memory();
+    NucLeiSMPCCInit smpcc_cfg = {EVALSOC_SMP_VER,
+                                EVALSOC_SMP_CFG | ((ms->smp.cpus - 1) << 1),
+                                EVALSOC_CC_CFG,
+                                EVALSOC_CLM_BASE_ADDR,
+                                EVALSOC_CLUSTER_CACHE_SIZE,
+                                EVALSOC_CLM_WAY_EN
+                                };
+
     int i = 0;
     char *plic_hart_config;
     size_t plic_hart_config_len;
@@ -798,6 +801,10 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                                    ms->smp.cpus,
                                    EVALSOC_INT_MAX,
                                    EVALSOC_CLIC_INTCTLBITS);
+
+    s->smpcc = nuclei_smpcc_create(memmap[EVALSOC_SMP].base + iregion_addr,
+                               memmap[EVALSOC_SMP].size,
+                               &smpcc_cfg);
 
     if (ms->firmware == NULL)
     {

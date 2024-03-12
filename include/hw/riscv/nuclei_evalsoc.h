@@ -35,6 +35,7 @@
 #include "hw/char/nuclei_uart.h"
 #include "hw/gpio/sifive_gpio.h"
 #include "hw/intc/nuclei_eclic.h"
+#include "hw/smpcc/nuclei_smpcc.h"
 #include "hw/sysbus.h"
 #include "hw/sd/sd.h"
 #include "hw/ssi/sifive_spi.h"
@@ -66,6 +67,7 @@ typedef struct EvalSoCSoCState {
 
     DeviceState *plic;
     DeviceState *eclic;
+    DeviceState *smpcc;
     MemoryRegion ilm;
     MemoryRegion dlm;
     MemoryRegion internal_rom;
@@ -209,6 +211,13 @@ enum
     EVALSOC_HFCLK_FREQ = 80000,
     EVALSOC_RTCCLK_FREQ = 80000
 };
+
+#define EVALSOC_SMP_VER             0
+#define EVALSOC_SMP_CFG             0x1
+#define EVALSOC_CC_CFG              0
+#define EVALSOC_CLM_BASE_ADDR       0
+#define EVALSOC_CLM_WAY_EN          0
+#define EVALSOC_CLUSTER_CACHE_SIZE  0x40000
 
 
 #define EVALSOC_MANAGEMENT_CPU_COUNT 1
