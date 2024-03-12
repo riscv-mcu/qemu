@@ -26,6 +26,7 @@
 
 #if !defined(CONFIG_USER_ONLY)
 #include "hw/intc/riscv_clic.h"
+#include "hw/intc/nuclei_eclic.h"
 #endif
 
 /* Exceptions processing helpers */
@@ -298,14 +299,14 @@ target_ulong helper_sret(CPURISCVState *env)
     uint64_t mstatus;
     target_ulong prev_priv, prev_virt;
 
-    if (riscv_clic_is_clic_mode(env)) {
+    if (riscv_intc_is_clic_mode(env)) {
         CPUState *cs = env_cpu(env);
         target_ulong spil = get_field(env->scause, SCAUSE_SPIL);
         env->mintstatus = set_field(env->mintstatus, MINTSTATUS_SIL, spil);
         env->scause = set_field(env->scause, SCAUSE_SPIE, 0);
         env->scause = set_field(env->scause, SCAUSE_SPP, PRV_U);
         qemu_mutex_lock_iothread();
-        riscv_clic_get_next_interrupt(env->clic, cs->cpu_index);
+        nuclei_eclic_next_interrupt(env->eclic, cs->cpu_index);
         qemu_mutex_unlock_iothread();
     }    
 
@@ -371,9 +372,10 @@ target_ulong helper_mret(CPURISCVState *env)
         riscv_raise_exception(env, RISCV_EXCP_INST_ADDR_MIS, GETPC());
     }
     /* if ECLIC mode */
-    if ((env->mtvec & 0b111111) == 0b000011) {
-        env->mintstatus = set_field(env->mintstatus, MINTSTATUS_MIL,
-                    get_field(env->mcause, MCAUSE_MPIL));
+    if (riscv_intc_is_clic_mode(env)) {
+
+        target_ulong mpil = get_field(env->mcause, MCAUSE_MPIL);
+        env->mintstatus = set_field(env->mintstatus, MINTSTATUS_MIL, mpil);
 
         if(get_field(env->mcause, MCAUSE_INTERRUPT) == 1)
             env->mstatus = set_field(env->mstatus, MSTATUS_MPP,
@@ -408,14 +410,10 @@ target_ulong helper_mret(CPURISCVState *env)
         riscv_cpu_set_virt_enabled(env, prev_virt);
     }
 
-    if (riscv_clic_is_clic_mode(env)) {
+    if (riscv_intc_is_clic_mode(env)) {
         CPUState *cs = env_cpu(env);
-        target_ulong mpil = get_field(env->mcause, MCAUSE_MPIL);
-        env->mintstatus = set_field(env->mintstatus, MINTSTATUS_MIL, mpil);
-        env->mcause = set_field(env->mcause, MCAUSE_MPIE, 0);
-        env->mcause = set_field(env->mcause, MCAUSE_MPP, PRV_U);
         qemu_mutex_lock_iothread();
-        riscv_clic_get_next_interrupt(env->clic, cs->cpu_index);
+        nuclei_eclic_next_interrupt(env->eclic, cs->cpu_index);
         qemu_mutex_unlock_iothread();
     }
 

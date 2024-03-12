@@ -34,6 +34,15 @@
 
 int hart_numbers = 0;
 
+static inline int nuclei_systimer_get_current_cpu(NucLeiSYSTIMERState *s)
+{
+    if (s->num_harts > 1)
+    {
+        return current_cpu->cpu_index;
+    }
+    return 0;
+}
+
 static uint64_t nuclei_cpu_riscv_read_rtc(void *opaque)
 {
     uint64_t timebase_freq = *(uint64_t*)opaque;
@@ -43,7 +52,7 @@ static uint64_t nuclei_cpu_riscv_read_rtc(void *opaque)
 
 static void nuclei_timer_update_compare(NucLeiSYSTIMERState *s)
 {
-    CPUState *cpu = qemu_get_cpu(0);
+    CPUState *cpu = qemu_get_cpu(nuclei_systimer_get_current_cpu(s));
     CPURISCVState *env = cpu ? cpu->env_ptr : NULL;
     uint64_t cmp, real_time;
     int64_t diff;
@@ -100,7 +109,7 @@ static void sifive_clint_write_timecmp(RISCVCPU *cpu, uint64_t value,
     /* back to ns (note args switched in muldiv64) */
     next = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) +
         muldiv64(diff, NANOSECONDS_PER_SECOND, timebase_freq);
-    timer_mod(cpu->env.timer, next);
+    timer_mod(cpu->env.mtimer, next);
 }
 
 /*
@@ -253,7 +262,7 @@ static uint64_t nuclei_timer_read(void *opaque, hwaddr offset,
     {
         return nuclei_clint_read(opaque, offset, size);
     }
-    CPUState *cpu = qemu_get_cpu(0);
+    CPUState *cpu = qemu_get_cpu(nuclei_systimer_get_current_cpu(s));
     CPURISCVState *env = cpu ? cpu->env_ptr : NULL;
     uint64_t value = 0;
 
@@ -309,7 +318,7 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
                                  uint64_t value, unsigned size)
 {
     NucLeiSYSTIMERState *s = NUCLEI_SYSTIMER(opaque);
-    CPUState *cpu = qemu_get_cpu(0);
+    CPUState *cpu = qemu_get_cpu(nuclei_systimer_get_current_cpu(s));
     CPURISCVState *env = cpu ? cpu->env_ptr : NULL;
     if(offset >= NUCLEI_SYSTIMER_CLINT_MSIP_HART0)
     {
@@ -434,7 +443,7 @@ static void nuclei_timer_register_types(void)
 type_init(nuclei_timer_register_types);
 
 static void nuclei_mtimecmp_cb(void *opaque) {
-    RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(0));
+    RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(nuclei_systimer_get_current_cpu(NUCLEI_SYSTIMER(opaque))));
     CPURISCVState *env = &cpu->env;
     nuclei_eclic_systimer_cb(((RISCVCPU *)cpu)->env.eclic);
     timer_del(env->mtimer);
@@ -444,8 +453,6 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_ba
         DeviceState *eclic,
         uint32_t timebase_freq)
 {
-    RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(0));
-    CPURISCVState *env = &cpu->env;
     hart_numbers = num_harts;
     int i = 0;
 
@@ -459,32 +466,28 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_ba
     qdev_prop_set_uint32(dev, "timebase-freq", timebase_freq);
     NucLeiSYSTIMERState *s = NUCLEI_SYSTIMER(dev);
 
-    if(eclic != NULL)
-    {
-        //env->features |= (1ULL << RISCV_FEATURE_ECLIC);
-        riscv_cpu_set_rdtime_fn(env, nuclei_cpu_riscv_read_rtc, &(s->timebase_freq));
-        env->mtimer = timer_new_ns(QEMU_CLOCK_VIRTUAL,
-                                    &nuclei_mtimecmp_cb, cpu);
-        env->mtimecmp = 0;
+    for (i = 0; i < num_harts; i++) {
+        CPUState *cpu = qemu_get_cpu(hartid_base + i);
+        CPURISCVState *env = cpu ? cpu->env_ptr : NULL;
 
-        s->eclic = eclic;
-        for (i = 0; i < num_harts; i++) {
+        if (!env) {
+            continue;
+        }
+
+        env->mtimecmp = 0;
+        if(eclic != NULL)
+        {
+            s->eclic = eclic;
             s->soft_irq =&(NUCLEI_ECLIC(eclic)->irqs[Internal_SysTimerSW_IRQn][i]);
             s->timer_irq = &(NUCLEI_ECLIC(eclic)->irqs[Internal_SysTimer_IRQn][i]);
+            env->mtimer = timer_new_ns(QEMU_CLOCK_VIRTUAL,
+                                        &nuclei_mtimecmp_cb, cpu);
         }
-    }
-    else
-    {
-        for (i = 0; i < num_harts; i++) {
-            CPUState *cpu = qemu_get_cpu(hartid_base + i);
-            CPURISCVState *env = cpu ? cpu->env_ptr : NULL;
-            if (!env) {
-                continue;
-            }
+        else
+        {
             riscv_cpu_set_rdtime_fn(env, nuclei_cpu_riscv_read_rtc, &(s->timebase_freq));
-            env->timer = timer_new_ns(QEMU_CLOCK_VIRTUAL,
-                                    &sifive_clint_timer_cb, cpu);
-            env->timecmp = 0;
+            env->mtimer = timer_new_ns(QEMU_CLOCK_VIRTUAL,
+                                        &sifive_clint_timer_cb, cpu);
         }
     }
     sysbus_realize_and_unref(SYS_BUS_DEVICE(dev), &error_fatal);

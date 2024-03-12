@@ -475,7 +475,6 @@ struct CPUArchState {
     bool vstime_irq;
 
     QEMUTimer *mtimer; /* Nuclei Internal timer */
-    QEMUTimer *timer; /* Nuclei Internal timer */
     void *eclic;
     void *clic;       /* clic interrupt controller */
     bool irq_pending;

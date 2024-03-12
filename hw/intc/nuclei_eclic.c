@@ -42,7 +42,6 @@ static void nuclei_eclic_update_intattr(NucLeiECLICState *eclic, int irq, int ha
 static void nuclei_eclic_update_intctl(NucLeiECLICState *eclic, int irq, int hartid, int new_intctl);
 static void eclic_insert_pending_list(NucLeiECLICState *eclic, int irq, int hartid);
 static void eclic_remove_pending_list(NucLeiECLICState *eclic, int irq, int hartid);
-static void nuclei_eclic_next_interrupt(void *eclic, int hartid);
 static void update_eclic_int_info(NucLeiECLICState *eclic, int irq, int hartid);
 qemu_irq nuclei_eclic_get_irq(DeviceState *dev, int irq, int hartid)
 {
@@ -246,7 +245,7 @@ static void update_eclic_int_info(NucLeiECLICState *eclic, int irq, int hartid)
     eclic->clicintlist[irq][hartid].trigger = (eclic->clicintattr[irq][hartid] >> 1) & 0x3;
 }
 
-static void nuclei_eclic_next_interrupt(void *eclic_ptr, int hartid)
+void nuclei_eclic_next_interrupt(void *eclic_ptr, int hartid)
 {
     RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(hartid));
     NucLeiECLICState *eclic = (NucLeiECLICState *)eclic_ptr;
@@ -321,8 +320,11 @@ static int level_compare(NucLeiECLICState *eclic, ECLICPendingInterrupt *irq1, E
 static void nuclei_eclic_irq_request(void *opaque, int id, int new_intip)
 {
     NucLeiECLICState *eclic = NUCLEI_ECLIC(opaque);
-    uint32_t hartid = nuclei_eclic_get_current_cpu(eclic);
-    nuclei_eclic_update_intip(eclic, id, hartid, new_intip);
+
+    for(int i = 0; i < eclic->num_harts; i++)
+    {
+        nuclei_eclic_update_intip(eclic, id, i, new_intip);
+    }
 }
 
 static void nuclei_eclic_update_intmth(NucLeiECLICState *eclic, int irq, int hartid, int mth)
@@ -508,4 +510,15 @@ DeviceState *nuclei_eclic_create(hwaddr addr, uint32_t aperture_size, bool prv_s
     sysbus_realize_and_unref(SYS_BUS_DEVICE(dev), &error_fatal);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, addr);
     return dev;
+}
+
+
+/*
+6'b000011:clic
+else:     clint
+ */
+bool riscv_intc_is_clic_mode(CPURISCVState *env)
+{
+    target_ulong xtvec = (env->priv == PRV_M) ? env->mtvec : env->stvec;
+    return env->eclic && ((xtvec & 0x3F) == 3);
 }
