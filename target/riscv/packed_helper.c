@@ -311,7 +311,7 @@ static inline void do_dsmmul(CPURISCVState *env, void *vd, void *va,
 
 RVPRD(dsmmul, 1, 8);
 
-static inline void do_dsmmulu(CPURISCVState *env, void *vd, void *va,
+static inline void do_dsmmul_u(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
 {
     int32_t *d = vd, *a = va, *b = vb;
@@ -319,7 +319,7 @@ static inline void do_dsmmulu(CPURISCVState *env, void *vd, void *va,
     d[i+1] = ((int64_t)a[i+1] * b[i+1] + (uint32_t)INT32_MIN) >> 32;
 }
 
-RVPRD(dsmmulu, 1, 8);
+RVPRD(dsmmul_u, 1, 8);
 
 static inline void do_dkwmmul(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
@@ -342,7 +342,7 @@ static inline void do_dkwmmul(CPURISCVState *env, void *vd, void *va,
 
 RVPRD(dkwmmul, 1, 8);
 
-static inline void do_dkwmmulu(CPURISCVState *env, void *vd, void *va,
+static inline void do_dkwmmul_u(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
 {
     int32_t *d = vd, *a = va, *b = vb;
@@ -361,7 +361,7 @@ static inline void do_dkwmmulu(CPURISCVState *env, void *vd, void *va,
     }
 }
 
-RVPRD(dkwmmulu, 1, 8);
+RVPRD(dkwmmul_u, 1, 8);
 
 static inline void do_dkadd32(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
@@ -5224,7 +5224,7 @@ static inline void do_dkmmac(CPURISCVState *env, void *vd, void *va,
 
 RVPR_ACC_D(dkmmac, 1, 4);
 
-static inline void do_dkmmacu(CPURISCVState *env, void *vd, void *va,
+static inline void do_dkmmac_u(CPURISCVState *env, void *vd, void *va,
                             void *vb, void *vc, uint8_t i)
 {
     int32_t *d = vd, *a = va, *b = vb, *c = vc;
@@ -5232,7 +5232,7 @@ static inline void do_dkmmacu(CPURISCVState *env, void *vd, void *va,
                            (uint32_t)INT32_MIN) >> 32, c[i]);
 }
 
-RVPR_ACC_D(dkmmacu, 1, 4);
+RVPR_ACC_D(dkmmac_u, 1, 4);
 
 static inline void do_dkmmsb(CPURISCVState *env, void *vd, void *va,
                             void *vb, void *vc, uint8_t i)
@@ -5243,7 +5243,7 @@ static inline void do_dkmmsb(CPURISCVState *env, void *vd, void *va,
 
 RVPR_ACC_D(dkmmsb, 1, 4);
 
-static inline void do_dkmmsbu(CPURISCVState *env, void *vd, void *va,
+static inline void do_dkmmsb_u(CPURISCVState *env, void *vd, void *va,
                             void *vb, void *vc, uint8_t i)
 {
     int32_t *d = vd, *a = va, *b = vb, *c = vc;
@@ -5251,7 +5251,7 @@ static inline void do_dkmmsbu(CPURISCVState *env, void *vd, void *va,
                                  (uint32_t)INT32_MIN) >> 32);
 }
 
-RVPR_ACC_D(dkmmsbu, 1, 4);
+RVPR_ACC_D(dkmmsb_u, 1, 4);
 
 static inline void do_dkmada(CPURISCVState *env, void *vd, void *va,
                             void *vb, void *vc, uint8_t i)
@@ -5391,7 +5391,7 @@ static inline void do_dsmaqa(CPURISCVState *env, void *vd, void *va,
 
 RVPR_ACC_D(dsmaqa, 1, 4);
 
-static inline void do_dsmaqasu(CPURISCVState *env, void *vd, void *va,
+static inline void do_dsmaqa_su(CPURISCVState *env, void *vd, void *va,
                             void *vb, void *vc, uint8_t i)
 {
     int8_t *a = va;
@@ -5404,7 +5404,7 @@ static inline void do_dsmaqasu(CPURISCVState *env, void *vd, void *va,
                a[H1(i * 4 + 3)] * b[H1(i * 4 + 3)];
 }
 
-RVPR_ACC_D(dsmaqasu, 1, 4);
+RVPR_ACC_D(dsmaqa_su, 1, 4);
 
 static inline void do_dumaqa(CPURISCVState *env, void *vd, void *va,
                             void *vb, void *vc, uint8_t i)
@@ -5736,7 +5736,7 @@ static inline void do_ddsmaqa(CPURISCVState *env, void *vd, void *va,
 
 RVPR_ACC_D(ddsmaqa, 1, 8);
 
-static inline void do_ddsmaqasu(CPURISCVState *env, void *vd, void *va,
+static inline void do_ddsmaqa_su(CPURISCVState *env, void *vd, void *va,
                             void *vb, void *vc, uint8_t i)
 {
     int8_t *a = va;
@@ -5754,7 +5754,7 @@ static inline void do_ddsmaqasu(CPURISCVState *env, void *vd, void *va,
                a[H1(i * 4 + 7)] * b[H1(i * 4 + 7)];
 }
 
-RVPR_ACC_D(ddsmaqasu, 1, 8);
+RVPR_ACC_D(ddsmaqa_su, 1, 8);
 
 static inline void do_ddumaqa(CPURISCVState *env, void *vd, void *va,
                             void *vb, void *vc, uint8_t i)
