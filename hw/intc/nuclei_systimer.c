@@ -52,7 +52,8 @@ static uint64_t nuclei_cpu_riscv_read_rtc(void *opaque)
 
 static void nuclei_timer_update_compare(NucLeiSYSTIMERState *s)
 {
-    CPUState *cpu = qemu_get_cpu(nuclei_systimer_get_current_cpu(s));
+    size_t hartid = nuclei_systimer_get_current_cpu(s);
+    CPUState *cpu = qemu_get_cpu(hartid);
     CPURISCVState *env = cpu ? cpu->env_ptr : NULL;
     uint64_t cmp, real_time;
     int64_t diff;
@@ -67,10 +68,10 @@ static void nuclei_timer_update_compare(NucLeiSYSTIMERState *s)
     diff = cmp - real_time;
 
     if ( real_time >= cmp) {
-        qemu_set_irq(*(s->timer_irq), 1);
+        qemu_set_irq(*(s->timer_irq[hartid]), 1);
     }
     else {
-            qemu_set_irq(*(s->timer_irq), 0);
+            qemu_set_irq(*(s->timer_irq[hartid]), 0);
 
             if (s->mtimecmp_hi != 0xffffffff) {
                 // set up future timer interrupt
@@ -193,9 +194,9 @@ static void nuclei_clint_write(void *opaque, hwaddr addr, uint64_t value,
             {
                 clint->msip = value;
                 if ((clint->msip & 0x1) == 1) {
-                    qemu_set_irq(*(clint->soft_irq), 1);
+                    qemu_set_irq(*(clint->soft_irq[hartid]), 1);
                 }else{
-                    qemu_set_irq(*(clint->soft_irq), 0);
+                    qemu_set_irq(*(clint->soft_irq[hartid]), 0);
                 }
             }
             else
@@ -327,7 +328,8 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
                                  uint64_t value, unsigned size)
 {
     NucLeiSYSTIMERState *s = NUCLEI_SYSTIMER(opaque);
-    CPUState *cpu = qemu_get_cpu(nuclei_systimer_get_current_cpu(s));
+    size_t hartid = nuclei_systimer_get_current_cpu(s);
+    CPUState *cpu = qemu_get_cpu(hartid);
     CPURISCVState *env = cpu ? cpu->env_ptr : NULL;
 
     if(s->prv_s && (s->mtime_srw_ctrl & 0x1))
@@ -374,9 +376,9 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
     case NUCLEI_SYSTIMER_REG_MSIP:
         s->msip = value;
         if ((s->msip & 0x1) == 1) {
-            qemu_set_irq(*(s->soft_irq), 1);
+            qemu_set_irq(*(s->soft_irq[hartid]), 1);
         }else{
-            qemu_set_irq(*(s->soft_irq), 0);
+            qemu_set_irq(*(s->soft_irq[hartid]), 0);
         }
 
         break;
@@ -488,6 +490,9 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, bool prv_s, uint32
     qdev_prop_set_uint32(dev, "timebase-freq", timebase_freq);
     NucLeiSYSTIMERState *s = NUCLEI_SYSTIMER(dev);
 
+    s->timer_irq = g_new0(qemu_irq *, s->num_harts);
+    s->soft_irq  = g_new0(qemu_irq *, s->num_harts);
+
     for (i = 0; i < num_harts; i++) {
         CPUState *cpu = qemu_get_cpu(hartid_base + i);
         CPURISCVState *env = cpu ? cpu->env_ptr : NULL;
@@ -500,8 +505,8 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, bool prv_s, uint32
         if(eclic != NULL)
         {
             s->eclic = eclic;
-            s->soft_irq =&(NUCLEI_ECLIC(eclic)->irqs[Internal_SysTimerSW_IRQn][i]);
-            s->timer_irq = &(NUCLEI_ECLIC(eclic)->irqs[Internal_SysTimer_IRQn][i]);
+            s->soft_irq[i] =&(NUCLEI_ECLIC(eclic)->irqs[Internal_SysTimerSW_IRQn][i]);
+            s->timer_irq[i] = &(NUCLEI_ECLIC(eclic)->irqs[Internal_SysTimer_IRQn][i]);
             env->mtimer = timer_new_ns(QEMU_CLOCK_VIRTUAL,
                                         &nuclei_mtimecmp_cb, cpu);
         }

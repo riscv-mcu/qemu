@@ -51,8 +51,8 @@ typedef struct NucLeiSYSTIMERState
 
     /*< public >*/
     MemoryRegion iomem;
-    qemu_irq *timer_irq;
-    qemu_irq *soft_irq;
+    qemu_irq **timer_irq;
+    qemu_irq **soft_irq;
 
     DeviceState *eclic;
 
