@@ -36,6 +36,7 @@
 #include "hw/char/nuclei_uart.h"
 #include "hw/gpio/sifive_gpio.h"
 #include "hw/intc/nuclei_eclic.h"
+#include "hw/intc/nuclei_cidu.h"
 #include "hw/sysbus.h"
 #include "hw/sd/sd.h"
 #include "hw/ssi/sifive_spi.h"
@@ -63,6 +64,7 @@ typedef struct DemoSoCSoCState {
 
     DeviceState *plic;
     DeviceState *eclic;
+    DeviceState *cidu;
     MemoryRegion ilm;
     MemoryRegion dlm;
     MemoryRegion internal_rom;

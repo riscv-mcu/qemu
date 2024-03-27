@@ -1199,7 +1199,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     s->cidu = nuclei_cidu_create(memmap[EVALSOC_CIDU].base + mst->iregion,
                                  memmap[EVALSOC_CIDU].size,
                                  ms->smp.cpus,
-                                 EVALSOC_ECLIC_NUM_SOURCES,
+                                 EVALSOC_ECLIC_NUM_SOURCES - CIDU_EXT_INT_OFST,
                                  s->eclic);
 
     if (ms->firmware == NULL)
@@ -1209,8 +1209,9 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                         mst->uart0_base,
                         memmap[EVALSOC_UART0].size,
                         serial_hd(0),
-                        nuclei_eclic_get_irq(DEVICE(s->eclic),
-                        mst->uart0_irq, ms->smp.cpus));
+                        mst->uart0_irq,
+                        s->cidu,
+                        s->eclic);
         
         nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion,
                 memmap[EVALSOC_TIMER].size, false, 0, ms->smp.cpus, s->eclic, mst->timer_freq);

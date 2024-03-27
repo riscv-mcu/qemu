@@ -41,6 +41,7 @@ DECLARE_INSTANCE_CHECKER(NucLeiCIDUState, NUCLEI_CIDU,
 #define CIDU_REG_CORE_NUM                0xc084
 #define CIDU_REG_INT_NUM                 0xc090
 
+#define CIDU_EXT_INT_OFST                (19)
 
 typedef struct NucLeiCIDUState
 {

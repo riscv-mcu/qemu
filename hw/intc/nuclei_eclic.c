@@ -316,13 +316,35 @@ static int level_compare(NucLeiECLICState *eclic, ECLICPendingInterrupt *irq1, E
     }
 }
 
+
+extern uint32_t coren_int_16;
+extern uint32_t cidu_int_indicator;
+
 static void nuclei_eclic_irq_request(void *opaque, int id, int new_intip)
 {
     NucLeiECLICState *eclic = NUCLEI_ECLIC(opaque);
 
-    for(int i = 0; i < eclic->num_harts; i++)
+    if (id < Internal_Reserved_Max_IRQn)
     {
-        nuclei_eclic_update_intip(eclic, id, i, new_intip);
+        if (id == Internal_Reserved14_IRQn)
+        {
+            nuclei_eclic_update_intip(eclic, id, coren_int_16, new_intip);
+        }
+        else
+        {
+            for (int i = 0; i < eclic->num_harts; i++)
+            {
+                nuclei_eclic_update_intip(eclic, id, i, new_intip);
+            }
+        }
+    }
+    else
+    {
+        for(int i = 0; i < eclic->num_harts; i++)
+        {
+            if(cidu_int_indicator & (1U << i))
+                nuclei_eclic_update_intip(eclic, id, i, new_intip);
+        }
     }
 }
 
@@ -364,6 +386,8 @@ static void eclic_remove_pending_list(NucLeiECLICState *eclic, int irq, int hart
 
 static void nuclei_eclic_update_intip(NucLeiECLICState *eclic, int irq, int hartid, int new_intip)
 {
+    uint32_t current_hart_id;
+    current_hart_id = nuclei_eclic_get_current_cpu(eclic);
 
     int old_intip = eclic->clicintlist[irq][hartid].sig;
     int trigger = (eclic->clicintattr[irq][hartid] >> 1) & 0x3;
@@ -383,10 +407,10 @@ static void nuclei_eclic_update_intip(NucLeiECLICState *eclic, int irq, int hart
         }
         else
         {
-            if (eclic->clicintip[irq][hartid])
-                eclic_remove_pending_list(eclic, irq, hartid);
-            eclic->clicintip[irq][hartid] = 0;
-            eclic->clicintlist[irq][hartid].sig = new_intip;
+            if (eclic->clicintip[irq][current_hart_id])
+                eclic_remove_pending_list(eclic, irq, current_hart_id);
+            eclic->clicintip[irq][current_hart_id] = 0;
+            eclic->clicintlist[irq][current_hart_id].sig = new_intip;
         }
 
     }
@@ -446,6 +470,9 @@ static void nuclei_eclic_realize(DeviceState *dev, Error **errp)
                                                                      eclic, Internal_SysTimerSW_IRQn);
         eclic->irqs[Internal_SysTimer_IRQn][i] = qemu_allocate_irq(nuclei_eclic_irq_request,
                                                                    eclic, Internal_SysTimer_IRQn);
+
+        eclic->irqs[Internal_Reserved14_IRQn][i] = qemu_allocate_irq(nuclei_eclic_irq_request,
+                                                                     eclic, Internal_Reserved14_IRQn);
 
         for (id = Internal_Reserved_Max_IRQn; id < eclic->num_sources; id++)
         {
@@ -516,7 +543,7 @@ DeviceState *nuclei_eclic_create(hwaddr addr, uint32_t aperture_size, bool prv_s
 6'b000011:clic
 else:     clint
  */
-bool riscv_intc_is_clic_mode(CPURISCVState *env)
+bool riscv_intc_is_clic_mode(CPUArchState *env)
 {
     target_ulong xtvec = (env->priv == PRV_M) ? env->mtvec : env->stvec;
     return env->eclic && ((xtvec & 0x3F) == 3);
