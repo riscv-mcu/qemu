@@ -106,6 +106,7 @@ config NUCLEI_EVALSOC
     select SIFIVE_PDMA
     select SIFIVE_PLIC
     select NUCLEI_ECLIC
+    select NUCLEI_CIDU
     select NUCLEI_UART
     select NUCLEI_IREGION
     select NUCLEI_SMPCC

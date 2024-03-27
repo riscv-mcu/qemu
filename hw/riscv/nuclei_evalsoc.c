@@ -81,6 +81,7 @@ static const struct MemmapEntry
     [EVALSOC_TIMER] = { IREGION_TIMER_OFS,              IREGION_TIMER_SIZE },
     [EVALSOC_PLIC]  = { IREGION_PLIC_OFS,               IREGION_PLIC_SIZE  },
     [EVALSOC_ECLIC] = { IREGION_ECLIC_OFS,              IREGION_ECLIC_SIZE },
+    [EVALSOC_CIDU]  = { IREGION_IDU_OFS,                IREGION_IDU_SIZE   },
     [EVALSOC_SMP]   = { IREGION_SMP_OFS,                IREGION_SMP_SIZE   },
     [EVALSOC_DDR]   = { EVALSOC_DDR_BASE,               EVALSOC_DDR_SIZE   },
     [EVALSOC_CLINT] = { IREGION_TIMER_OFS + 0x1000,     0xF000 },//MTIME in CLINT mode
@@ -1194,6 +1195,12 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     s->smpcc = nuclei_smpcc_create(memmap[EVALSOC_SMP].base + mst->iregion,
                                memmap[EVALSOC_SMP].size,
                                &smpcc_cfg);
+
+    s->cidu = nuclei_cidu_create(memmap[EVALSOC_CIDU].base + mst->iregion,
+                                 memmap[EVALSOC_CIDU].size,
+                                 ms->smp.cpus,
+                                 EVALSOC_ECLIC_NUM_SOURCES,
+                                 s->eclic);
 
     if (ms->firmware == NULL)
     {

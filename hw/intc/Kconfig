@@ -114,3 +114,6 @@ config NUCLEI_ECLIC
 
 config NUCLEI_SYSTIMER
     bool
+
+config NUCLEI_CIDU
+    bool

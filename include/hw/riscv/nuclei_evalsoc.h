@@ -35,6 +35,7 @@
 #include "hw/char/nuclei_uart.h"
 #include "hw/gpio/sifive_gpio.h"
 #include "hw/intc/nuclei_eclic.h"
+#include "hw/intc/nuclei_cidu.h"
 #include "hw/smpcc/nuclei_smpcc.h"
 #include "hw/sysbus.h"
 #include "hw/sd/sd.h"
@@ -67,6 +68,7 @@ typedef struct EvalSoCSoCState {
 
     DeviceState *plic;
     DeviceState *eclic;
+    DeviceState *cidu;
     DeviceState *smpcc;
     MemoryRegion ilm;
     MemoryRegion dlm;
@@ -132,6 +134,7 @@ enum {
     EVALSOC_CLINT,
     EVALSOC_PLIC,
     EVALSOC_ECLIC,
+    EVALSOC_CIDU,
     EVALSOC_GPIO,
     EVALSOC_UART0,
     EVALSOC_QSPI0,
@@ -312,6 +315,7 @@ enum
 #define IREGION_SMP_OFS             (0x40000)
 #define IREGION_SMP_SIZE            (0x1000)
 #define IREGION_IDU_OFS             (0x50000)
+#define IREGION_IDU_SIZE            (0x10000)
 #define IREGION_PL2_OFS             (0x60000)
 #define IREGION_DPREFETCH_OFS       (0x70000)
 #define IREGION_PLIC_OFS            (0x4000000)
