@@ -69,6 +69,9 @@ static uint64_t nuclei_cidu_read(void *opaque, hwaddr addr, unsigned size)
     return 0;
 }
 
+uint32_t coren_int_16 = 0;
+uint32_t cidu_int_indicator = 0;
+
 static void nuclei_cidu_write(void *opaque, hwaddr addr, uint64_t value,
                                unsigned size)
 {
@@ -80,6 +83,8 @@ static void nuclei_cidu_write(void *opaque, hwaddr addr, uint64_t value,
     {
         uint32_t core_id = (addr - CIDU_REG_COREN_INT_STATUS_BASE) >> 2;
         cidu->coren_int_status[core_id] &= ~((uint32_t)value);
+
+        qemu_set_irq(cidu->soft_irq[core_id], 0);
     }
     else if (addr_in_range(addr, CIDU_REG_SEMAPHORE_BASE, CIDU_MAX_SEMAPHORE_NUM << 2))
     {
@@ -91,12 +96,17 @@ static void nuclei_cidu_write(void *opaque, hwaddr addr, uint64_t value,
         cidu->ici_shadow_reg = value;
         send_core = (value >> 16) & 0xffff;
         recv_core = value & 0xffff;
+        coren_int_16 = recv_core;
+
+        qemu_set_irq(cidu->soft_irq[recv_core], 1);
+
         cidu->coren_int_status[recv_core] = 1 << send_core;
     }
     else if (addr_in_range(addr, CIDU_REG_INTN_INDICATOR_BASE, CIDU_MAX_EXTERNAL_INT_NUM << 2))
     {
         uint32_t irq = (addr - CIDU_REG_INTN_INDICATOR_BASE) >> 2;
         cidu->intn_indicator[irq] = value;
+        cidu_int_indicator = value;
     }
     else if (addr_in_range(addr, CIDU_REG_INTN_MASK_BASE, CIDU_MAX_EXTERNAL_INT_NUM << 2))
     {
@@ -190,6 +200,18 @@ DeviceState *nuclei_cidu_create(hwaddr addr, uint32_t aperture_size,
     qdev_prop_set_uint32(dev, "num-sources", num_sources);
     qdev_prop_set_uint64(dev, "mcidubase", addr);
     qdev_prop_set_uint32(dev, "aperture-size", aperture_size);
+    NucLeiCIDUState *s = NUCLEI_CIDU(dev);
+
+    if(eclic != NULL)
+    {
+        for (int i = 0; i < num_harts; i++) {
+            s->soft_irq[i] = NUCLEI_ECLIC(eclic)->irqs[Internal_Reserved14_IRQn][i];
+
+            for(int j = 0; j < num_sources; j++) {
+                s->external_irq[j] = NUCLEI_ECLIC(eclic)->irqs[j + CIDU_EXT_INT_OFST][i];
+            }
+        }
+    }
 
     sysbus_realize_and_unref(SYS_BUS_DEVICE(dev), &error_fatal);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, addr);

@@ -125,7 +125,7 @@ DeviceState *nuclei_eclic_create(hwaddr addr, uint32_t aperture_size, bool prv_s
 qemu_irq nuclei_eclic_get_irq(DeviceState *dev, int irq, int hartid);
 void nuclei_eclic_systimer_cb(DeviceState *dev);
 void riscv_cpu_eclic_int_handler_start(void *eclic_ptr, int irq, int hartid);
-bool riscv_intc_is_clic_mode(CPURISCVState *env);
+bool riscv_intc_is_clic_mode(CPUArchState *env);
 void nuclei_eclic_next_interrupt(void *eclic, int hartid);
 
 #endif
