@@ -1219,12 +1219,6 @@ static RISCVException read_mimpid(CPURISCVState *env, int csrno,
     return RISCV_EXCP_NONE;
 }
 
-static RISCVException write_any(CPURISCVState *env, int csrno,
-                                target_ulong val)
-{
-    return RISCV_EXCP_NONE;
-}
-
 static RISCVException read_mhartid(CPURISCVState *env, int csrno,
                                    target_ulong *val)
 {
@@ -4106,17 +4100,42 @@ static int read_mcfg_info(CPURISCVState *env, int csrno, target_ulong *val)
     return RISCV_EXCP_NONE;
 }
 
+static int read_micfg_info(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->micfg_info;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mdcfg_info(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mdcfg_info;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mtlbcfg_info(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mtlbcfg_info;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mppicfg_info(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mppicfg_info;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mfiocfg_info(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mfiocfg_info;
+    return RISCV_EXCP_NONE;
+}
+
 static int read_mintstatus(CPURISCVState *env, int csrno, target_ulong *val)
 {
     *val = env->mintstatus;
     return RISCV_EXCP_NONE;
 }
 
-static int write_mintstatus(CPURISCVState *env, int csrno, target_ulong val)
-{
-    env->mintstatus = val;
-    return RISCV_EXCP_NONE;
-}
 
 static int write_mintthresh(CPURISCVState *env, int csrno, target_ulong val)
 {
@@ -4182,12 +4201,6 @@ static int rmw_mscratchcswl(CPURISCVState *env, int csrno, target_ulong *ret_val
 static int read_mnvec(CPURISCVState *env, int csrno, target_ulong *val)
 {
     *val = env->mnvec;
-    return RISCV_EXCP_NONE;
-}
-
-static int write_mnvec(CPURISCVState *env, int csrno, target_ulong val)
-{
-    env->mnvec = val;
     return RISCV_EXCP_NONE;
 }
 
@@ -4726,19 +4739,19 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_VTYPE]    = { "vtype",    vs,     read_vtype                 },
     [CSR_VLENB]    = { "vlenb",    vs,     read_vlenb                 },
     /* nuclei custom tee csr */
-    [CSR_NUCLEI_SPMPCFG0]    = { "spmpcfg0",    any,   read_zero, write_any},
-    [CSR_NUCLEI_SPMPCFG1]    = { "spmpcfg1",    any,   read_zero, write_any},
-    [CSR_NUCLEI_SPMPCFG2]    = { "spmpcfg2",    any,   read_zero, write_any},
-    [CSR_NUCLEI_SPMPCFG3]    = { "spmpcfg3",    any,   read_zero, write_any},
+    [CSR_NUCLEI_SPMPCFG0]    = { "spmpcfg0",    any,   read_zero, write_ignore},
+    [CSR_NUCLEI_SPMPCFG1]    = { "spmpcfg1",    any,   read_zero, write_ignore},
+    [CSR_NUCLEI_SPMPCFG2]    = { "spmpcfg2",    any,   read_zero, write_ignore},
+    [CSR_NUCLEI_SPMPCFG3]    = { "spmpcfg3",    any,   read_zero, write_ignore},
 
-    [CSR_NUCLEI_SPMPADDR0]    = { "spmpaddr0",    any,   read_zero, write_any},
-    [CSR_NUCLEI_SPMPADDR1]    = { "spmpaddr1",    any,   read_zero, write_any},
-    [CSR_NUCLEI_SPMPADDR2]    = { "spmpaddr2",    any,   read_zero, write_any},
+    [CSR_NUCLEI_SPMPADDR0]    = { "spmpaddr0",    any,   read_zero, write_ignore},
+    [CSR_NUCLEI_SPMPADDR1]    = { "spmpaddr1",    any,   read_zero, write_ignore},
+    [CSR_NUCLEI_SPMPADDR2]    = { "spmpaddr2",    any,   read_zero, write_ignore},
 
-    [CSR_NUCLEI_JALSNXTI]      = { "jalsnxti",      any,   read_zero, write_any},
-    [CSR_NUCLEI_STVT2]         = { "stvt2",         any,   read_zero, write_any},
-    [CSR_NUCLEI_PUSHSCAUSE]    = { "pushscause",    any,   read_zero, write_any},
-    [CSR_NUCLEI_PUSHSEPC]      = { "pushsepc",      any,   read_zero, write_any},
+    [CSR_NUCLEI_JALSNXTI]      = { "jalsnxti",      any,   read_zero, write_ignore},
+    [CSR_NUCLEI_STVT2]         = { "stvt2",         any,   read_zero, write_ignore},
+    [CSR_NUCLEI_PUSHSCAUSE]    = { "pushscause",    any,   read_zero, write_ignore},
+    [CSR_NUCLEI_PUSHSEPC]      = { "pushsepc",      any,   read_zero, write_ignore},
     /* User Timers and Counters */
     [CSR_CYCLE]    = { "cycle",    ctr,    read_hpmcounter  },
     [CSR_INSTRET]  = { "instret",  ctr,    read_hpmcounter  },
@@ -4746,71 +4759,71 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_INSTRETH] = { "instreth", ctr32,  read_hpmcounterh },
 
     /* P-Extension Registers */
-    [CSR_NUCLEI_UCODE]    = { "ucode",    any,    read_zero, write_any},
+    [CSR_NUCLEI_UCODE]    = { "ucode",    any,    read_zero, write_ignore},
     /* === Nuclei custom CSR Registers === */
-    [CSR_NUCLEI_MILM_CTL]    = { "milm_ctl",     any,    read_zero, write_any},
-    [CSR_NUCLEI_MDLM_CTL]    = { "mdlm_ctl",     any,    read_zero, write_any},
-    [CSR_NUCLEI_MECC_CODE]   = { "mecc_code",    any,    read_zero, write_any},
-    [CSR_NUCLEI_MTLB_CTL]    = { "mtlb_ctl",     any,    read_zero, write_any},
-    [CSR_NUCLEI_MECC_LOCK]   = { "mecc_lock",    any,    read_zero, write_any},
-    [CSR_NUCLEI_MFP16MODE]   = { "mfp16mode",    any,    read_zero, write_any},
-    [CSR_NUCLEI_LSTEPFORC]   = { "lstepforc",    any,    read_zero, write_any},
-    [CSR_NUCLEI_MPPICFG_INFO]   = { "mppicfg_info",    any,    read_zero, write_any},
-    [CSR_NUCLEI_MFIOCFG_INFO]   = { "mfiocfg_info",    any,    read_zero, write_any},
-    [CSR_NUCLEI_MIRGB_INFO]   = { "mirgb_info",    any,    read_mirgb_info, write_any},
-    [CSR_NUCLEI_MICFG_INFO]     = { "micfg_info",      any,    read_zero, write_any},
-    [CSR_NUCLEI_MDCFG_INFO]     = { "mdcfg_info",      any,    read_zero, write_any},
-    [CSR_NUCLEI_MCFG_INFO]      = { "mcfg_info",       any,    read_mcfg_info, write_any},
-    [CSR_NUCLEI_MTLBCFG_INFO]      = { "mtlbcfg_info", any,    read_zero, write_any},
+    [CSR_NUCLEI_MILM_CTL]    = { "milm_ctl",     any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MDLM_CTL]    = { "mdlm_ctl",     any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MECC_CODE]   = { "mecc_code",    any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MTLB_CTL]    = { "mtlb_ctl",     any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MECC_LOCK]   = { "mecc_lock",    any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MFP16MODE]   = { "mfp16mode",    any,    read_zero, write_ignore},
+    [CSR_NUCLEI_LSTEPFORC]   = { "lstepforc",    any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MPPICFG_INFO]   = { "mppicfg_info",    any,    read_mppicfg_info, write_ignore},
+    [CSR_NUCLEI_MFIOCFG_INFO]   = { "mfiocfg_info",    any,    read_mfiocfg_info, write_ignore},
+    [CSR_NUCLEI_MIRGB_INFO]   = { "mirgb_info",    any,    read_mirgb_info, write_ignore},
+    [CSR_NUCLEI_MICFG_INFO]     = { "micfg_info",      any,    read_micfg_info, write_ignore},
+    [CSR_NUCLEI_MDCFG_INFO]     = { "mdcfg_info",      any,    read_mdcfg_info, write_ignore},
+    [CSR_NUCLEI_MCFG_INFO]      = { "mcfg_info",       any,    read_mcfg_info, write_ignore},
+    [CSR_NUCLEI_MTLBCFG_INFO]      = { "mtlbcfg_info", any,    read_mtlbcfg_info, write_ignore},
 
-    [CSR_NUCLEI_SATTRI0_BASE]      = { "sattri0_base", any,    read_zero, write_any},
-    [CSR_NUCLEI_SATTRI0_MASK]      = { "sattri0_mask", any,    read_zero, write_any},
-    [CSR_NUCLEI_SATTRI1_BASE]      = { "sattri1_base", any,    read_zero, write_any},
-    [CSR_NUCLEI_SATTRI1_MASK]      = { "sattri1_mask", any,    read_zero, write_any},
-    [CSR_NUCLEI_SATTRI2_BASE]      = { "sattri2_base", any,    read_zero, write_any},
-    [CSR_NUCLEI_SATTRI2_MASK]      = { "sattri2_mask", any,    read_zero, write_any},
-    [CSR_NUCLEI_SATTRI3_BASE]      = { "sattri3_base", any,    read_zero, write_any},
-    [CSR_NUCLEI_SATTRI3_MASK]      = { "sattri3_mask", any,    read_zero, write_any},
-    [CSR_NUCLEI_SATTRI4_BASE]      = { "sattri4_base", any,    read_zero, write_any},
-    [CSR_NUCLEI_SATTRI4_MASK]      = { "sattri4_mask", any,    read_zero, write_any},
-    [CSR_NUCLEI_SATTRI5_BASE]      = { "sattri5_base", any,    read_zero, write_any},
-    [CSR_NUCLEI_SATTRI5_MASK]      = { "sattri5_mask", any,    read_zero, write_any},
-    [CSR_NUCLEI_SATTRI6_BASE]      = { "sattri6_base", any,    read_zero, write_any},
-    [CSR_NUCLEI_SATTRI6_MASK]      = { "sattri6_mask", any,    read_zero, write_any},
-    [CSR_NUCLEI_SATTRI7_BASE]      = { "sattri7_base", any,    read_zero, write_any},
-    [CSR_NUCLEI_SATTRI7_MASK]      = { "sattri7_mask", any,    read_zero, write_any},
+    [CSR_NUCLEI_SATTRI0_BASE]      = { "sattri0_base", any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SATTRI0_MASK]      = { "sattri0_mask", any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SATTRI1_BASE]      = { "sattri1_base", any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SATTRI1_MASK]      = { "sattri1_mask", any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SATTRI2_BASE]      = { "sattri2_base", any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SATTRI2_MASK]      = { "sattri2_mask", any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SATTRI3_BASE]      = { "sattri3_base", any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SATTRI3_MASK]      = { "sattri3_mask", any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SATTRI4_BASE]      = { "sattri4_base", any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SATTRI4_MASK]      = { "sattri4_mask", any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SATTRI5_BASE]      = { "sattri5_base", any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SATTRI5_MASK]      = { "sattri5_mask", any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SATTRI6_BASE]      = { "sattri6_base", any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SATTRI6_MASK]      = { "sattri6_mask", any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SATTRI7_BASE]      = { "sattri7_base", any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SATTRI7_MASK]      = { "sattri7_mask", any,    read_zero, write_ignore},
 
     /* === Nuclei CCM Registers === */
-    [CSR_NUCLEI_CCM_MBEGINADDR]      = { "ccm_mbeginaddr", any,    read_zero, write_any},
-    [CSR_NUCLEI_CCM_MCOMMAND]        = { "ccm_mcommand",   any,    read_zero, write_any},
-    [CSR_NUCLEI_CCM_MDATA]           = { "ccm_mdata",      any,    read_zero, write_any},
-    [CSR_NUCLEI_CCM_SUEN]            = { "ccm_suen",       any,    read_zero, write_any},
-    [CSR_NUCLEI_CCM_SBEGINADDR]      = { "ccm_sbeginaddr", any,    read_zero, write_any},
-    [CSR_NUCLEI_CCM_SCOMMAND]        = { "ccm_scommand",   any,    read_zero, write_any},
-    [CSR_NUCLEI_CCM_SDATA]           = { "ccm_sdata",      any,    read_zero, write_any},
-    [CSR_NUCLEI_CCM_UBEGINADDR]      = { "ccm_ubeginaddr", any,    read_zero, write_any},
-    [CSR_NUCLEI_CCM_UCOMMAND]        = { "ccm_ucommand",   any,    read_zero, write_any},
-    [CSR_NUCLEI_CCM_UDATA]           = { "ccm_udata",      any,    read_zero, write_any},
-    [CSR_NUCLEI_CCM_FPIPE]           = { "ccm_fpipe",      any,    read_zero, write_any},
-    [CSR_NUCLEI_SMPUSWITCH0]         = { "smpuswitch0",      any,    read_zero, write_any},
-    [CSR_NUCLEI_SMPUSWITCH1]         = { "smpuswitch1",      any,    read_zero, write_any},
-    [CSR_NUCLEI_SDCAUSE]             = { "sdcause",          any,    read_zero, write_any},
-    [CSR_NUCLEI_MLWID]               = { "mlwid",      any,    read_zero, write_any},
-    [CSR_NUCLEI_MWIDDELEG]           = { "mwiddeleg",      any,    read_zero, write_any},
-    [CSR_NUCLEI_SLWID]               = { "slwid",          any,    read_zero, write_any},
-    [CSR_NUCLEI_MECC_CTRL]           = { "mecc_ctrl",          any,    read_zero, write_any},
-    [CSR_NUCLEI_MECC_STATUS]         = { "mecc_status",          any,    read_zero, write_any},
+    [CSR_NUCLEI_CCM_MBEGINADDR]      = { "ccm_mbeginaddr", any,    read_zero, write_ignore},
+    [CSR_NUCLEI_CCM_MCOMMAND]        = { "ccm_mcommand",   any,    read_zero, write_ignore},
+    [CSR_NUCLEI_CCM_MDATA]           = { "ccm_mdata",      any,    read_zero, write_ignore},
+    [CSR_NUCLEI_CCM_SUEN]            = { "ccm_suen",       any,    read_zero, write_ignore},
+    [CSR_NUCLEI_CCM_SBEGINADDR]      = { "ccm_sbeginaddr", any,    read_zero, write_ignore},
+    [CSR_NUCLEI_CCM_SCOMMAND]        = { "ccm_scommand",   any,    read_zero, write_ignore},
+    [CSR_NUCLEI_CCM_SDATA]           = { "ccm_sdata",      any,    read_zero, write_ignore},
+    [CSR_NUCLEI_CCM_UBEGINADDR]      = { "ccm_ubeginaddr", any,    read_zero, write_ignore},
+    [CSR_NUCLEI_CCM_UCOMMAND]        = { "ccm_ucommand",   any,    read_zero, write_ignore},
+    [CSR_NUCLEI_CCM_UDATA]           = { "ccm_udata",      any,    read_zero, write_ignore},
+    [CSR_NUCLEI_CCM_FPIPE]           = { "ccm_fpipe",      any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SMPUSWITCH0]         = { "smpuswitch0",      any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SMPUSWITCH1]         = { "smpuswitch1",      any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SDCAUSE]             = { "sdcause",          any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MLWID]               = { "mlwid",      any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MWIDDELEG]           = { "mwiddeleg",      any,    read_zero, write_ignore},
+    [CSR_NUCLEI_SLWID]               = { "slwid",          any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MECC_CTRL]           = { "mecc_ctrl",          any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MECC_STATUS]         = { "mecc_status",          any,    read_zero, write_ignore},
     //NCDEV
-    [CSR_NUCLEI_MATTRI0_BASE]         = { "mattri0_base",          any,    read_zero, write_any},
-    [CSR_NUCLEI_MATTRI0_MASK]         = { "mattri0_mask",          any,    read_zero, write_any},
-    [CSR_NUCLEI_MATTRI1_BASE]         = { "mattri1_base",          any,    read_zero, write_any},
-    [CSR_NUCLEI_MATTRI1_MASK]         = { "mattri1_mask",          any,    read_zero, write_any},
-    [CSR_NUCLEI_MATTRI2_BASE]         = { "mattri2_base",          any,    read_zero, write_any},
-    [CSR_NUCLEI_MATTRI2_MASK]         = { "mattri2_mask",          any,    read_zero, write_any},
-    [CSR_NUCLEI_MATTRI3_BASE]         = { "mattri3_base",          any,    read_zero, write_any},
-    [CSR_NUCLEI_MATTRI3_MASK]         = { "mattri3_mask",          any,    read_zero, write_any},
-    [CSR_NUCLEI_MATTRI4_BASE]         = { "mattri4_base",          any,    read_zero, write_any},
-    [CSR_NUCLEI_MATTRI4_MASK]         = { "mattri4_mask",          any,    read_zero, write_any},
+    [CSR_NUCLEI_MATTRI0_BASE]         = { "mattri0_base",          any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MATTRI0_MASK]         = { "mattri0_mask",          any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MATTRI1_BASE]         = { "mattri1_base",          any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MATTRI1_MASK]         = { "mattri1_mask",          any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MATTRI2_BASE]         = { "mattri2_base",          any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MATTRI2_MASK]         = { "mattri2_mask",          any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MATTRI3_BASE]         = { "mattri3_base",          any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MATTRI3_MASK]         = { "mattri3_mask",          any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MATTRI4_BASE]         = { "mattri4_base",          any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MATTRI4_MASK]         = { "mattri4_mask",          any,    read_zero, write_ignore},
     /*
      * In privileged mode, the monitor will have to emulate TIME CSRs only if
      * rdtime callback is not provided by machine/platform emulation.
@@ -4861,10 +4874,10 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     /* Nuclei Customized CSR Registers */
     [CSR_NUCLEI_MTVT] =                { "mtvt", any,  read_mtvt,        write_mtvt        },
     [CSR_NUCLEI_MNXTI] =               { "mnxti", any,  read_mnxti,       write_mnxti, rmw_mnxti},
-    [CSR_NUCLEI_MINTSTATUS] =          { "mintstatus", any,  read_mintstatus,  write_mintstatus  },
+    [CSR_NUCLEI_MINTSTATUS] =          { "mintstatus", any,  read_mintstatus,  write_ignore  },
     [CSR_NUCLEI_MSCRATCHCSW] =         { "mscratchcsw", any,  read_mscratchcsw, write_mscratchcsw, rmw_mscratchcsw},
     [CSR_NUCLEI_MSCRATCHCSWL] =        { "mscratchcswl", any,  read_mscratchcswl, write_mscratchcswl,  rmw_mscratchcswl},
-    [CSR_NUCLEI_MNVEC] =               { "mnvec", any,  read_mnvec,       write_mnvec       },
+    [CSR_NUCLEI_MNVEC] =               { "mnvec", any,  read_mnvec,       write_ignore       },
     [CSR_NUCLEI_MSUBM] =               { "msubm", any,  read_msubm,       write_msubm       },
     [CSR_NUCLEI_MSTACK_CTRL] =         { "mstack_ctrl", any,  read_mstack_ctrl, write_mstack_ctrl },
     [CSR_NUCLEI_MSTACK_BOUND] =        { "mstack_bound", any,  read_mstack_bound, write_mstack_bound },

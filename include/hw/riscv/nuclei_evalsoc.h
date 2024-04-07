@@ -316,6 +316,23 @@ enum
 #define IREGION_DPREFETCH_OFS       (0x70000)
 #define IREGION_PLIC_OFS            (0x4000000)
 #define IREGION_PLIC_SIZE           (0x4000000)
+#define EVALSOC_PPI_ADDR            (0xB0000000)
+#define EVALSOC_FIO_ADDR            (0xC0000000)
+
+#define EVALSOC_MSTACK_BOUND        0xffffffff
+#define EVALSOC_MSTACK_BASE         0xffffffff
+#define EVALSOC_MCACHE_CTL          0x20004
+#define EVALSOC_MCFG_INFO           0x810fcc
+#define EVALSOC_MICFG_INFO          0xd0137
+#define EVALSOC_MDCFG_INFO          0xd0137
+#define EVALSOC_MTLBCFG_INFO        0x2d02b4
+#define EVALSOC_MPPICFG_INFO        (EVALSOC_PPI_ADDR | 0x1e)
+#define EVALSOC_MFIOCFG_INFO        (EVALSOC_FIO_ADDR | 0x1e)
+#define EVALSOC_MECC_CTRL           0x3ff
+#define EVALSOC_MECC_STATUS         0
+#define EVALSOC_MTLB_CTL            0
+#define EVALSOC_MFP16MODE           0
+
 
 #if defined(TARGET_RISCV32)
 #define EVALSOC_CPU TYPE_RISCV_CPU_NUCLEI_N300FD

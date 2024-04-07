@@ -846,18 +846,27 @@ static void evalsoc_machine_init(MachineState *machine)
     memory_region_add_subregion(system_memory, 
         s->norflash_base, &s->soc.xip_mem);
 
+    // Evalsoc custom csr info init
     for (i = 0; i < machine->smp.cpus; i ++) {
-        s->soc.cpus.harts[i].env.msmpcfg_info = ((memmap[EVALSOC_SMP].base + s->iregion) & ~(1<<10)) | 0xF;
-    }
+        s->soc.cpus.harts[i].env.milm_ctl |= EVALSOC_ILM_ADDR & 0x1;
+        s->soc.cpus.harts[i].env.mdlm_ctl |= EVALSOC_DLM_ADDR & 0x1;
+        s->soc.cpus.harts[i].env.mstack_bound = EVALSOC_MSTACK_BOUND;
+        s->soc.cpus.harts[i].env.mstack_base = EVALSOC_MSTACK_BASE;
+        s->soc.cpus.harts[i].env.mcache_ctl = EVALSOC_MCACHE_CTL;
+        s->soc.cpus.harts[i].env.mcfg_info = EVALSOC_MCFG_INFO;
+        s->soc.cpus.harts[i].env.micfg_info = EVALSOC_MICFG_INFO;
+        s->soc.cpus.harts[i].env.mdcfg_info = EVALSOC_MDCFG_INFO;
+        s->soc.cpus.harts[i].env.mtlbcfg_info = EVALSOC_MTLBCFG_INFO;
+        s->soc.cpus.harts[i].env.mppicfg_info = EVALSOC_MPPICFG_INFO;
+        s->soc.cpus.harts[i].env.mfiocfg_info = EVALSOC_MFIOCFG_INFO;
+        s->soc.cpus.harts[i].env.mecc_ctrl = EVALSOC_MECC_CTRL;
+        s->soc.cpus.harts[i].env.mecc_status = EVALSOC_MECC_STATUS;
+        s->soc.cpus.harts[i].env.mtlb_ctl = EVALSOC_MTLB_CTL;
+        s->soc.cpus.harts[i].env.mfp16mode = EVALSOC_MFP16MODE;
 
-    //iregion
-    for (i = 0; i < machine->smp.cpus; i ++) {
-        if(machine->smp.cpus > 1)
-        {
-            s->soc.cpus.harts[i].env.mcfg_info |= 1 << 11;
-        }
+        s->soc.cpus.harts[i].env.msmpcfg_info = ((memmap[EVALSOC_SMP].base + s->iregion) & ~(1<<10)) | 0xF;
+
         // note: The iregion function is optional and cannot be forced to be set.
-        s->soc.cpus.harts[i].env.mcfg_info |= 1 << 16;
         s->soc.cpus.harts[i].env.mirgb_info = (s->iregion & ~(1<<10)) | 0xF;;
     }
     /* load/create device tree */

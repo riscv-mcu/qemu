@@ -319,12 +319,24 @@ struct CPUArchState {
     target_ulong pushmcause;
     target_ulong pushmepc;
 
+    target_ulong milm_ctl;
+    target_ulong mdlm_ctl;
     target_ulong wfe;
     target_ulong sleepvalue;
     target_ulong txevt;
     target_ulong msmpcfg_info;
     target_ulong mirgb_info;
     target_ulong mcfg_info;
+    target_ulong micfg_info;
+    target_ulong mdcfg_info;
+    target_ulong mtlbcfg_info;
+    target_ulong mppicfg_info;
+    target_ulong mfiocfg_info;
+    target_ulong mecc_ctrl;
+    target_ulong mecc_status;
+    target_ulong mtlb_ctl;
+    target_ulong mfp16mode;
+    target_ulong shartid;
 
     /* Hypervisor CSRs */
     target_ulong hstatus;
