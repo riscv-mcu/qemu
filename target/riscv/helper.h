@@ -1677,3 +1677,7 @@ DEF_HELPER_4(dkmatt32, i64, env, i64, i64, i64)
 DEF_HELPER_1(lbuf, void, tl)
 DEF_HELPER_1(sbuf, void, tl)
 DEF_HELPER_1(rowsum, tl, tl)
+
+/* Nuclei vnice instructions */
+DEF_HELPER_5(vnl32, void, ptr, ptr, tl, env, i32)
+DEF_HELPER_5(vns32, void, ptr, ptr, tl, env, i32)

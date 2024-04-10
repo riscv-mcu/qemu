@@ -5270,3 +5270,19 @@ GEN_VEXT_INT_EXT(vsext_vf2_d, int64_t, int32_t, H8, H4)
 GEN_VEXT_INT_EXT(vsext_vf4_w, int32_t, int8_t,  H4, H1)
 GEN_VEXT_INT_EXT(vsext_vf4_d, int64_t, int16_t, H8, H2)
 GEN_VEXT_INT_EXT(vsext_vf8_d, int64_t, int8_t,  H8, H1)
+
+/* Nuclei custom vnice load */
+void HELPER(vnl32)(void *vd, void *v0, target_ulong base,
+                  CPURISCVState *env, uint32_t desc)
+{
+    vext_ldst_us(vd, base, env, desc, lde_w,
+                 ctzl(sizeof(int32_t)), env->vl, GETPC());
+}
+
+/* Nuclei custom vnice store */
+void HELPER(vns32)(void *vd, void *v0, target_ulong base,
+                  CPURISCVState *env, uint32_t desc)
+{
+    vext_ldst_us(vd, base, env, desc, ste_w,
+                 ctzl(sizeof(int32_t)), env->vl, GETPC());
+}
