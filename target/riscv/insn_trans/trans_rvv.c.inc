@@ -3077,6 +3077,7 @@ GEN_MM_TRANS(vmor_mm)
 GEN_MM_TRANS(vmnor_mm)
 GEN_MM_TRANS(vmorn_mm)
 GEN_MM_TRANS(vmxnor_mm)
+GEN_MM_TRANS(vn_cmpx_mul)
 
 /* Vector count population in mask vcpop */
 static bool trans_vcpop_m(DisasContext *s, arg_rmr *a)

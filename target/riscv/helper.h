@@ -1681,3 +1681,4 @@ DEF_HELPER_1(rowsum, tl, tl)
 /* Nuclei vnice instructions */
 DEF_HELPER_5(vnl32, void, ptr, ptr, tl, env, i32)
 DEF_HELPER_5(vns32, void, ptr, ptr, tl, env, i32)
+DEF_HELPER_6(vn_cmpx_mul, void, ptr, ptr, ptr, ptr, env, i32)
