@@ -92,7 +92,7 @@ static uint64_t nuclei_eclic_read(void *opaque, hwaddr offset, unsigned size)
         value = eclic->cliccfg[hartid] & 0xFF;
         break;
     case NUCLEI_ECLIC_REG_CLICINFO:
-        value = (CLICINTCTLBITS << 21) | (0x1 << 13) | 4095;
+        value = (CLICINTCTLBITS << 21) | (0x1 << 13) | eclic->num_sources;
         break;
     case NUCLEI_ECLIC_REG_MTH:
         value = eclic->mth[hartid] & 0xFF;
@@ -210,7 +210,6 @@ static Property nuclei_eclic_properties[] = {
     DEFINE_PROP_BOOL("prv-u", NucLeiECLICState, prv_u, false),
     DEFINE_PROP_BOOL("vector", NucLeiECLICState, nvbits, false),
     DEFINE_PROP_UINT32("num-harts", NucLeiECLICState, num_harts, 0),
-    //DEFINE_PROP_UINT32("num-sources", NucLeiECLICState, num_sources, 0),
     DEFINE_PROP_UINT32("eclicintctlbits", NucLeiECLICState, eclicintctlbits, 0),
     DEFINE_PROP_UINT32("aperture-size", NucLeiECLICState, aperture_size, 0),
     DEFINE_PROP_UINT32("num-sources", NucLeiECLICState, num_sources, 0),
