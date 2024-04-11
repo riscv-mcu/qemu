@@ -142,7 +142,8 @@ enum {
     EVALSOC_XIP,
     EVALSOC_ILM,
     EVALSOC_DLM,
-    EVALSOC_DDR
+    EVALSOC_DDR,
+    EVALSOC_DEV_END
 };
 
 enum

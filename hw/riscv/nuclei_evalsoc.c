@@ -74,7 +74,7 @@ static const struct MemmapEntry
     [EVALSOC_UART0] = { EVALSOC_UART0_BASE,             EVALSOC_UART0_SIZE },
     [EVALSOC_UART1] = { EVALSOC_UART1_BASE,             EVALSOC_UART1_SIZE },
     [EVALSOC_QSPI0] = { EVALSOC_QSPI0_BASE,             EVALSOC_QSPI0_SIZE },
-    [EVALSOC_QSPI1] = { EVALSOC_QSPI1_BASE,             EVALSOC_QSPI1_BASE },
+    [EVALSOC_QSPI1] = { EVALSOC_QSPI1_BASE,             EVALSOC_QSPI1_SIZE },
     [EVALSOC_QSPI2] = { EVALSOC_QSPI2_BASE,             EVALSOC_QSPI2_SIZE },
     [EVALSOC_XIP]   = { EVALSOC_XIP_BASE,               EVALSOC_XIP_SIZE   },
     [EVALSOC_DEBUG] = { IREGION_DEBUG_OFS,              IREGION_DEBUG_SIZE },
@@ -640,6 +640,52 @@ static void parse_json_config(MachineState *machine)
     }
 }
 
+static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCState *s)
+{
+    struct MemmapEntry *memoryRegion = g_new0(struct MemmapEntry, EVALSOC_DEV_END);
+    memcpy(memoryRegion, evalsoc_memmap, sizeof(struct MemmapEntry) * EVALSOC_DEV_END);
+    //json config
+    memoryRegion[EVALSOC_DDR].base = s->ddr_base;
+    memoryRegion[EVALSOC_DDR].size = s->ddr_size;
+    memoryRegion[EVALSOC_XIP].base = s->norflash_base;
+    memoryRegion[EVALSOC_XIP].size = s->norflash_size;
+    memoryRegion[EVALSOC_UART0].base = s->uart0_base;
+    memoryRegion[EVALSOC_UART1].base = s->uart1_base;
+    memoryRegion[EVALSOC_QSPI0].base = s->qspi0_base;
+    memoryRegion[EVALSOC_QSPI1].base = s->qspi1_base;
+    memoryRegion[EVALSOC_QSPI2].base = s->qspi2_base;
+    //iregion offset
+    memoryRegion[EVALSOC_DEBUG].base = memmap[EVALSOC_DEBUG].base + s->iregion;
+    memoryRegion[EVALSOC_TIMER].base = memmap[EVALSOC_TIMER].base + s->iregion;
+    memoryRegion[EVALSOC_PLIC].base = memmap[EVALSOC_PLIC].base + s->iregion;
+    memoryRegion[EVALSOC_ECLIC].base = memmap[EVALSOC_ECLIC].base + s->iregion;
+    memoryRegion[EVALSOC_SMP].base = memmap[EVALSOC_SMP].base + s->iregion;
+    memoryRegion[EVALSOC_CLINT].base = memmap[EVALSOC_CLINT].base + s->iregion;
+
+    for (size_t i = 0; i < EVALSOC_DEV_END; ++i) {
+        if (i == EVALSOC_CLINT) continue;
+        hwaddr start1 = memoryRegion[i].base;
+        hwaddr end1 = start1 + memoryRegion[i].size;
+  
+        for (size_t j = 0; j < EVALSOC_DEV_END; ++j) {
+            if (i == j || j == EVALSOC_CLINT) continue; // Skip comparing with itself
+  
+            hwaddr start2 = memoryRegion[j].base;
+            hwaddr end2 = start2 + memoryRegion[j].size;
+  
+            // If there is overlap, return true
+            if (!(end1 <= start2 || end2 <= start1)) {
+                printf("memory is overlap, [%lx:%lx] and [%lx:%lx]\n", (long)start1, (long)end1, (long)start2, (long)end2);
+                return true;
+            }
+        }
+    }
+    g_free(memoryRegion);
+
+    // If no overlap is found, return false
+    return false;
+}
+
 static void evalsoc_machine_init(MachineState *machine)
 {
     const struct MemmapEntry *memmap = evalsoc_memmap;
@@ -775,6 +821,11 @@ static void evalsoc_machine_init(MachineState *machine)
         }
     }
 
+    if(is_iregion_addr_overlap(memmap, s) == true)
+    {
+        error_report("is_iregion_addr_overlap() failed");
+        exit(1);
+    }
     /* TODO: Add qtest support */
     /* Initialize SOC */
     object_initialize_child(OBJECT(machine), "soc", &s->soc, TYPE_EVALSOC_SOC);
