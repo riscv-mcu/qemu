@@ -115,6 +115,7 @@ typedef struct
     uint64_t qspi2_irq;
     uint64_t cpu_freq;
     uint64_t timer_freq;
+    uint64_t irqmax;
     /*< public >*/
     EvalSoCSoCState soc;
     uint32_t msel;
@@ -188,7 +189,7 @@ enum
     EVALSOC_PLIC_SPI0_IRQ = 35,
     EVALSOC_PLIC_SPI1_IRQ = 36,
     EVALSOC_PLIC_SPI2_IRQ = 37,
-    EVALSOC_PLIC_INT_MAX = 1023,
+    EVALSOC_PLIC_INT_MAX = 54,
 };
 
 enum {
@@ -237,7 +238,7 @@ enum {
     EVALSOC_ECLIC_INT61_IRQn           = 61,                /*!< Device Interrupt */
     EVALSOC_ECLIC_INT62_IRQn           = 62,                /*!< Device Interrupt */
     EVALSOC_ECLIC_INT63_IRQn           = 63,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT_MAX              = 4095,
+    EVALSOC_ECLIC_INT_MAX              = 64,
 };
 
 

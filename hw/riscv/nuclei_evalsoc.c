@@ -469,6 +469,19 @@ static QDict *parse_json_filename(const char *filename, Error **errp)
     return options;
 }
 
+static uint32_t get_irq_number_alignment(uint64_t n)
+{
+    uint32_t result = 1;
+    g_assert(n <= EVALSOC_ECLIC_NUM_SOURCES);
+    if (n < 16) {
+        return 16;
+    }
+    while (result < n) {
+        result <<= 1;
+    }
+    return (n == result) ? n : result;
+}
+
 static unsigned long string_to_uint64(const char *str)
 {
     char *end;
@@ -524,6 +537,10 @@ static void parse_json_config(MachineState *machine)
                             if(!strcmp(page1->key, "timer_freq"))//timer_freq
                             {
                                 s->timer_freq = string_to_uint64(qstring_get_str(qobject_to(QString, page1->value)));
+                            }
+                            else if(!strcmp(page1->key, "irqmax"))//irqmax
+                            {
+                                s->irqmax = string_to_uint64(qstring_get_str(qobject_to(QString, page1->value)));
                             }
                             else if(!strcmp(page1->key, "cpu_freq"))//cpu_freq
                             {
@@ -708,6 +725,18 @@ static void evalsoc_machine_init(MachineState *machine)
     if(s->timer_freq == -1)
     {
         s->timer_freq = EVALSOC_TIMEBASE_FREQ;
+    }
+
+    if(s->irqmax == -1)
+    {
+        if(machine->firmware == NULL)
+        {
+            s->irqmax = EVALSOC_ECLIC_INT_MAX;
+        }
+        else
+        {
+            s->irqmax = EVALSOC_PLIC_INT_MAX;
+        }
     }
 
     if(s->iregion == -1)
@@ -1012,6 +1041,7 @@ static void evalsoc_machine_instance_init(Object *obj)
 
     s->cpu_freq = -1;
     s->timer_freq = -1;
+    s->irqmax = -1;
     s->iregion = -1;
     s->ddr_base = -1;
     s->ddr_size = -1;
@@ -1174,7 +1204,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     /* MMIO */
     s->plic = sifive_plic_create(memmap[EVALSOC_PLIC].base + mst->iregion,
                                  plic_hart_config, ms->smp.cpus, 0,
-                                 EVALSOC_PLIC_NUM_SOURCES,
+                                 mst->irqmax > EVALSOC_PLIC_NUM_SOURCES ? EVALSOC_PLIC_NUM_SOURCES : mst->irqmax,
                                  EVALSOC_PLIC_NUM_PRIORITIES,
                                  EVALSOC_PLIC_PRIORITY_BASE,
                                  EVALSOC_PLIC_PENDING_BASE,
@@ -1189,7 +1219,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                                    memmap[EVALSOC_ECLIC].size,
                                    false, false, true,
                                    ms->smp.cpus,
-                                   EVALSOC_ECLIC_NUM_SOURCES,
+                                   get_irq_number_alignment(mst->irqmax),
                                    EVALSOC_CLIC_INTCTLBITS);
 
     s->smpcc = nuclei_smpcc_create(memmap[EVALSOC_SMP].base + mst->iregion,
