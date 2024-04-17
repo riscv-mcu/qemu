@@ -202,6 +202,16 @@ const RISCVIsaExtData isa_edata_arr[] = {
     ISA_EXT_DATA_ENTRY(xtheadmempair, PRIV_VERSION_1_11_0, ext_xtheadmempair),
     ISA_EXT_DATA_ENTRY(xtheadsync, PRIV_VERSION_1_11_0, ext_xtheadsync),
     ISA_EXT_DATA_ENTRY(xventanacondops, PRIV_VERSION_1_12_0, ext_XVentanaCondOps),
+    ISA_EXT_DATA_ENTRY(xxlcz, PRIV_VERSION_1_12_0, ext_xxlcz),
+    ISA_EXT_DATA_ENTRY(xxlczpstinc, PRIV_VERSION_1_12_0, ext_xxlczpstinc),
+    ISA_EXT_DATA_ENTRY(xxlczbmrk, PRIV_VERSION_1_12_0, ext_xxlczbmrk),
+    ISA_EXT_DATA_ENTRY(xxlczbitop, PRIV_VERSION_1_12_0, ext_xxlczbitop),
+    ISA_EXT_DATA_ENTRY(xxlczslet, PRIV_VERSION_1_12_0, ext_xxlczslet),
+    ISA_EXT_DATA_ENTRY(xxlczabs, PRIV_VERSION_1_12_0, ext_xxlczabs),
+    ISA_EXT_DATA_ENTRY(xxlczmac, PRIV_VERSION_1_12_0, ext_xxlczmac),
+    ISA_EXT_DATA_ENTRY(xxlczbri, PRIV_VERSION_1_12_0, ext_xxlczbri),
+    ISA_EXT_DATA_ENTRY(xxlczbitrev, PRIV_VERSION_1_12_0, ext_xxlczbitrev),
+    ISA_EXT_DATA_ENTRY(xxlczgp, PRIV_VERSION_1_12_0, ext_xxlczgp),
 
     DEFINE_PROP_END_OF_LIST(),
 };
@@ -1567,6 +1577,16 @@ const RISCVCPUMultiExtConfig riscv_cpu_vendor_exts[] = {
     MULTI_EXT_CFG_BOOL("xtheadmempair", ext_xtheadmempair, false),
     MULTI_EXT_CFG_BOOL("xtheadsync", ext_xtheadsync, false),
     MULTI_EXT_CFG_BOOL("xventanacondops", ext_XVentanaCondOps, false),
+    MULTI_EXT_CFG_BOOL("xxlcz", ext_xxlcz, false),
+    MULTI_EXT_CFG_BOOL("xxlczpstinc", ext_xxlczpstinc, false),
+    MULTI_EXT_CFG_BOOL("xxlczbmrk", ext_xxlczbmrk, false),
+    MULTI_EXT_CFG_BOOL("xxlczbitop", ext_xxlczbitop, false),
+    MULTI_EXT_CFG_BOOL("xxlczslet", ext_xxlczslet, false),
+    MULTI_EXT_CFG_BOOL("xxlczabs", ext_xxlczabs, false),
+    MULTI_EXT_CFG_BOOL("xxlczmac", ext_xxlczmac, false),
+    MULTI_EXT_CFG_BOOL("xxlczbri", ext_xxlczbri, false),
+    MULTI_EXT_CFG_BOOL("xxlczbitrev", ext_xxlczbitrev, false),
+    MULTI_EXT_CFG_BOOL("xxlczgp", ext_xxlczgp, false),
 
     DEFINE_PROP_END_OF_LIST(),
 };

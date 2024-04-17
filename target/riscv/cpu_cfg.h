@@ -150,6 +150,16 @@ struct RISCVCPUConfig {
     bool ext_xtheadmempair;
     bool ext_xtheadsync;
     bool ext_XVentanaCondOps;
+    bool ext_xxlcz;
+    bool ext_xxlczpstinc;
+    bool ext_xxlczbmrk;
+    bool ext_xxlczbitop;
+    bool ext_xxlczslet;
+    bool ext_xxlczabs;
+    bool ext_xxlczmac;
+    bool ext_xxlczbri;
+    bool ext_xxlczbitrev;
+    bool ext_xxlczgp;
 
     uint32_t pmu_mask;
     uint16_t vlenb;

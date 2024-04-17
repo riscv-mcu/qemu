@@ -721,6 +721,18 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         cpu->pmu_avail_ctrs = 0;
     }
 
+    if (cpu->cfg.ext_xxlcz) {
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczpstinc), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczbmrk), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczbitop), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczslet), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczabs), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczmac), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczbri), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczbitrev), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczgp), true);
+    }
+
     /*
      * Disable isa extensions based on priv spec after we
      * validated and set everything we need.
