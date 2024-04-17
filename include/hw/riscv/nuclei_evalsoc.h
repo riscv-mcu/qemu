@@ -189,66 +189,12 @@ enum
     EVALSOC_PLIC_SPI0_IRQ = 35,
     EVALSOC_PLIC_SPI1_IRQ = 36,
     EVALSOC_PLIC_SPI2_IRQ = 37,
-    EVALSOC_PLIC_INT_MAX = 54,
+    EVALSOC_PLIC_COUNTER0_IRQ = 38,
+    EVALSOC_PLIC_COUNTER1_IRQ = 39,
+    EVALSOC_PLIC_INT_MAX
 };
 
-enum {
-    EVALSOC_ECLIC_INT19_IRQn           = 19,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT20_IRQn           = 20,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT21_IRQn           = 21,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT22_IRQn           = 22,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT23_IRQn           = 23,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT24_IRQn           = 24,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT25_IRQn           = 25,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT26_IRQn           = 26,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT27_IRQn           = 27,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT28_IRQn           = 28,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT29_IRQn           = 29,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT30_IRQn           = 30,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT31_IRQn           = 31,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT32_IRQn           = 32,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT33_IRQn           = 33,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT34_IRQn           = 34,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT35_IRQn           = 35,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT36_IRQn           = 36,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT37_IRQn           = 37,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT38_IRQn           = 38,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT39_IRQn           = 39,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT40_IRQn           = 40,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT41_IRQn           = 41,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT42_IRQn           = 42,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT43_IRQn           = 43,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT44_IRQn           = 44,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT45_IRQn           = 45,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT46_IRQn           = 46,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT47_IRQn           = 47,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT48_IRQn           = 48,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT49_IRQn           = 49,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT50_IRQn           = 50,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT51_IRQn           = 51,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT52_IRQn           = 52,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT53_IRQn           = 53,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT54_IRQn           = 54,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT55_IRQn           = 55,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT56_IRQn           = 56,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT57_IRQn           = 57,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT58_IRQn           = 58,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT59_IRQn           = 59,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT60_IRQn           = 60,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT61_IRQn           = 61,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT62_IRQn           = 62,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT63_IRQn           = 63,                /*!< Device Interrupt */
-    EVALSOC_ECLIC_INT_MAX              = 64,
-};
-
-
-/* UART0 Interrupt */
-#define UART0_IRQn                                 EVALSOC_ECLIC_INT51_IRQn
-#define UART1_IRQn                                 EVALSOC_ECLIC_INT52_IRQn
-/* QSPI Interrupt */
-#define QSPI0_IRQn                                 EVALSOC_ECLIC_INT53_IRQn
-#define QSPI1_IRQn                                 EVALSOC_ECLIC_INT54_IRQn
-#define QSPI2_IRQn                                 EVALSOC_ECLIC_INT55_IRQn
+#define PLIC_IRQ_TO_ECLIC_IRQ(n)                  (n + 18)
 
 enum
 {

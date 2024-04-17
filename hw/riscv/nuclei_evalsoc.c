@@ -729,14 +729,11 @@ static void evalsoc_machine_init(MachineState *machine)
 
     if(s->irqmax == -1)
     {
-        if(machine->firmware == NULL)
-        {
-            s->irqmax = EVALSOC_ECLIC_INT_MAX;
-        }
-        else
-        {
-            s->irqmax = EVALSOC_PLIC_INT_MAX;
-        }
+        /* irqmax: max irq number for external irq
+            1.eclic core irq:irq[0~18] external irq:irq[19...4095] 
+            2.plic  irq 0: wire 0 external irq:irq[1...1023] 
+        */ 
+        s->irqmax = EVALSOC_PLIC_INT_MAX;
     }
 
     if(s->iregion == -1)
@@ -773,14 +770,7 @@ static void evalsoc_machine_init(MachineState *machine)
 
     if(s->uart0_irq == -1)
     {
-        if (machine->firmware == NULL)
-        {
-            s->uart0_irq = UART0_IRQn;
-        }
-        else
-        {
-            s->uart0_irq = EVALSOC_PLIC_UART0_IRQ;
-        }
+        s->uart0_irq = EVALSOC_PLIC_UART0_IRQ;
     }
 
     if(s->uart1_base == -1)
@@ -790,14 +780,7 @@ static void evalsoc_machine_init(MachineState *machine)
 
     if(s->uart1_irq == -1)
     {
-        if (machine->firmware == NULL)
-        {
-            s->uart1_irq = UART1_IRQn;
-        }
-        else
-        {
-            s->uart1_irq = EVALSOC_PLIC_UART1_IRQ;
-        }
+        s->uart1_irq = EVALSOC_PLIC_UART1_IRQ;
     }
 
     if(s->qspi0_base == -1)
@@ -807,14 +790,7 @@ static void evalsoc_machine_init(MachineState *machine)
 
     if(s->qspi0_irq == -1)
     {
-        if (machine->firmware == NULL)
-        {
-            s->qspi0_irq = QSPI0_IRQn;
-        }
-        else
-        {
-            s->qspi0_irq = EVALSOC_PLIC_SPI0_IRQ;
-        }
+        s->qspi0_irq = EVALSOC_PLIC_SPI0_IRQ;
     }
 
     if(s->qspi1_base == -1)
@@ -824,14 +800,7 @@ static void evalsoc_machine_init(MachineState *machine)
 
     if(s->qspi1_irq == -1)
     {
-        if (machine->firmware == NULL)
-        {
-            s->qspi1_irq = QSPI1_IRQn;
-        }
-        else
-        {
-            s->qspi1_irq = EVALSOC_PLIC_SPI1_IRQ;
-        }
+        s->qspi1_irq = EVALSOC_PLIC_SPI1_IRQ;
     }
 
     if(s->qspi2_base == -1)
@@ -841,14 +810,7 @@ static void evalsoc_machine_init(MachineState *machine)
 
     if(s->qspi2_irq == -1)
     {
-        if (machine->firmware == NULL)
-        {
-            s->qspi2_irq = QSPI2_IRQn;
-        }
-        else
-        {
-            s->qspi2_irq = EVALSOC_PLIC_SPI2_IRQ;
-        }
+        s->qspi2_irq = EVALSOC_PLIC_SPI2_IRQ;
     }
 
     if(is_iregion_addr_overlap(memmap, s) == true)
@@ -1219,7 +1181,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                                    memmap[EVALSOC_ECLIC].size,
                                    false, false, true,
                                    ms->smp.cpus,
-                                   get_irq_number_alignment(mst->irqmax),
+                                   get_irq_number_alignment(PLIC_IRQ_TO_ECLIC_IRQ(mst->irqmax)),
                                    EVALSOC_CLIC_INTCTLBITS);
 
     s->smpcc = nuclei_smpcc_create(memmap[EVALSOC_SMP].base + mst->iregion,
@@ -1239,7 +1201,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                         mst->uart0_base,
                         memmap[EVALSOC_UART0].size,
                         serial_hd(0),
-                        mst->uart0_irq,
+                        PLIC_IRQ_TO_ECLIC_IRQ(mst->uart0_irq),
                         s->cidu,
                         s->eclic);
         
