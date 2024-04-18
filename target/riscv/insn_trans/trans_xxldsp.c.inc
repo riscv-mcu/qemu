@@ -28,7 +28,23 @@
     }                                           \
 } while (0)
 
+#define REQUIRE_XXLDSPN1X(ctx) do {              \
+    if (!ctx->cfg_ptr->ext_xxldspn1x) {          \
+        return false;                           \
+    }                                           \
+} while (0)
 
+#define REQUIRE_XXLDSPN2X(ctx) do {              \
+    if (!ctx->cfg_ptr->ext_xxldspn2x) {          \
+        return false;                           \
+    }                                           \
+} while (0)
+
+#define REQUIRE_XXLDSPN3X(ctx) do {              \
+    if (!ctx->cfg_ptr->ext_xxldspn3x) {          \
+        return false;                           \
+    }                                           \
+} while (0)
 
 /*
  * For some instructions, such as add16, an oberservation can be utilized:
@@ -206,6 +222,55 @@ static bool trans_##NAME(DisasContext *s, arg_r *a)    \
     return r_ool(s, a, gen_helper_##NAME);             \
 }
 
+#define GEN_RVP_R_OOL_D_N1(NAME)                        \
+static bool trans_##NAME(DisasContext *s, arg_r *a)     \
+{                                                       \
+    REQUIRE_XXLDSPN1X(s);                               \
+    return r_ool_d(s, a, gen_helper_##NAME);            \
+}
+
+#define GEN_RVP_R_OOL_D_N2(NAME)                        \
+static bool trans_##NAME(DisasContext *s, arg_r *a)     \
+{                                                       \
+    REQUIRE_XXLDSPN2X(s);                               \
+    return r_ool_d(s, a, gen_helper_##NAME);            \
+}
+
+#define GEN_RVP_R_OOL_D_N3(NAME)                        \
+static bool trans_##NAME(DisasContext *s, arg_r *a)     \
+{                                                       \
+    REQUIRE_XXLDSPN3X(s);                               \
+    return r_ool_d(s, a, gen_helper_##NAME);            \
+}
+
+#define GEN_RVP_R_OOL_D64_S64_S32_D_N1(NAME)            \
+static bool trans_##NAME(DisasContext *s, arg_r *a)     \
+{                                                       \
+    REQUIRE_XXLDSPN1X(s);                               \
+    return r_ool_d64_s64_s32_d(s, a, gen_helper_##NAME);\
+}
+
+#define GEN_RVP_R_OOL_D64_S64_S32_D_N2(NAME)            \
+static bool trans_##NAME(DisasContext *s, arg_r *a)     \
+{                                                       \
+    REQUIRE_XXLDSPN2X(s);                               \
+    return r_ool_d64_s64_s32_d(s, a, gen_helper_##NAME);\
+}
+
+#define GEN_RVP_R_OOL_D64_S32_S32_D_N2(NAME)            \
+static bool trans_##NAME(DisasContext *s, arg_r *a)     \
+{                                                       \
+    REQUIRE_XXLDSPN2X(s);                               \
+    return r_ool_d64_s32_s32_d(s, a, gen_helper_##NAME);\
+}
+
+#define GEN_RVP_R_OOL_D32_S64_S64_D_N3(NAME)            \
+static bool trans_##NAME(DisasContext *s, arg_r *a)     \
+{                                                       \
+    REQUIRE_XXLDSPN3X(s);                               \
+    return r_ool_d32_s64_s64_d(s, a, gen_helper_##NAME);\
+}
+
 GEN_RVP_R_OOL(radd16);
 GEN_RVP_R_OOL(uradd16);
 GEN_RVP_R_OOL(kadd16);
@@ -322,6 +387,13 @@ rvp_shifti(DisasContext *ctx, arg_shift *a,
 static bool trans_##NAME(DisasContext *s, arg_shift *a)  \
 {                                                        \
     return rvp_shifti(s, a, VECOP, OP);                  \
+}
+
+#define GEN_RVP_SHIFTI_D_N2(NAME)                        \
+static bool trans_##NAME(DisasContext *s, arg_shift *a)  \
+{                                                        \
+    REQUIRE_XXLDSPN2X(s);                                \
+    return rvp_shifti_ool_d(s, a, gen_helper_##NAME);    \
 }
 
 GEN_RVP_SHIFTI(srai16, tcg_gen_vec_sar16i_tl, gen_helper_sra16);
@@ -451,10 +523,122 @@ r2_ool(DisasContext *ctx, arg_r2 *a,
     return true;
 }
 
+static bool
+r2_ool_d(DisasContext *ctx, arg_r2 *a,
+       void (* fn)(TCGv_i64, TCGv_ptr, TCGv_i64))
+{
+#ifdef TARGET_RISCV64
+    return true;
+#else
+    TCGv a0, a1, d0, d1;
+    TCGv_i64 src,dst;
+
+    a0 = get_gpr(ctx, a->rs1, EXT_ZERO);
+    a1 = get_gpr(ctx, a->rs1 + 1, EXT_ZERO);
+
+    src = tcg_temp_new_i64();
+    dst = tcg_temp_new_i64();
+
+    tcg_gen_concat_i32_i64(src, a0, a1);
+
+    fn(dst, tcg_env, src);
+
+    d0 = dest_gpr(ctx, a->rd);
+    d1 = dest_gpr(ctx, a->rd + 1);
+    tcg_gen_extrl_i64_i32(d0, dst);
+    tcg_gen_extrh_i64_i32(d1, dst);
+    gen_set_gpr(ctx, a->rd, d0);
+    gen_set_gpr(ctx, a->rd + 1, d1);
+
+    return true;
+#endif
+}
+
+static bool
+r2_ool_d32_s64_d(DisasContext *ctx, arg_r2 *a,
+       void (* fn)(TCGv_i32, TCGv_ptr, TCGv_i64))
+{
+#ifdef TARGET_RISCV64
+    return true;
+#else
+    TCGv a0, a1, dst;
+    TCGv_i64 src;
+
+    a0 = get_gpr(ctx, a->rs1, EXT_ZERO);
+    a1 = get_gpr(ctx, a->rs1 + 1, EXT_ZERO);
+    dst = dest_gpr(ctx, a->rd);
+
+    src = tcg_temp_new_i64();
+    dst = tcg_temp_new_i32();
+
+    tcg_gen_concat_i32_i64(src, a0, a1);
+    fn(dst, tcg_env, src);
+    gen_set_gpr(ctx, a->rd, dst);
+
+    return true;
+#endif
+}
+
 #define GEN_RVP_R2_OOL(NAME)                           \
 static bool trans_##NAME(DisasContext *s, arg_r2 *a)   \
 {                                                      \
     return r2_ool(s, a, gen_helper_##NAME);            \
+}
+
+#define GEN_RVP_R2_OOL_N1(NAME)                        \
+static bool trans_##NAME(DisasContext *s, arg_r2 *a)   \
+{                                                      \
+    REQUIRE_XXLDSPN1X(s);                              \
+    return r2_ool(s, a, gen_helper_##NAME);            \
+}
+
+static bool
+r2_d64_s64_ool(DisasContext *ctx, arg_r2 *a,
+       void (* fn)(TCGv_i64, TCGv_ptr, TCGv_i64))
+{
+    TCGv t1;
+    TCGv_i64 src1, dst;
+    REQUIRE_64BIT(ctx);
+    REQUIRE_XXLDSP(ctx);
+
+    src1 = tcg_temp_new_i64();
+    dst = tcg_temp_new_i64();
+
+    t1 = get_gpr(ctx, a->rs1, EXT_ZERO);
+    tcg_gen_ext_tl_i64(src1, t1);
+
+    fn(dst, tcg_env, src1);
+    tcg_gen_trunc_i64_tl(t1, dst);
+    gen_set_gpr(ctx, a->rd, t1);
+
+    return true;
+}
+
+#define GEN_RVP_R2_D64_S64_OOL(NAME)                \
+static bool trans_##NAME(DisasContext *s, arg_r2 *a)   \
+{                                                      \
+    return r2_d64_s64_ool(s, a, gen_helper_##NAME);    \
+}
+
+#define GEN_RVP_R2_OOL_D_N1(NAME)                       \
+static bool trans_##NAME(DisasContext *s, arg_r2 *a)    \
+{                                                       \
+    REQUIRE_XXLDSPN1X(s);                               \
+    return r2_ool_d(s, a, gen_helper_##NAME);           \
+}
+
+#define GEN_RVP_R2_OOL_D_N2(NAME)                       \
+static bool trans_##NAME(DisasContext *s, arg_r2 *a)    \
+{                                                       \
+    REQUIRE_XXLDSPN2X(s);                               \
+    return r2_ool_d(s, a, gen_helper_##NAME);           \
+}
+
+#define GEN_RVP_R2_OOL_D32_S64_D_N2(NAME)               \
+static bool trans_##NAME(DisasContext *s, arg_r2 *a)    \
+{                                                       \
+    REQUIRE_XXLDSPN2X(s);                               \
+    return r2_ool_d32_s64_d(s, a, gen_helper_##NAME);   \
 }
 
 GEN_RVP_R2_OOL(kabs16);
@@ -475,6 +659,99 @@ GEN_RVP_R2_OOL(clz8);
 GEN_RVP_R2_OOL(clo8);
 GEN_RVP_R2_OOL(swap8);
 GEN_RVP_R2_OOL(swap16);
+
+GEN_RVP_R2_OOL(expd80);
+GEN_RVP_R2_OOL(expd81);
+GEN_RVP_R2_OOL(expd82);
+GEN_RVP_R2_OOL(expd83);
+GEN_RVP_R2_D64_S64_OOL(expd84);
+GEN_RVP_R2_D64_S64_OOL(expd85);
+GEN_RVP_R2_D64_S64_OOL(expd86);
+GEN_RVP_R2_D64_S64_OOL(expd87);
+
+GEN_RVP_R_OOL_D_N1(dkhm8);
+GEN_RVP_R_OOL_D_N1(dkhm16);
+GEN_RVP_R2_OOL_D_N1(dkabs8);
+GEN_RVP_R2_OOL_D_N1(dkabs16);
+GEN_RVP_R_OOL_D64_S64_S32_D_N1(dkslra8);
+GEN_RVP_R_OOL_D64_S64_S32_D_N1(dkslra16);
+GEN_RVP_R_OOL_D_N1(dkadd8);
+GEN_RVP_R_OOL_D_N1(dkadd16);
+GEN_RVP_R_OOL_D_N1(dksub8);
+GEN_RVP_R_OOL_D_N1(dksub16);
+
+GEN_RVP_R_OOL_D_N2(dkhmx8);
+GEN_RVP_R_OOL_D_N2(dkhmx16);
+GEN_RVP_R_OOL_D_N2(dsmmul);
+GEN_RVP_R_OOL_D_N2(dsmmul_u);
+GEN_RVP_R_OOL_D_N2(dkwmmul);
+GEN_RVP_R_OOL_D_N2(dkwmmul_u);
+GEN_RVP_R2_OOL_D_N2(dkabs32);
+GEN_RVP_R_OOL_D64_S64_S32_D_N2(dkslra32);
+GEN_RVP_R_OOL_D_N2(dkadd32);
+GEN_RVP_R_OOL_D_N2(dksub32);
+GEN_RVP_R_OOL_D_N2(dradd16);
+GEN_RVP_R_OOL_D_N2(dsub16);
+GEN_RVP_R_OOL_D_N2(dradd32);
+GEN_RVP_R_OOL_D_N2(dsub32);
+GEN_RVP_R_OOL_D_N2(dkmda);
+GEN_RVP_R_OOL_D_N2(dkmxda);
+GEN_RVP_R_OOL_D_N2(dsmdrs);
+GEN_RVP_R_OOL_D_N2(dsmxds);
+GEN_RVP_R_OOL_D_N2(dsmbb32);
+GEN_RVP_R_OOL_D_N2(dsmbb32_sra14);
+GEN_RVP_R_OOL_D_N2(dsmbb32_sra32);
+GEN_RVP_R_OOL_D_N2(dsmbt32);
+GEN_RVP_R_OOL_D_N2(dsmbt32_sra14);
+GEN_RVP_R_OOL_D_N2(dsmbt32_sra32);
+GEN_RVP_R_OOL_D_N2(dsmtt32);
+GEN_RVP_R_OOL_D_N2(dsmtt32_sra14);
+GEN_RVP_R_OOL_D_N2(dsmtt32_sra32);
+GEN_RVP_R_OOL_D_N2(dpkbb32);
+GEN_RVP_R_OOL_D_N2(dpkbt32);
+GEN_RVP_R_OOL_D_N2(dpktt32);
+GEN_RVP_R_OOL_D_N2(dpktb32);
+GEN_RVP_R_OOL_D_N2(dpktb16);
+GEN_RVP_R_OOL_D_N2(dpkbb16);
+GEN_RVP_R_OOL_D_N2(dpkbt16);
+GEN_RVP_R_OOL_D_N2(dpktt16);
+GEN_RVP_R_OOL_D_N2(dsra16);
+GEN_RVP_R_OOL_D_N2(dadd16);
+GEN_RVP_R_OOL_D_N2(dadd32);
+GEN_RVP_R_OOL_D_N2(dsmbb16);
+GEN_RVP_R_OOL_D_N2(dsmbt16);
+GEN_RVP_R_OOL_D_N2(dsmtt16);
+GEN_RVP_R_OOL_D_N2(drcrsa16);
+GEN_RVP_R_OOL_D_N2(drcras16);
+GEN_RVP_R_OOL_D_N2(dkcrsa16);
+GEN_RVP_R_OOL_D_N2(dkcras16);
+GEN_RVP_R_OOL_D_N2(drsub16);
+GEN_RVP_R_OOL_D_N2(drsub32);
+GEN_RVP_R_OOL_D_N2(dstsa32);
+GEN_RVP_R_OOL_D_N2(dstas32);
+GEN_RVP_R_OOL_D_N2(dkcras32);
+GEN_RVP_R_OOL_D_N2(dkcrsa32);
+GEN_RVP_R_OOL_D_N2(dcrsa32);
+GEN_RVP_R_OOL_D_N2(dcras32);
+GEN_RVP_R_OOL_D_N2(dkstsa16);
+GEN_RVP_R_OOL_D_N2(dkstas16);
+GEN_RVP_R_OOL_D_N2(drcrsa32);
+GEN_RVP_R_OOL_D_N2(drcras32);
+GEN_RVP_R2_OOL_D32_S64_D_N2(dkclip64);
+GEN_RVP_SHIFTI_D_N2(dsclip8);
+GEN_RVP_SHIFTI_D_N2(dsclip16);
+GEN_RVP_SHIFTI_D_N2(dsclip32);
+GEN_RVP_R_OOL_D64_S32_S32_D_N2(dpack32);
+GEN_RVP_R2_OOL_D_N2(dsunpkd810);
+GEN_RVP_R2_OOL_D_N2(dsunpkd820);
+GEN_RVP_R2_OOL_D_N2(dsunpkd830);
+GEN_RVP_R2_OOL_D_N2(dsunpkd831);
+GEN_RVP_R2_OOL_D_N2(dsunpkd832);
+GEN_RVP_R2_OOL_D_N2(dzunpkd810);
+GEN_RVP_R2_OOL_D_N2(dzunpkd820);
+GEN_RVP_R2_OOL_D_N2(dzunpkd830);
+GEN_RVP_R2_OOL_D_N2(dzunpkd831);
+GEN_RVP_R2_OOL_D_N2(dzunpkd832);
 
 /* 8-bit Unpacking Instructions */
 GEN_RVP_R2_OOL(sunpkd810);
@@ -598,6 +875,13 @@ static inline bool r_acc_ool_d(DisasContext *ctx, arg_r *a,
     return true;
 }
 
+#define GEN_RVP_R_ACC_OOL_D_N3(NAME)                    \
+static bool trans_##NAME(DisasContext *s, arg_r *a)     \
+{                                                       \
+    REQUIRE_XXLDSPN3X(s);                               \
+    return r_acc_ool_d(s, a, gen_helper_##NAME);        \
+}
+
 static inline bool r_acc_ool_d32(DisasContext *ctx, arg_r *a,
                              void (* fn)(TCGv_i32, TCGv_ptr, TCGv_i64, TCGv_i64, TCGv_i64))
 {
@@ -630,6 +914,70 @@ static inline bool r_acc_ool_d32(DisasContext *ctx, arg_r *a,
     return true;
 #endif
 }
+
+#define GEN_RVP_R_ACC_OOL_D32_N3(NAME)                  \
+static bool trans_##NAME(DisasContext *s, arg_r *a)     \
+{                                                       \
+    REQUIRE_XXLDSPN3X(s);                               \
+    return r_acc_ool_d32(s, a, gen_helper_##NAME);      \
+}
+
+GEN_RVP_R_ACC_OOL_D_N3(dkmmac);
+GEN_RVP_R_ACC_OOL_D_N3(dkmmac_u);
+GEN_RVP_R_ACC_OOL_D_N3(dkmmsb);
+GEN_RVP_R_ACC_OOL_D_N3(dkmmsb_u);
+GEN_RVP_R_ACC_OOL_D_N3(dkmada);
+GEN_RVP_R_ACC_OOL_D_N3(dkmaxda);
+GEN_RVP_R_ACC_OOL_D_N3(dkmads);
+GEN_RVP_R_ACC_OOL_D_N3(dkmadrs);
+GEN_RVP_R_ACC_OOL_D_N3(dkmaxds);
+GEN_RVP_R_ACC_OOL_D_N3(dkmsda);
+GEN_RVP_R_ACC_OOL_D_N3(dkmsxda);
+GEN_RVP_R_ACC_OOL_D_N3(dsmaqa);
+GEN_RVP_R_ACC_OOL_D_N3(dsmaqa_su);
+GEN_RVP_R_ACC_OOL_D_N3(dumaqa);
+GEN_RVP_R_OOL_D_N3(dkmda32);
+GEN_RVP_R_OOL_D_N3(dkmxda32);
+GEN_RVP_R_ACC_OOL_D_N3(dkmada32);
+GEN_RVP_R_ACC_OOL_D_N3(dkmaxda32);
+GEN_RVP_R_ACC_OOL_D_N3(dkmads32);
+GEN_RVP_R_ACC_OOL_D_N3(dkmadrs32);
+GEN_RVP_R_ACC_OOL_D_N3(dkmaxds32);
+GEN_RVP_R_ACC_OOL_D_N3(dkmsda32);
+GEN_RVP_R_ACC_OOL_D_N3(dkmsxda32);
+GEN_RVP_R_OOL_D_N3(dsmds32);
+GEN_RVP_R_OOL_D_N3(dsmdrs32);
+GEN_RVP_R_OOL_D_N3(dsmxds32);
+GEN_RVP_R_ACC_OOL_D_N3(dsmalda);
+GEN_RVP_R_ACC_OOL_D_N3(dsmalxda);
+GEN_RVP_R_ACC_OOL_D_N3(dsmalds);
+GEN_RVP_R_ACC_OOL_D_N3(dsmaldrs);
+GEN_RVP_R_ACC_OOL_D_N3(dsmalxds);
+GEN_RVP_R_ACC_OOL_D_N3(dsmslda);
+GEN_RVP_R_ACC_OOL_D_N3(dsmslxda);
+GEN_RVP_R_ACC_OOL_D_N3(ddsmaqa);
+GEN_RVP_R_ACC_OOL_D_N3(ddsmaqa_su);
+GEN_RVP_R_ACC_OOL_D_N3(ddumaqa);
+GEN_RVP_R_OOL_D_N2(dmsr16);
+GEN_RVP_R_OOL_D_N2(dmsr17);
+GEN_RVP_R_OOL_D_N2(dmsr33);
+GEN_RVP_R_OOL_D_N2(dmxsr33);
+GEN_RVP_R_ACC_OOL_D32_N3(dsmada16);
+GEN_RVP_R_ACC_OOL_D32_N3(dsmaxda16);
+GEN_RVP_R_ACC_OOL_D_N3(dksms32_u);
+GEN_RVP_R_ACC_OOL_D32_N3(dmada32);
+GEN_RVP_R2_OOL_D32_S64_D_N2(dredas16);
+GEN_RVP_R2_OOL_D32_S64_D_N2(dredsa16);
+GEN_RVP_R_OOL_D32_S64_S64_D_N3(dsma32_u);
+GEN_RVP_R_OOL_D32_S64_S64_D_N3(dsmxs32_u);
+GEN_RVP_R_OOL_D32_S64_S64_D_N3(dsmxa32_u);
+GEN_RVP_R_OOL_D32_S64_S64_D_N3(dsms32_u);
+GEN_RVP_R_ACC_OOL_D_N3(dsmalbb);
+GEN_RVP_R_ACC_OOL_D_N3(dsmalbt);
+GEN_RVP_R_ACC_OOL_D_N3(dsmaltt);
+GEN_RVP_R_ACC_OOL_D_N3(dkmabb32);
+GEN_RVP_R_ACC_OOL_D_N3(dkmabt32);
+GEN_RVP_R_ACC_OOL_D_N3(dkmatt32);
 
 /* Signed 16-bit Multiply with 64-bit Add/Subtract Instructions */
 static bool
