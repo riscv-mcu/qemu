@@ -71,6 +71,7 @@ typedef struct CPUArchState CPURISCVState;
 #define RVJ RV('J')
 #define RVG RV('G')
 #define RVB RV('B')
+#define RVP RV('P')
 
 extern const uint32_t misa_bits[];
 const char *riscv_get_misa_ext_name(uint32_t bit);
@@ -108,6 +109,8 @@ enum {
 
 #define VEXT_VERSION_1_00_0 0x00010000
 #define VEXT_VER_1_00_0_STR "v1.0"
+#define PEXT_VERSION_0_09_4 0x00000904
+#define PEXT_VER_0_9_4_STR "v0.9.4"
 
 enum {
     TRANSLATE_SUCCESS,
@@ -187,6 +190,7 @@ struct CPUArchState {
 
     target_ulong priv_ver;
     target_ulong vext_ver;
+    target_ulong pext_ver;
 
     /* RISCVMXL, but uint32_t for vmstate migration */
     uint32_t misa_mxl;      /* current mxl */
