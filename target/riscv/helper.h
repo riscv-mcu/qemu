@@ -1174,6 +1174,29 @@ DEF_HELPER_FLAGS_3(sm4ks, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
 /* Zce helper */
 DEF_HELPER_FLAGS_2(cm_jalt, TCG_CALL_NO_WG, tl, env, i32)
 
+/* xxlcz helper */
+DEF_HELPER_3(xl_extract, tl, tl, tl, tl)
+DEF_HELPER_2(xl_extractr, tl, tl, tl)
+DEF_HELPER_3(xl_extractu, tl, tl, tl, tl)
+DEF_HELPER_2(xl_extractur, tl, tl, tl)
+DEF_HELPER_4(xl_insert, tl, tl, tl, tl, tl)
+DEF_HELPER_3(xl_bclr, tl, tl, tl, tl)
+DEF_HELPER_2(xl_bclrr, tl, tl, tl)
+DEF_HELPER_3(xl_bset, tl, tl, tl, tl)
+DEF_HELPER_2(xl_bsetr, tl, tl, tl)
+DEF_HELPER_1(xl_clb, tl, tl)
+DEF_HELPER_1(xl_ff1, tl, tl)
+DEF_HELPER_1(xl_ff0, tl, tl)
+DEF_HELPER_1(xl_fl0, tl, tl)
+
+DEF_HELPER_FLAGS_2(xl_bitrev, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+DEF_HELPER_FLAGS_5(xl_addibne, TCG_CALL_NO_RWG_SE, tl, tl, tl, i32, i32, i32)
+
+DEF_HELPER_FLAGS_4(xl_addrchk, TCG_CALL_NO_RWG_SE, tl, tl, tl, s32, i32)
+DEF_HELPER_FLAGS_4(xl_bezm, TCG_CALL_NO_RWG_SE, tl, tl, tl, s32, i32)
+DEF_HELPER_FLAGS_1(xl_nzmsk, TCG_CALL_NO_RWG_SE, tl, tl)
+DEF_HELPER_FLAGS_1(xl_ffnz, TCG_CALL_NO_RWG_SE, tl, tl)
+
 /* BF16 functions */
 DEF_HELPER_FLAGS_2(fcvt_bf16_s, TCG_CALL_NO_RWG, i64, env, i64)
 DEF_HELPER_FLAGS_2(fcvt_s_bf16, TCG_CALL_NO_RWG, i64, env, i64)

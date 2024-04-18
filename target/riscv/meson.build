@@ -4,6 +4,7 @@ gen = [
   decodetree.process('insn32.decode', extra_args: '--static-decode=decode_insn32'),
   decodetree.process('xthead.decode', extra_args: '--static-decode=decode_xthead'),
   decodetree.process('XVentanaCondOps.decode', extra_args: '--static-decode=decode_XVentanaCodeOps'),
+  decodetree.process('xxlcz.decode', extra_args: '--static-decode=decode_xxlcz'),
 ]
 
 riscv_ss = ss.source_set()
@@ -22,7 +23,8 @@ riscv_ss.add(files(
   'm128_helper.c',
   'crypto_helper.c',
   'zce_helper.c',
-  'vcrypto_helper.c'
+  'vcrypto_helper.c',
+  'xxlcz_helper.c'
 ))
 
 riscv_system_ss = ss.source_set()
