@@ -198,6 +198,15 @@ static inline bool has_xthead_p(const RISCVCPUConfig *cfg)
            cfg->ext_xtheadmempair || cfg->ext_xtheadsync;
 }
 
+static inline bool has_xxlcz_p(const RISCVCPUConfig *cfg)
+{
+    return cfg->ext_xxlcz || cfg->ext_xxlczpstinc ||
+           cfg->ext_xxlczbmrk || cfg->ext_xxlczbitop ||
+           cfg->ext_xxlczslet || cfg->ext_xxlczabs ||
+           cfg->ext_xxlczmac || cfg->ext_xxlczbri ||
+           cfg->ext_xxlczbitrev || cfg->ext_xxlczgp;
+}
+
 #define MATERIALISE_EXT_PREDICATE(ext) \
     static inline bool has_ ## ext ## _p(const RISCVCPUConfig *cfg) \
     { \
