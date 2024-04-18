@@ -168,6 +168,10 @@ struct RISCVCPUConfig {
     bool ext_xxlczbri;
     bool ext_xxlczbitrev;
     bool ext_xxlczgp;
+    bool ext_xxldsp;
+    bool ext_xxldspn1x;
+    bool ext_xxldspn2x;
+    bool ext_xxldspn3x;
 
     uint32_t pmu_mask;
     uint16_t vlenb;

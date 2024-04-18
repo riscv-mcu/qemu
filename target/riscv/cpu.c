@@ -42,7 +42,7 @@
 /* RISC-V CPU definitions */
 static const char riscv_single_letter_exts[] = "IEMAFDQCBPVH";
 const uint32_t misa_bits[] = {RVI, RVE, RVM, RVA, RVF, RVD, RVV,
-                              RVC, RVS, RVU, RVH, RVJ, RVG, RVB, 0};
+                              RVC, RVS, RVU, RVH, RVJ, RVG, RVB, RVP, 0};
 
 /*
  * From vector_helper.c
@@ -219,6 +219,10 @@ const RISCVIsaExtData isa_edata_arr[] = {
     ISA_EXT_DATA_ENTRY(xxlczbri, PRIV_VERSION_1_12_0, ext_xxlczbri),
     ISA_EXT_DATA_ENTRY(xxlczbitrev, PRIV_VERSION_1_12_0, ext_xxlczbitrev),
     ISA_EXT_DATA_ENTRY(xxlczgp, PRIV_VERSION_1_12_0, ext_xxlczgp),
+    ISA_EXT_DATA_ENTRY(xxldsp, PRIV_VERSION_1_12_0, ext_xxldsp),
+    ISA_EXT_DATA_ENTRY(xxldspn1x, PRIV_VERSION_1_12_0, ext_xxldspn1x),
+    ISA_EXT_DATA_ENTRY(xxldspn2x, PRIV_VERSION_1_12_0, ext_xxldspn2x),
+    ISA_EXT_DATA_ENTRY(xxldspn3x, PRIV_VERSION_1_12_0, ext_xxldspn3x),
 
     DEFINE_PROP_END_OF_LIST(),
 };
@@ -1419,7 +1423,8 @@ static const MISAExtInfo misa_ext_info_arr[] = {
     MISA_EXT_INFO(RVJ, "x-j", "Dynamic translated languages"),
     MISA_EXT_INFO(RVV, "v", "Vector operations"),
     MISA_EXT_INFO(RVG, "g", "General purpose (IMAFD_Zicsr_Zifencei)"),
-    MISA_EXT_INFO(RVB, "b", "Bit manipulation (Zba_Zbb_Zbs)")
+    MISA_EXT_INFO(RVB, "b", "Bit manipulation (Zba_Zbb_Zbs)"),
+    MISA_EXT_INFO(RVP, "x-p", "Packed SIMD instructions")
 };
 
 static void riscv_cpu_validate_misa_mxl(RISCVCPUClass *mcc)
@@ -1606,6 +1611,10 @@ const RISCVCPUMultiExtConfig riscv_cpu_vendor_exts[] = {
     MULTI_EXT_CFG_BOOL("xxlczbri", ext_xxlczbri, false),
     MULTI_EXT_CFG_BOOL("xxlczbitrev", ext_xxlczbitrev, false),
     MULTI_EXT_CFG_BOOL("xxlczgp", ext_xxlczgp, false),
+    MULTI_EXT_CFG_BOOL("xxldsp", ext_xxldsp, false),
+    MULTI_EXT_CFG_BOOL("xxldspn1x", ext_xxldspn1x, false),
+    MULTI_EXT_CFG_BOOL("xxldspn2x", ext_xxldspn2x, false),
+    MULTI_EXT_CFG_BOOL("xxldspn3x", ext_xxldspn3x, false),
 
     DEFINE_PROP_END_OF_LIST(),
 };
@@ -2221,6 +2230,37 @@ static const PropertyInfo prop_marchid = {
     .set = prop_marchid_set,
 };
 
+static void prop_pext_spec_set(Object *obj, Visitor *v, const char *name,
+                               void *opaque, Error **errp)
+{
+    RISCVCPU *cpu = RISCV_CPU(obj);
+    g_autofree char *value = NULL;
+
+    visit_type_str(v, name, &value, errp);
+
+    if (g_strcmp0(value, PEXT_VER_0_9_4_STR) != 0) {
+        error_setg(errp, "Unsupported packed spec version '%s'", value);
+        return;
+    }
+
+    cpu_option_add_user_setting(name, PEXT_VERSION_0_09_4);
+    cpu->env.pext_ver = PEXT_VERSION_0_09_4;
+}
+
+static void prop_pext_spec_get(Object *obj, Visitor *v, const char *name,
+                               void *opaque, Error **errp)
+{
+    const char *value = PEXT_VER_0_9_4_STR;
+
+    visit_type_str(v, name, (char **)&value, errp);
+}
+
+static const PropertyInfo prop_pext_spec = {
+    .name = "pext_spec",
+    .get = prop_pext_spec_get,
+    .set = prop_pext_spec_set,
+};
+
 /*
  * RVA22U64 defines some 'named features' that are cache
  * related: Za64rs, Zic64b, Ziccif, Ziccrse, Ziccamoa
@@ -2668,6 +2708,33 @@ static RISCVCPUImpliedExtsRule XXLCZ_IMPLIED = {
     },
 };
 
+static RISCVCPUImpliedExtsRule XXLDSPN3X_IMPLIED = {
+    .ext = CPU_CFG_OFFSET(ext_xxldspn3x),
+    .implied_multi_exts = {
+        CPU_CFG_OFFSET(ext_xxldspn2x),
+
+        RISCV_IMPLIED_EXTS_RULE_END
+    },
+};
+
+static RISCVCPUImpliedExtsRule XXLDSPN2X_IMPLIED = {
+    .ext = CPU_CFG_OFFSET(ext_xxldspn2x),
+    .implied_multi_exts = {
+        CPU_CFG_OFFSET(ext_xxldspn1x),
+
+        RISCV_IMPLIED_EXTS_RULE_END
+    },
+};
+
+static RISCVCPUImpliedExtsRule XXLDSPN1X_IMPLIED = {
+    .ext = CPU_CFG_OFFSET(ext_xxldspn1x),
+    .implied_multi_exts = {
+        CPU_CFG_OFFSET(ext_xxldsp),
+
+        RISCV_IMPLIED_EXTS_RULE_END
+    },
+};
+
 RISCVCPUImpliedExtsRule *riscv_misa_ext_implied_rules[] = {
     &RVA_IMPLIED, &RVD_IMPLIED, &RVF_IMPLIED,
     &RVM_IMPLIED, &RVV_IMPLIED, NULL
@@ -2686,7 +2753,8 @@ RISCVCPUImpliedExtsRule *riscv_multi_ext_implied_rules[] = {
     &ZVFH_IMPLIED, &ZVFHMIN_IMPLIED, &ZVKN_IMPLIED,
     &ZVKNC_IMPLIED, &ZVKNG_IMPLIED, &ZVKNHB_IMPLIED,
     &ZVKS_IMPLIED,  &ZVKSC_IMPLIED, &ZVKSG_IMPLIED,
-    &XXLCZ_IMPLIED,
+    &XXLCZ_IMPLIED, &XXLDSPN3X_IMPLIED, &XXLDSPN2X_IMPLIED,
+    &XXLDSPN1X_IMPLIED,
     NULL
 };
 
@@ -2712,6 +2780,7 @@ static Property riscv_cpu_properties[] = {
      {.name = "mvendorid", .info = &prop_mvendorid},
      {.name = "mimpid", .info = &prop_mimpid},
      {.name = "marchid", .info = &prop_marchid},
+     {.name = "pext_spec", .info = &prop_pext_spec},
 
 #ifndef CONFIG_USER_ONLY
     DEFINE_PROP_UINT64("resetvec", RISCVCPU, env.resetvec, DEFAULT_RSTVEC),
