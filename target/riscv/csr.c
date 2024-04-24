@@ -4511,6 +4511,66 @@ static int write_wfe(CPURISCVState *env, int csrno, target_ulong val)
     return RISCV_EXCP_NONE;
 }
 
+static int read_safetyctrl(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->safetyctrl;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_safetyctrl(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->safetyctrl = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_stlresult(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->stlresult;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_stlresult(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->stlresult = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mmacro_dev_en(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mmacro_dev_en;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mmacro_dev_en(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mmacro_dev_en = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mmacro_nc_en(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mmacro_nc_en;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mmacro_nc_en(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mmacro_nc_en = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mmacro_cach_en(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mmacro_cach_en;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mmacro_cach_en(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mmacro_cach_en = val;
+    return RISCV_EXCP_NONE;
+}
+
 static int write_mnxti(CPURISCVState *env, int csrno, target_ulong val)
 {
     env->mnxti = val;
@@ -4898,6 +4958,8 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_PUSHMCAUSE] =          { "pushmcause", any,  NULL,  NULL , rmw_pushmcause },
     [CSR_NUCLEI_PUSHMEPC] =            { "pushmepc", any,  NULL,    NULL,  rmw_pushmepc },
     [CSR_NUCLEI_WFE] =                 { "wfe", any,  read_wfe,         write_wfe         },
+    [CSR_NUCLEI_SAFETYCTRL] =          { "safetyctrl", any, read_safetyctrl, write_safetyctrl },
+    [CSR_NUCLEI_STLRESULT] =           { "stlresult", any, read_stlresult, write_stlresult },
     [CSR_NUCLEI_SLEEPVALUE] =          { "sleepvalue", any,  read_sleepvalue,  write_sleepvalue  },
     [CSR_NUCLEI_TXEVT] =               { "txevt", any,  read_txevt,       write_txevt       },
     [CSR_MSCOUNTEREN] =                { "mscounteren", any,   read_mscounteren, write_mscounteren },
@@ -5532,5 +5594,8 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     /* Supervisor Mode Core Level Interrupt Controller */
     [CSR_STVT] = { "stvt", any,  read_stvt, write_stvt       },
     [CSR_SNXTI] = { "snxti", any,   NULL, NULL, rmw_snxti},
+    [CSR_NUCLEI_MMACRO_DEV_EN] = { "mmacro_dev_en", any,  read_mmacro_dev_en, write_mmacro_dev_en },
+    [CSR_NUCLEI_MMACRO_NC_EN] = { "mmacro_nc_en", any,  read_mmacro_nc_en, write_mmacro_nc_en },
+    [CSR_NUCLEI_MMACRO_CACH_EN] = { "mmacro_cach_en", any,  read_mmacro_cach_en, write_mmacro_cach_en },
 #endif /* !CONFIG_USER_ONLY */
 };

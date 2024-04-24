@@ -512,6 +512,8 @@
 #define CSR_NUCLEI_SLEEPVALUE          0x811
 #define CSR_NUCLEI_TXEVT               0x812
 #define CSR_NUCLEI_WFE                 0x810
+#define CSR_NUCLEI_SAFETYCTRL          0x813
+#define CSR_NUCLEI_STLRESULT           0x814
 #define CSR_NUCLEI_SHARTID             0xDC0
 #define CSR_NUCLEI_MICFG_INFO          0xFC0
 #define CSR_NUCLEI_MDCFG_INFO          0xFC1
@@ -543,6 +545,9 @@
 #define CSR_NUCLEI_MATTRI3_MASK    0x7fc
 #define CSR_NUCLEI_MATTRI4_BASE    0x7fd
 #define CSR_NUCLEI_MATTRI4_MASK    0x7fe
+#define CSR_NUCLEI_MMACRO_DEV_EN   0xbc8
+#define CSR_NUCLEI_MMACRO_NC_EN    0xbc9
+#define CSR_NUCLEI_MMACRO_CACH_EN  0xbca
 
 /* === Nuclei N100 TIMER */
 #define CSR_NUCLEI_MSIP            0xBD8

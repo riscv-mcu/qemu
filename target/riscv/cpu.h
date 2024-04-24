@@ -322,6 +322,8 @@ struct CPUArchState {
     target_ulong milm_ctl;
     target_ulong mdlm_ctl;
     target_ulong wfe;
+    target_ulong safetyctrl;
+    target_ulong stlresult;
     target_ulong sleepvalue;
     target_ulong txevt;
     target_ulong msmpcfg_info;
@@ -337,6 +339,9 @@ struct CPUArchState {
     target_ulong mtlb_ctl;
     target_ulong mfp16mode;
     target_ulong shartid;
+    target_ulong mmacro_dev_en;
+    target_ulong mmacro_nc_en;
+    target_ulong mmacro_cach_en;
 
     /* Hypervisor CSRs */
     target_ulong hstatus;
