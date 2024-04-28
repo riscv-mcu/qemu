@@ -1997,9 +1997,13 @@ static RISCVException write_mcountinhibit(CPURISCVState *env, int csrno,
 
     /* Check if any other counter is also monitoring cycles/instructions */
     for (cidx = 0; cidx < RV_MAX_MHPMCOUNTERS; cidx++) {
+        counter = &env->pmu_ctrs[cidx];
         if (!get_field(env->mcountinhibit, BIT(cidx))) {
-            counter = &env->pmu_ctrs[cidx];
             counter->started = true;
+        }
+        else
+        {
+            counter->started = false;
         }
     }
 
