@@ -493,6 +493,8 @@ struct CPUArchState {
     uint64_t mtimecmp;
     uint64_t timecmp;
 
+    QEMUTimer *mtimer; /* Nuclei Internal timer */
+
     hwaddr kernel_addr;
     hwaddr fdt_addr;
 
