@@ -476,6 +476,7 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_ba
                         uint32_t num_harts, DeviceState *eclic, uint32_t timebase_freq)
 {
     hart_numbers = num_harts;
+    int i = 0;
 
     DeviceState *dev = qdev_new(TYPE_NUCLEI_SYSTIMER);
     qdev_prop_set_uint32(dev, "hartid-base", hartid_base);
@@ -486,7 +487,36 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_ba
     qdev_prop_set_uint32(dev, "ssip-base", NUCLEI_SSIP_BASE);
     qdev_prop_set_uint32(dev, "aperture-size", size);
     qdev_prop_set_uint32(dev, "timebase-freq", timebase_freq);
+    NucLeiSYSTIMERState *s = NUCLEI_SYSTIMER(dev);
 
+    s->timer_irq = g_new0(qemu_irq *, s->num_harts);
+    s->soft_irq  = g_new0(qemu_irq *, s->num_harts);
+
+    for (i = 0; i < num_harts; i++) {
+        CPUState *cpu = qemu_get_cpu(hartid_base + i);
+        CPURISCVState *env = cpu ? cpu_env(cpu) : NULL;
+
+        if (!env) {
+            continue;
+        }
+
+        env->mtimecmp = 0;
+        if(eclic != NULL)
+        {
+            s->eclic = eclic;
+            s->soft_irq[i] =&(NUCLEI_ECLIC(eclic)->irqs[Internal_SysTimerSW_IRQn][i]);
+            s->timer_irq[i] = &(NUCLEI_ECLIC(eclic)->irqs[Internal_SysTimer_IRQn][i]);
+            riscv_cpu_set_rdtime_fn(env, nuclei_cpu_riscv_read_rtc, &(s->timebase_freq));
+            env->mtimer = timer_new_ns(QEMU_CLOCK_VIRTUAL,
+                                        &nuclei_mtimecmp_cb, cpu);
+        }
+        else
+        {
+            riscv_cpu_set_rdtime_fn(env, nuclei_cpu_riscv_read_rtc, &(s->timebase_freq));
+            env->mtimer = timer_new_ns(QEMU_CLOCK_VIRTUAL,
+                                        &sifive_clint_timer_cb, cpu);
+        }
+    }
     sysbus_realize_and_unref(SYS_BUS_DEVICE(dev), &error_fatal);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, addr);
 
