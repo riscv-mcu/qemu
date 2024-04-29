@@ -507,6 +507,7 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, bool prv_s, uint32
             s->eclic = eclic;
             s->soft_irq[i] =&(NUCLEI_ECLIC(eclic)->irqs[Internal_SysTimerSW_IRQn][i]);
             s->timer_irq[i] = &(NUCLEI_ECLIC(eclic)->irqs[Internal_SysTimer_IRQn][i]);
+            riscv_cpu_set_rdtime_fn(env, nuclei_cpu_riscv_read_rtc, &(s->timebase_freq));
             env->mtimer = timer_new_ns(QEMU_CLOCK_VIRTUAL,
                                         &nuclei_mtimecmp_cb, cpu);
         }
