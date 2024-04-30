@@ -76,3 +76,4 @@ specific_ss.add(when: 'CONFIG_LOONGARCH_PCH_PIC', if_true: files('loongarch_pch_
 specific_ss.add(when: 'CONFIG_LOONGARCH_PCH_MSI', if_true: files('loongarch_pch_msi.c'))
 specific_ss.add(when: 'CONFIG_LOONGARCH_EXTIOI', if_true: files('loongarch_extioi.c'))
 specific_ss.add(when: 'CONFIG_NUCLEI_SYSTIMER', if_true: files('nuclei_systimer.c'))
+specific_ss.add(when: 'CONFIG_NUCLEI_ECLIC', if_true: files('nuclei_eclic.c'))

@@ -619,6 +619,32 @@ void riscv_cpu_set_geilen(CPURISCVState *env, target_ulong geilen)
     env->geilen = geilen;
 }
 
+void riscv_cpu_eclic_interrupt(RISCVCPU *cpu, int exccode)
+{
+    CPURISCVState *env = &cpu->env;
+    bool locked = false;
+
+    env->exccode = exccode;
+
+    if (!bql_locked()) {
+        locked = true;
+        bql_lock();
+    }
+
+    if (exccode != -1) {
+        env->irq_pending = true;
+        cpu_interrupt(CPU(cpu), CPU_INTERRUPT_ECLIC);
+
+    } else {
+        env->irq_pending = false;
+        cpu_reset_interrupt(CPU(cpu), CPU_INTERRUPT_ECLIC);
+    }
+
+    if (locked) {
+        bql_unlock();
+    }
+}
+
 int riscv_cpu_claim_interrupts(RISCVCPU *cpu, uint64_t interrupts)
 {
     CPURISCVState *env = &cpu->env;
