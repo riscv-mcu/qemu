@@ -38,6 +38,10 @@
 #include "hw/intc/nuclei_eclic.h"
 #endif
 
+#if !defined(CONFIG_USER_ONLY)
+#include "hw/intc/riscv_clic.h"
+#endif
+
 int riscv_env_mmu_index(CPURISCVState *env, bool ifetch)
 {
 #ifdef CONFIG_USER_ONLY
@@ -1710,7 +1714,7 @@ static target_ulong riscv_intr_pc(CPURISCVState *env, target_ulong tvec,
                                   int cause, int mode)
 {
     int mode1 = tvec & 0b11, mode2 = tvec & 0b111111;
-    //CPUState *cs = env_cpu(env);
+    CPUState *cs = env_cpu(env);
 
     if (!(async || clic)) {
         return tvec & ~0b11;
@@ -1724,12 +1728,11 @@ static target_ulong riscv_intr_pc(CPURISCVState *env, target_ulong tvec,
     default:
         if (env->clic && (mode2 == 0b000011)) {
             /* Non-vectored, clicintattr[i].shv = 0 || cliccfg.nvbits = 0 */
-            // if (!riscv_clic_shv_interrupt(env->clic, mode, cs->cpu_index,
-            //                               cause)) {
-            //     /* NBASE = mtvec[XLEN-1:6]<<6 */
-            //     return tvec & ~0b111111;
-            // } else {
-            {
+            if (!riscv_clic_shv_interrupt(env->clic, mode, cs->cpu_index,
+                                          cause)) {
+                /* NBASE = mtvec[XLEN-1:6]<<6 */
+                return tvec & ~0b111111;
+            } else {
                 /*
                  * pc := M[TBASE + XLEN/8 * exccode)] & ~1,
                  * TBASE = mtvt[XLEN-1:6]<<6
