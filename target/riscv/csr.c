@@ -29,9 +29,11 @@
 #include "sysemu/cpu-timers.h"
 #include "qemu/guest-random.h"
 #include "qapi/error.h"
+#include "qemu/main-loop.h"
 
 #if !defined(CONFIG_USER_ONLY)
 #include "hw/intc/nuclei_eclic.h"
+#include "hw/intc/riscv_clic.h"
 #endif
 
 /* CSR function table public API */
@@ -2749,12 +2751,101 @@ static RISCVException rmw_mip(CPURISCVState *env, int csrno,
     uint64_t rval;
     RISCVException ret;
 
+     /* The xip CSR appears hardwired to zero in CLIC mode. (Section 4.3) */
+    if (riscv_intc_is_clic_mode(env)) {
+        *ret_val = 0;
+        return RISCV_EXCP_NONE;
+    }
+
     ret = rmw_mip64(env, csrno, &rval, new_val, wr_mask);
     if (ret_val) {
         *ret_val = rval;
     }
 
     return ret;
+}
+
+static bool get_xnxti_status(CPURISCVState *env)
+{
+    CPUState *cs = env_cpu(env);
+    int clic_irq, clic_priv, clic_il, pil;
+
+    if (!env->exccode) { /* No interrupt */
+        return false;
+    }
+    /* The system is not in a CLIC mode */
+    if (!riscv_intc_is_clic_mode(env)) {
+        return false;
+    } else {
+        riscv_clic_decode_exccode(env->exccode, &clic_priv, &clic_il,
+                                  &clic_irq);
+
+        if (env->priv == PRV_M) {
+            pil = MAX(get_field(env->mcause, MCAUSE_MPIL), env->mintthresh);
+        } else if (env->priv == PRV_S) {
+            pil = MAX(get_field(env->scause, SCAUSE_SPIL), env->sintthresh);
+        } else {
+            qemu_log_mask(LOG_GUEST_ERROR,
+                          "CSR: rmw xnxti with unsupported mode\n");
+            exit(1);
+        }
+
+        if ((clic_priv != env->priv) || /* No horizontal interrupt */
+            (clic_il <= pil) || /* No higher level interrupt */
+            (riscv_clic_shv_interrupt(env->clic, clic_priv, cs->cpu_index,
+                                      clic_irq))) { /* CLIC vector mode */
+            return false;
+        } else {
+            return true;
+        }
+    }
+}
+
+static int rmw_mnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                     target_ulong new_value, target_ulong write_mask)
+{
+    int clic_priv, clic_il, clic_irq;
+    bool ready;
+    CPUState *cs = env_cpu(env);
+
+    // If in debug mode, directly return
+    if (env->debugger) {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+        return RISCV_EXCP_NONE;
+    }
+
+    if (write_mask) {
+        env->mstatus |= new_value & (write_mask & 0b11111);
+    }
+
+    bql_lock();
+    ready = get_xnxti_status(env);
+    if (ready) {
+        riscv_clic_decode_exccode(env->exccode, &clic_priv, &clic_il,
+                                  &clic_irq);
+        if (write_mask) {
+            bool edge = riscv_clic_edge_triggered(env->clic, clic_priv,
+                                                  cs->cpu_index, clic_irq);
+            if (edge) {
+                riscv_clic_clean_pending(env->clic, clic_priv,
+                                         cs->cpu_index, clic_irq);
+            }
+            env->mintstatus = set_field(env->mintstatus,
+                                        MINTSTATUS_MIL, clic_il);
+            env->mcause = set_field(env->mcause, MCAUSE_EXCCODE, clic_irq);
+        }
+        if (ret_value) {
+            *ret_value = (env->mtvt & ~0x3f) + sizeof(target_ulong) * clic_irq;
+        }
+    } else {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+    }
+    bql_unlock();
+    return RISCV_EXCP_NONE;
 }
 
 static RISCVException rmw_miph(CPURISCVState *env, int csrno,
@@ -3101,9 +3192,18 @@ static RISCVException read_stvec(CPURISCVState *env, int csrno,
 static RISCVException write_stvec(CPURISCVState *env, int csrno,
                                   target_ulong val)
 {
-    /* bits [1:0] encode mode; 0 = direct, 1 = vectored, 2 >= reserved */
+    /*
+     * bits [1:0] encode mode; 0 = direct, 1 = vectored, 3 = CLIC,
+     * others reserved
+     */
     if ((val & 3) < 2) {
         env->stvec = val;
+    } else if ((val & 1) && env->clic) {
+        /*
+         * If only CLIC mode is supported, writes to bit 1 are also ignored and
+         * it is always set to one. CLIC mode hardwires xtvec bits 2-5 to zero.
+         */
+        env->stvec = ((val & ~0x3f) << 6) | (0b000011);
     } else {
         qemu_log_mask(LOG_UNIMP, "CSR_STVEC: reserved mode not supported\n");
     }
@@ -3297,12 +3397,65 @@ static RISCVException rmw_sip(CPURISCVState *env, int csrno,
     uint64_t rval;
     RISCVException ret;
 
+    /* The xip CSR appears hardwired to zero in CLIC mode. (Section 4.3) */
+    if (riscv_intc_is_clic_mode(env)) {
+        *ret_val = 0;
+        return RISCV_EXCP_NONE;
+    }
+
     ret = rmw_sip64(env, csrno, &rval, new_val, wr_mask);
     if (ret_val) {
         *ret_val = rval;
     }
 
     return ret;
+}
+
+static int rmw_snxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                     target_ulong new_value, target_ulong write_mask)
+{
+    int clic_priv, clic_il, clic_irq;
+    bool ready;
+    CPUState *cs = env_cpu(env);
+
+    // If in debug mode, directly return
+    if (env->debugger) {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+        return RISCV_EXCP_NONE;
+    }
+
+    if (write_mask) {
+        env->mstatus |= new_value & (write_mask & 0b11111);
+    }
+
+    bql_lock();
+    ready = get_xnxti_status(env);
+    if (ready) {
+        riscv_clic_decode_exccode(env->exccode, &clic_priv, &clic_il,
+                                  &clic_irq);
+        if (write_mask) {
+            bool edge = riscv_clic_edge_triggered(env->clic, clic_priv,
+                                                  cs->cpu_index, clic_irq);
+            if (edge) {
+                riscv_clic_clean_pending(env->clic, clic_priv,
+                                         cs->cpu_index, clic_irq);
+            }
+            env->mintstatus = set_field(env->mintstatus,
+                                        MINTSTATUS_SIL, clic_il);
+            env->scause = set_field(env->scause, SCAUSE_EXCCODE, clic_irq);
+        }
+        if (ret_value) {
+            *ret_value = (env->stvt & ~0x3f) + sizeof(target_ulong) * clic_irq;
+        }
+    } else {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+    }
+    bql_unlock();
+    return RISCV_EXCP_NONE;
 }
 
 static RISCVException rmw_siph(CPURISCVState *env, int csrno,
@@ -5186,11 +5339,18 @@ static int rmw_pushmsubm(CPURISCVState *env, int csrno, target_ulong *ret_value,
 {
     uint64_t notify_addr = 0;
     uint32_t riscv_addr_size = 4;
-    if (riscv_cpu_mxl(env) == MXL_RV32)
-    {
+
+    // If in debug mode, directly return
+    if (env->debugger) {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+        return RISCV_EXCP_NONE;
     }
-    else
-    {
+
+    if (riscv_cpu_mxl(env) == MXL_RV32) {
+    } else {
+
         riscv_addr_size = 8;
     }
 
@@ -5223,12 +5383,17 @@ static int rmw_jalmnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
 #ifndef CONFIG_USER_ONLY
     target_ulong addr;
 
-    uint32_t riscv_addr_size = 4;
-    if (riscv_cpu_mxl(env) == MXL_RV32)
-    {
+    // If in debug mode, directly return
+    if (env->debugger) {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+        return RISCV_EXCP_NONE;
     }
-    else
-    {
+
+    uint32_t riscv_addr_size = 4;
+    if (riscv_cpu_mxl(env) == MXL_RV32) {
+    } else {
         riscv_addr_size = 8;
     }
 
@@ -5251,6 +5416,15 @@ static int rmw_pushmcause(CPURISCVState *env, int csrno, target_ulong *ret_value
 {
     uint64_t notify_addr = 0;
     uint32_t riscv_addr_size = 4;
+
+    // If in debug mode, directly return
+    if (env->debugger) {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+        return RISCV_EXCP_NONE;
+    }
+
     if (riscv_cpu_mxl(env) == MXL_RV32) {
     } else {
         riscv_addr_size = 8;
@@ -5266,11 +5440,16 @@ static int rmw_pushmepc(CPURISCVState *env, int csrno, target_ulong *ret_value,
     uint64_t notify_addr = 0;
     uint32_t riscv_addr_size = 4;
 
-    if (riscv_cpu_mxl(env) == MXL_RV32)
-    {
+    // If in debug mode, directly return
+    if (env->debugger) {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+        return RISCV_EXCP_NONE;
     }
-    else
-    {
+
+    if (riscv_cpu_mxl(env) == MXL_RV32) {
+    } else {
         riscv_addr_size = 8;
     }
 
@@ -5349,18 +5528,6 @@ static int read_sintstatus(CPURISCVState *env, int csrno, target_ulong *val)
 static int write_mnxti(CPURISCVState *env, int csrno, target_ulong val)
 {
     env->mnxti = val;
-    return RISCV_EXCP_NONE;
-}
-
-static int rmw_mnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
-                     target_ulong new_value, target_ulong write_mask)
-{
-    return RISCV_EXCP_NONE;
-}
-
-static int rmw_snxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
-                     target_ulong new_value, target_ulong write_mask)
-{
     return RISCV_EXCP_NONE;
 }
 

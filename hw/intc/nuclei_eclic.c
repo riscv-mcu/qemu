@@ -42,8 +42,18 @@ static void nuclei_eclic_update_intattr(NucLeiECLICState *eclic, int irq, int ne
 static void nuclei_eclic_update_intctl(NucLeiECLICState *eclic, int irq, int new_intctl);
 static void eclic_insert_pending_list(NucLeiECLICState *eclic, int irq);
 static void eclic_remove_pending_list(NucLeiECLICState *eclic, int irq);
-static void nuclei_eclic_next_interrupt(void *eclic);
 static void update_eclic_int_info(NucLeiECLICState *eclic, int irq);
+
+/*
+6'b000011:clic
+else:     clint
+ */
+bool riscv_intc_is_clic_mode(CPURISCVState *env)
+{
+    target_ulong xtvec = (env->priv == PRV_M) ? env->mtvec : env->stvec;
+    return env->eclic && ((xtvec & 0x3F) == 3);
+}
+
 qemu_irq nuclei_eclic_get_irq(DeviceState *dev, int irq)
 {
     NucLeiECLICState *eclic = NUCLEI_ECLIC(dev);
@@ -232,19 +242,21 @@ static void update_eclic_int_info(NucLeiECLICState *eclic, int irq)
     eclic->clicintlist[irq].trigger = (eclic->clicintattr[irq] >> 1) & 0x3;
 }
 
-static void nuclei_eclic_next_interrupt(void *eclic_ptr)
+void nuclei_eclic_next_interrupt(void *eclic_ptr)
 {
     RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(0));
     NucLeiECLICState *eclic = (NucLeiECLICState *)eclic_ptr;
     ECLICPendingInterrupt *active;
     int shv;
+    int mode = PRV_M;
 
     QLIST_FOREACH(active, &eclic->pending_list, next)
     {
         if (active->enable)
         {
             if (active->level >= eclic->mth)
-            {
+            {                  
+                eclic->exccode[0] = active->irq | mode << 12 | active->level << 14; 
                 shv = eclic->clicintattr[active->irq] & 0x1;
                 eclic->active_count++;
                 riscv_cpu_eclic_interrupt(cpu, (active->irq & 0xFFF) | (shv << 12) | (active->level << 13));

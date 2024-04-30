@@ -1266,13 +1266,21 @@ bool riscv_cpu_has_work(CPUState *cs)
 #ifndef CONFIG_USER_ONLY
     RISCVCPU *cpu = RISCV_CPU(cs);
     CPURISCVState *env = &cpu->env;
+    int eclic_irq_panding = env->exccode & 0x3FF;
+
     /*
      * Definition of the WFI instruction requires it to ignore the privilege
      * mode and delegation registers, but respect individual enables
      */
+    if ((eclic_irq_panding > 0) && (eclic_irq_panding < 0x3ff)) {
+    } else {
+        eclic_irq_panding = 0;
+    }
+
     return riscv_cpu_all_pending(env) != 0 ||
         riscv_cpu_sirq_pending(env) != RISCV_EXCP_NONE ||
-        riscv_cpu_vsirq_pending(env) != RISCV_EXCP_NONE;
+        riscv_cpu_vsirq_pending(env) != RISCV_EXCP_NONE ||
+        eclic_irq_panding;
 #else
     return true;
 #endif

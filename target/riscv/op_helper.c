@@ -24,6 +24,12 @@
 #include "exec/exec-all.h"
 #include "exec/cpu_ldst.h"
 #include "exec/helper-proto.h"
+#include "qemu/main-loop.h"
+
+#if !defined(CONFIG_USER_ONLY)
+#include "hw/intc/riscv_clic.h"
+#include "hw/intc/nuclei_eclic.h"
+#endif
 
 /* Exceptions processing helpers */
 G_NORETURN void riscv_raise_exception(CPURISCVState *env,
@@ -264,6 +270,16 @@ target_ulong helper_sret(CPURISCVState *env)
     uint64_t mstatus;
     target_ulong prev_priv, prev_virt = env->virt_enabled;
 
+    if (riscv_intc_is_clic_mode(env)) {
+        target_ulong spil = get_field(env->scause, SCAUSE_SPIL);
+        env->mintstatus = set_field(env->mintstatus, MINTSTATUS_SIL, spil);
+        env->scause = set_field(env->scause, SCAUSE_SPIE, 0);
+        env->scause = set_field(env->scause, SCAUSE_SPP, PRV_U);
+        bql_lock();
+        nuclei_eclic_next_interrupt(env->eclic);
+        bql_unlock();
+    }
+
     if (!(env->priv >= PRV_S)) {
         riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, GETPC());
     }
@@ -324,9 +340,9 @@ target_ulong helper_mret(CPURISCVState *env)
     }
 
     /* if ECLIC mode */
-    if ((env->mtvec & 0b111111) == 0b000011) {
-        env->mintstatus = set_field(env->mintstatus, MINTSTATUS_MIL,
-                    get_field(env->mcause, MCAUSE_MPIL));
+    if (riscv_intc_is_clic_mode(env)) {
+        target_ulong mpil = get_field(env->mcause, MCAUSE_MPIL);
+        env->mintstatus = set_field(env->mintstatus, MINTSTATUS_MIL, mpil);
 
         if(get_field(env->mcause, MCAUSE_INTERRUPT) == 1)
             env->mstatus = set_field(env->mstatus, MSTATUS_MPP,
@@ -359,6 +375,12 @@ target_ulong helper_mret(CPURISCVState *env)
     }
 
     riscv_cpu_set_mode(env, prev_priv, prev_virt);
+
+    if (riscv_intc_is_clic_mode(env)) {
+        bql_lock();
+        nuclei_eclic_next_interrupt(env->eclic);
+        bql_unlock();
+    }
 
     return retpc;
 }

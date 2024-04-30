@@ -73,6 +73,11 @@ config RISCV_APLIC
     bool
     select MSI_NONBROKEN
 
+config RISCV_CLIC
+    bool
+    default y
+    depends on RISCV32 || RISCV64
+
 config RISCV_IMSIC
     bool
     select MSI_NONBROKEN
