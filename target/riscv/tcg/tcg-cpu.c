@@ -623,6 +623,22 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         cpu->pmu_avail_ctrs = 0;
     }
 
+    if (cpu->cfg.ext_xxlcz) {
+        cpu->env.mcfg_info |= (1 << 15);
+    }
+
+    if (cpu->cfg.ext_xxldspn3x) {
+        cpu->env.mcfg_info |= (1 << 14);
+    }
+
+    if (cpu->cfg.ext_xxldspn2x) {
+        cpu->env.mcfg_info |= (1 << 13);
+    }
+
+    if (cpu->cfg.ext_xxldspn1x) {
+        cpu->env.mcfg_info |= (1 << 12);
+    }
+
     /*
      * Disable isa extensions based on priv spec after we
      * validated and set everything we need.
