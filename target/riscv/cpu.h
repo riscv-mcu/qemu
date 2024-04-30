@@ -206,6 +206,8 @@ struct CPUArchState {
 
     target_ulong jvt;
 
+    target_ulong ucode;
+
 #ifdef CONFIG_USER_ONLY
     uint32_t elf_flags;
 #endif
@@ -428,6 +430,68 @@ struct CPUArchState {
     QEMUTimer *stimer; /* Internal timer for S-mode interrupt */
     QEMUTimer *vstimer; /* Internal timer for VS-mode interrupt */
     bool vstime_irq;
+
+    target_ulong stvt; /* clic-spec */
+    target_ulong sintthresh; /* clic-spec */
+    target_ulong mtvt;
+
+    target_ulong mnxti;
+    target_ulong mintstatus;
+    target_ulong mintthresh; /* clic-spec */
+    target_ulong mclicbase; /* clic-spec */
+    target_ulong mscratchcsw;
+    target_ulong mscratchcswl;
+
+    /* NMI  CSR*/
+    target_ulong mnvec;
+    target_ulong msubm;
+    target_ulong mdcause;
+    target_ulong mcache_ctl;
+    target_ulong mmisc_ctl;
+    target_ulong msavestatus;
+    target_ulong msaveepc1;
+    target_ulong msavecause1;
+    target_ulong msaveepc2;
+    target_ulong msavecause2;
+    target_ulong msavedcause1;
+    target_ulong msavedcause2;
+    target_ulong pushmsubm;
+    target_ulong mtvt2;
+    target_ulong jalmnxti;
+    target_ulong pushmcause;
+    target_ulong pushmepc;
+
+    target_ulong wfe;
+    target_ulong sleepvalue;
+    target_ulong txevt;
+    target_ulong msmpcfg_info;
+    target_ulong mirgb_info;
+    target_ulong mcfg_info;
+
+    target_ulong milm_ctl;
+    target_ulong mdlm_ctl;
+    target_ulong mecc_ctrl;
+    target_ulong mecc_status;
+    target_ulong mstack_ctl;
+    target_ulong mstack_bound;
+    target_ulong mstack_base;
+    target_ulong micfg_info;
+    target_ulong mdcfg_info;
+    target_ulong mtlbcfg_info;
+    target_ulong mppicfg_info;
+    target_ulong mfiocfg_info;
+
+    target_ulong mtlb_ctl;
+    target_ulong mfp16mode;
+    target_ulong safety_crc_ctl;
+    target_ulong safety_stl_status;
+    target_ulong mmacro_dev_en;
+    target_ulong mmacro_nc_en;
+    target_ulong mmacro_cach_en;
+
+    /*nuclei timer comparators */
+    uint64_t mtimecmp;
+    uint64_t timecmp;
 
     hwaddr kernel_addr;
     hwaddr fdt_addr;

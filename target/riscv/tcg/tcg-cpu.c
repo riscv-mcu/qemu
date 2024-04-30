@@ -731,18 +731,22 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczbri), true);
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczbitrev), true);
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczgp), true);
+        cpu->env.mcfg_info |= (1 << 15);
     }
 
     if (cpu->cfg.ext_xxldspn3x) {
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxldspn2x), true);
+        cpu->env.mcfg_info |= (1 << 14);
     }
 
     if (cpu->cfg.ext_xxldspn2x) {
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxldspn1x), true);
+        cpu->env.mcfg_info |= (1 << 13);
     }
 
     if (cpu->cfg.ext_xxldspn1x) {
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxldsp), true);
+        cpu->env.mcfg_info |= (1 << 12);
     }
 
     /*
