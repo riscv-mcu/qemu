@@ -33,6 +33,11 @@
 #include "cpu_bits.h"
 #include "debug.h"
 #include "tcg/oversized-guest.h"
+#include "exec/cpu_ldst.h"
+
+#ifndef CONFIG_USER_ONLY
+#include "hw/intc/nuclei_eclic.h"
+#endif
 
 int riscv_env_mmu_index(CPURISCVState *env, bool ifetch)
 {
@@ -62,6 +67,22 @@ int riscv_env_mmu_index(CPURISCVState *env, bool ifetch)
     return mode | (virt ? MMU_2STAGE_BIT : 0);
 #endif
 }
+
+#ifndef CONFIG_USER_ONLY
+static int riscv_cpu_local_irq_mode_enabled(CPUState *cs, int excode, int level)
+{
+
+    RISCVCPU *cpu = RISCV_CPU(cs);
+    CPURISCVState *env = &cpu->env;
+
+    target_ulong mintstatus_mil = get_field(env->mintstatus, MINTSTATUS_MIL);
+
+    if (mintstatus_mil >= level) {
+        return false;
+    }
+    return env->priv < PRV_M || (env->priv == PRV_M && get_field(env->mstatus, MSTATUS_MIE));
+}
+#endif
 
 void cpu_get_tb_cpu_state(CPURISCVState *env, vaddr *pc,
                           uint64_t *cs_base, uint32_t *pflags)
@@ -506,6 +527,24 @@ bool riscv_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
             return true;
         }
     }
+
+#ifndef CONFIG_USER_ONLY
+    if (interrupt_request & CPU_INTERRUPT_ECLIC) {
+        RISCVCPU *cpu = RISCV_CPU(cs);
+        CPURISCVState *env = &cpu->env;
+
+        int exccode = env->exccode & 0x3FF;
+        int level = (env->exccode >> 13) & 0xFF;
+
+        int enabled = riscv_cpu_local_irq_mode_enabled(cs, exccode, level);
+
+        if(enabled && env->exccode ){
+            cs->exception_index = RISCV_EXCP_INT_ECLIC |  env->exccode;
+            riscv_cpu_do_interrupt(cs);
+            return true;
+        }
+    }
+#endif
     return false;
 }
 
@@ -1667,6 +1706,55 @@ static target_ulong riscv_transformed_insn(CPURISCVState *env,
     return xinsn;
 }
 
+#if !defined(CONFIG_USER_ONLY)
+static target_ulong riscv_intr_pc(CPURISCVState *env, target_ulong tvec,
+                                  target_ulong tvt, bool async, bool clic,
+                                  int cause, int mode)
+{
+    int mode1 = tvec & 0b11, mode2 = tvec & 0b111111;
+    //CPUState *cs = env_cpu(env);
+
+    if (!(async || clic)) {
+        return tvec & ~0b11;
+    }
+    /* bits [1:0] encode mode; 0 = direct, 1 = vectored, 2 >= reserved */
+    switch (mode1) {
+    case 0b00:
+        return tvec & ~0b11;
+    case 0b01:
+        return (tvec & ~0b11) + cause * 4;
+    default:
+        if (env->clic && (mode2 == 0b000011)) {
+            /* Non-vectored, clicintattr[i].shv = 0 || cliccfg.nvbits = 0 */
+            // if (!riscv_clic_shv_interrupt(env->clic, mode, cs->cpu_index,
+            //                               cause)) {
+            //     /* NBASE = mtvec[XLEN-1:6]<<6 */
+            //     return tvec & ~0b111111;
+            // } else {
+            {
+                /*
+                 * pc := M[TBASE + XLEN/8 * exccode)] & ~1,
+                 * TBASE = mtvt[XLEN-1:6]<<6
+                 */
+                int size = TARGET_LONG_BITS / 8;
+                target_ulong tbase = (tvt & ~0b111111) + size * cause;
+                void *host = tlb_vaddr_to_host(env, tbase, MMU_DATA_LOAD, mode);
+                if (host != NULL) {
+                    target_ulong new_pc = ldn_p(host, size);
+                    if (tlb_vaddr_to_host(env, new_pc, MMU_INST_FETCH, mode)) {
+                        return new_pc;
+                    }
+                }
+                qemu_log_mask(LOG_GUEST_ERROR,
+                              "CLIC: load trap handler error!\n");
+                exit(1);
+            }
+        }
+        g_assert_not_reached();
+    }
+}
+#endif
+
 /*
  * Handle Traps
  *
@@ -1680,12 +1768,15 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     bool virt = env->virt_enabled;
     bool write_gva = false;
     uint64_t s;
+    int mode = 0, level = 0;
+    target_ulong newpc = 0;
 
     /*
      * cs->exception is 32-bits wide unlike mcause which is XLEN-bits wide
      * so we mask off the MSB and separate into trap type and cause.
      */
     bool async = !!(cs->exception_index & RISCV_EXCP_INT_FLAG);
+    bool eclic_flag = !!(cs->exception_index & RISCV_EXCP_INT_ECLIC);  //TODO: eclic support
     target_ulong cause = cs->exception_index & RISCV_EXCP_INT_MASK;
     uint64_t deleg = async ? env->mideleg : env->medeleg;
     bool s_injected = env->mvip & (1 << cause) & env->mvien &&
@@ -1746,13 +1837,6 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         case RISCV_EXCP_VIRT_INSTRUCTION_FAULT:
             tval = env->bins;
             break;
-        case RISCV_EXCP_BREAKPOINT:
-            tval = env->badaddr;
-            if (cs->watchpoint_hit) {
-                tval = cs->watchpoint_hit->hitaddr;
-                cs->watchpoint_hit = NULL;
-            }
-            break;
         default:
             break;
         }
@@ -1770,6 +1854,20 @@ void riscv_cpu_do_interrupt(CPUState *cs)
                 cause = RISCV_EXCP_U_ECALL;
             }
         }
+    }
+    if (eclic_flag) {
+        mode = (cause >> 12) & 0x1;
+        level = (cause >> 13) & 0xFF;
+        cause &= 0x3ff;
+        cause |= get_field(env->mstatus, MSTATUS_MPP) << 28;
+        cause |= get_field(env->mintstatus, MINTSTATUS_MIL) << 16;
+        cause |= get_field(env->mstatus, MSTATUS_MPIE) << 27;
+        cause = set_field(cause, MCAUSE_MPP, PRV_M);
+        cause = set_field(cause, MCAUSE_INTERRUPT, 1);
+
+        env->mintstatus = set_field(env->mintstatus, MINTSTATUS_MIL, level);
+    } else {
+        cause = set_field(cause, MCAUSE_INTERRUPT, 0);
     }
 
     trace_riscv_trap(env->mhartid, async, cause, env->pc, tval,
@@ -1822,16 +1920,38 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         s = set_field(s, MSTATUS_SPP, env->priv);
         s = set_field(s, MSTATUS_SIE, 0);
         env->mstatus = s;
-        env->scause = cause | ((target_ulong)async << (TARGET_LONG_BITS - 1));
+        env->scause = cause | ((target_ulong)(async | eclic_flag) <<
+                               (TARGET_LONG_BITS - 1));
         env->sepc = env->pc;
         env->stval = tval;
         env->htval = htval;
         env->htinst = tinst;
-        env->pc = (env->stvec >> 2 << 2) +
-                  ((async && (env->stvec & 3) == 1) ? cause * 4 : 0);
+        env->pc = riscv_intr_pc(env, env->stvec, env->stvt, async,
+                                eclic_flag & 0xfff, cause, PRV_S);
         riscv_cpu_set_mode(env, PRV_S, virt);
     } else {
         /* handle the trap in M-mode */
+        if (eclic_flag) {
+            uint32_t riscv_addr_size = 4; 
+            if (riscv_cpu_mxl(env) == MXL_RV64) {
+                riscv_addr_size = 8;
+            }
+
+            if (mode) {
+                uint64_t vec_addr = (cause & 0x3FF) *riscv_addr_size + env->mtvt;
+                cpu_physical_memory_rw(vec_addr, &newpc,  riscv_addr_size, 0);
+            } else {
+                if ((env->mtvt2 & 0x1) == 0) {
+                    newpc = env->mtvec & 0xfffffffc;
+                } else if ((env->mtvt2 & 0x1) == 1) {
+                    newpc = env->mtvt2 & 0xfffffffc;
+                }
+            }
+
+        } else {
+            newpc = (env->mtvec >> 2 << 2) +
+                ((async && (env->mtvec & 3) == 1) ? cause * 4 : 0);
+        }
         if (riscv_has_ext(env, RVH)) {
             if (env->virt_enabled) {
                 riscv_cpu_swap_hypervisor_regs(env);
@@ -1858,8 +1978,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         env->mtval = tval;
         env->mtval2 = mtval2;
         env->mtinst = tinst;
-        env->pc = (env->mtvec >> 2 << 2) +
-                  ((async && (env->mtvec & 3) == 1) ? cause * 4 : 0);
+        env->pc = newpc;
         riscv_cpu_set_mode(env, PRV_M, virt);
     }
 
@@ -1872,6 +1991,9 @@ void riscv_cpu_do_interrupt(CPUState *cs)
 
     env->two_stage_lookup = false;
     env->two_stage_indirect_lookup = false;
+
+    if (eclic_flag && mode)
+        riscv_cpu_eclic_int_handler_start(env->eclic, cause & 0x3ff);
 }
 
 #endif /* !CONFIG_USER_ONLY */
