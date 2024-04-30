@@ -35,6 +35,7 @@
 
 typedef struct CPUArchState CPURISCVState;
 
+#define CPU_INTERRUPT_ECLIC CPU_INTERRUPT_TGT_EXT_0
 #define CPU_RESOLVING_TYPE TYPE_RISCV_CPU
 
 #if defined(TARGET_RISCV32)
@@ -495,6 +496,9 @@ struct CPUArchState {
 
     QEMUTimer *mtimer; /* Nuclei Internal timer */
 
+    uint32_t exccode;
+    bool irq_pending;
+
     hwaddr kernel_addr;
     hwaddr fdt_addr;
 
@@ -902,5 +906,7 @@ target_ulong riscv_new_csr_seed(target_ulong new_value,
 
 uint8_t satp_mode_max_from_map(uint32_t map);
 const char *satp_mode_str(uint8_t satp_mode, bool is_32_bit);
+
+void riscv_cpu_eclic_interrupt(RISCVCPU *cpu, int exccode);
 
 #endif /* RISCV_CPU_H */
