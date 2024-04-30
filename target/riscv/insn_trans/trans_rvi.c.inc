@@ -825,6 +825,13 @@ static bool trans_fence_i(DisasContext *ctx, arg_fence_i *a)
     return true;
 }
 
+static bool do_csr_post2(DisasContext *ctx)
+{
+    tcg_gen_exit_tb(NULL, 0);
+    ctx->base.is_jmp = DISAS_NORETURN;
+    return true;
+}
+
 static bool do_csr_post(DisasContext *ctx)
 {
     /* The helper may raise ILLEGAL_INSN -- record binv for unwind. */
@@ -862,9 +869,17 @@ static bool do_csrrw(DisasContext *ctx, int rd, int rc, TCGv src, TCGv mask)
     TCGv_i32 csr = tcg_constant_i32(rc);
 
     translator_io_start(&ctx->base);
-    gen_helper_csrrw(dest, tcg_env, csr, src, mask);
-    gen_set_gpr(ctx, rd, dest);
-    return do_csr_post(ctx);
+    if(rc == CSR_NUCLEI_JALMNXTI)
+    {
+        gen_helper_csrrw(cpu_pc, tcg_env, csr, src, mask);
+        return do_csr_post2(ctx);
+    }
+    else
+    {
+        gen_helper_csrrw(dest, tcg_env, csr, src, mask);
+        gen_set_gpr(ctx, rd, dest);
+        return do_csr_post(ctx);
+    }
 }
 
 static bool do_csrr_i128(DisasContext *ctx, int rd, int rc)

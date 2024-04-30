@@ -30,6 +30,9 @@
 #include "qemu/guest-random.h"
 #include "qapi/error.h"
 
+#if !defined(CONFIG_USER_ONLY)
+#include "hw/intc/nuclei_eclic.h"
+#endif
 
 /* CSR function table public API */
 void riscv_get_csr_ops(int csrno, riscv_csr_operations *ops)
@@ -1952,12 +1955,23 @@ static RISCVException read_mtvec(CPURISCVState *env, int csrno,
 static RISCVException write_mtvec(CPURISCVState *env, int csrno,
                                   target_ulong val)
 {
+    int mode1 = val & 0b11, mode2 = val & 0b111111;
     /* bits [1:0] encode mode; 0 = direct, 1 = vectored, 2 >= reserved */
-    if ((val & 3) < 2) {
+    if (mode1 < 2) {
         env->mtvec = val;
+        env->mnvec = val;
     } else {
-        qemu_log_mask(LOG_UNIMP, "CSR_MTVEC: reserved mode not supported\n");
+         /* bits [5:0] encode extended modes currently used by the ECLIC */
+        switch (mode2) {
+        case 0b000011: /* ECLIC  mode */
+            env->mtvec = val;
+            env->mnvec = val;
+            break;
+        default:
+                qemu_log_mask(LOG_UNIMP, "CSR_MTVEC: reserved mode not supported\n");
+        }
     }
+
     return RISCV_EXCP_NONE;
 }
 
@@ -4640,6 +4654,15 @@ static int write_mscratchcsw(CPURISCVState *env, int csrno, target_ulong val)
 static int rmw_mscratchcsw(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
+    target_ulong t;
+    if(get_field(env->mcause, MCAUSE_MPP)  !=  PRV_M)
+    {
+        t = new_value;
+        *ret_value = env->mscratch;
+        env->mscratch = t;
+    }else{
+        *ret_value =  new_value;
+    }
     return RISCV_EXCP_NONE;
 }
 
@@ -4658,6 +4681,16 @@ static int write_mscratchcswl(CPURISCVState *env, int csrno, target_ulong val)
 static int rmw_mscratchcswl(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
+    target_ulong t;
+    if( (get_field(env->mcause, MCAUSE_MPIL) == 0)
+        != (get_field(env->mintstatus, MINTSTATUS_MIL) == 0))
+    {
+        t = new_value;
+        *ret_value = env->mscratch;
+        env->mscratch = t;
+    }else{
+        *ret_value =  new_value;
+    }
     return RISCV_EXCP_NONE;
 }
 
@@ -4802,6 +4835,20 @@ static int write_msavedcause2(CPURISCVState *env, int csrno, target_ulong val)
 static int rmw_pushmsubm(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
+    uint64_t notify_addr = 0;
+    uint32_t riscv_addr_size = 4;
+    if (riscv_cpu_mxl(env) == MXL_RV32)
+    {
+    }
+    else
+    {
+        riscv_addr_size = 8;
+    }
+
+    notify_addr = new_value * riscv_addr_size + env->gpr[2];
+
+    cpu_physical_memory_rw(notify_addr, &env->msubm,  riscv_addr_size, 1);
+
     return RISCV_EXCP_NONE;
 }
 
@@ -4825,6 +4872,29 @@ static int write_mtvt2(CPURISCVState *env, int csrno, target_ulong val)
 static int rmw_jalmnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
+#ifndef CONFIG_USER_ONLY
+    target_ulong addr;
+
+    uint32_t riscv_addr_size = 4;
+    if (riscv_cpu_mxl(env) == MXL_RV32)
+    {
+    }
+    else
+    {
+        riscv_addr_size = 8;
+    }
+
+    if (env->irq_pending) {
+        uint64_t vec_addr = (env->mcause & 0x3FF) *riscv_addr_size + env->mtvt;
+        cpu_physical_memory_rw(vec_addr, &addr,  riscv_addr_size, 0);
+        env->gpr[1] = env->pc + riscv_addr_size;  //ret use
+        env->gpr[5] = env->pc + riscv_addr_size;  //link reg
+        *ret_value = addr;
+        env->mstatus = set_field(env->mstatus, MSTATUS_MIE, 1);
+        riscv_cpu_eclic_int_handler_start(env->eclic, env->mcause & 0x3ff);
+    } else
+        *ret_value = env->pc + riscv_addr_size;
+#endif
     return RISCV_EXCP_NONE;
 }
 
@@ -4846,6 +4916,20 @@ static int rmw_pushmcause(CPURISCVState *env, int csrno, target_ulong *ret_value
 static int rmw_pushmepc(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
+    uint64_t notify_addr = 0;
+    uint32_t riscv_addr_size = 4;
+
+    if (riscv_cpu_mxl(env) == MXL_RV32)
+    {
+    }
+    else
+    {
+        riscv_addr_size = 8;
+    }
+
+    notify_addr = new_value * riscv_addr_size + env->gpr[2];
+    cpu_physical_memory_rw(notify_addr, &env->mepc, riscv_addr_size, 1);
+
     return RISCV_EXCP_NONE;
 }
 
@@ -4870,6 +4954,9 @@ static int read_sleepvalue(CPURISCVState *env, int csrno, target_ulong *val)
 static int write_sleepvalue(CPURISCVState *env, int csrno, target_ulong val)
 {
     env->sleepvalue = val;
+#if !defined(CONFIG_USER_ONLY)
+    riscv_cpu_eclic_int_handler_start(env->eclic, env->mcause & val);
+#endif
     return RISCV_EXCP_NONE;
 }
 
@@ -4907,7 +4994,8 @@ static int write_mscounteren(CPURISCVState *env, int csrno, target_ulong val)
 
 static int read_sintstatus(CPURISCVState *env, int csrno, target_ulong *val)
 {
-    *val = env->mintstatus;
+    target_ulong mask = SINTSTATUS_SIL | SINTSTATUS_UIL;
+    *val = env->mintstatus & mask;
     return RISCV_EXCP_NONE;
 }
 

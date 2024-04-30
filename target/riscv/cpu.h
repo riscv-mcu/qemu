@@ -498,6 +498,8 @@ struct CPUArchState {
 
     uint32_t exccode;
     bool irq_pending;
+    void *eclic;
+    void *clic;       /* clic interrupt controller */
 
     hwaddr kernel_addr;
     hwaddr fdt_addr;
