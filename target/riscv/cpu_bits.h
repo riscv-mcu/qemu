@@ -512,8 +512,8 @@
 #define CSR_NUCLEI_SLEEPVALUE          0x811
 #define CSR_NUCLEI_TXEVT               0x812
 #define CSR_NUCLEI_WFE                 0x810
-#define CSR_NUCLEI_SAFETYCTRL          0x813
-#define CSR_NUCLEI_STLRESULT           0x814
+#define CSR_NUCLEI_SAFETY_CRC_CTL      0x813
+#define CSR_NUCLEI_SAFETY_STL_STATUS   0x814
 #define CSR_NUCLEI_SHARTID             0xDC0
 #define CSR_NUCLEI_MICFG_INFO          0xFC0
 #define CSR_NUCLEI_MDCFG_INFO          0xFC1

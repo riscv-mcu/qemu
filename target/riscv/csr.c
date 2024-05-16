@@ -4511,27 +4511,27 @@ static int write_wfe(CPURISCVState *env, int csrno, target_ulong val)
     return RISCV_EXCP_NONE;
 }
 
-static int read_safetyctrl(CPURISCVState *env, int csrno, target_ulong *val)
+static int read_safety_crc_ctl(CPURISCVState *env, int csrno, target_ulong *val)
 {
-    *val = env->safetyctrl;
+    *val = env->safety_crc_ctl;
     return RISCV_EXCP_NONE;
 }
 
-static int write_safetyctrl(CPURISCVState *env, int csrno, target_ulong val)
+static int write_safety_crc_ctl(CPURISCVState *env, int csrno, target_ulong val)
 {
-    env->safetyctrl = val;
+    env->safety_crc_ctl = val;
     return RISCV_EXCP_NONE;
 }
 
-static int read_stlresult(CPURISCVState *env, int csrno, target_ulong *val)
+static int read_safety_stl_status(CPURISCVState *env, int csrno, target_ulong *val)
 {
-    *val = env->stlresult;
+    *val = env->safety_stl_status;
     return RISCV_EXCP_NONE;
 }
 
-static int write_stlresult(CPURISCVState *env, int csrno, target_ulong val)
+static int write_safety_stl_status(CPURISCVState *env, int csrno, target_ulong val)
 {
-    env->stlresult = val;
+    env->safety_stl_status = val;
     return RISCV_EXCP_NONE;
 }
 
@@ -4958,8 +4958,8 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_PUSHMCAUSE] =          { "pushmcause", any,  NULL,  NULL , rmw_pushmcause },
     [CSR_NUCLEI_PUSHMEPC] =            { "pushmepc", any,  NULL,    NULL,  rmw_pushmepc },
     [CSR_NUCLEI_WFE] =                 { "wfe", any,  read_wfe,         write_wfe         },
-    [CSR_NUCLEI_SAFETYCTRL] =          { "safetyctrl", any, read_safetyctrl, write_safetyctrl },
-    [CSR_NUCLEI_STLRESULT] =           { "stlresult", any, read_stlresult, write_stlresult },
+    [CSR_NUCLEI_SAFETY_CRC_CTL] =      { "safety_crc_ctl", any, read_safety_crc_ctl, write_safety_crc_ctl },
+    [CSR_NUCLEI_SAFETY_STL_STATUS] =   { "safety_stl_status", any, read_safety_stl_status, write_safety_stl_status },
     [CSR_NUCLEI_SLEEPVALUE] =          { "sleepvalue", any,  read_sleepvalue,  write_sleepvalue  },
     [CSR_NUCLEI_TXEVT] =               { "txevt", any,  read_txevt,       write_txevt       },
     [CSR_MSCOUNTEREN] =                { "mscounteren", any,   read_mscounteren, write_mscounteren },
