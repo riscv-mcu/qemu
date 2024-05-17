@@ -5316,3 +5316,34 @@ void HELPER(vn_cmpx_mul)(void *vd, void *v0, void *vs1,
         }
     }
 }
+
+/* Nuclei custom vnice complex mask mul */
+void HELPER(vn_cmpx_mul_m)(void *vd, void *v0, void *vs1,
+                  void *vs2, CPURISCVState *env,
+                  uint32_t desc)
+{
+    uint32_t vl = env->vl;
+    uint32_t total_elems = riscv_cpu_cfg(env)->vlen;
+    uint32_t vta_all_1s = vext_vta_all_1s(desc);
+    uint32_t i;
+    uint8_t tmp[2] = {0};
+    uint8_t *a = vs1, *b = vs2;
+
+    for (i = env->vstart; i < vl; i+=2) {
+        tmp[0] = (uint8_t)(a[i+1] * b[i] + a[i] * b[i+1]);
+        tmp[1] = (uint8_t)(a[i+1] * b[i+1] - a[i] * b[i]);
+
+        ((uint8_t *)vd)[i] = !vext_elem_mask(v0, i) ? a[i] : tmp[0];
+        ((uint8_t *)vd)[i+1] = !vext_elem_mask(v0, i+1) ? a[i+1] : tmp[1];
+    }
+    env->vstart = 0;
+    /* mask destination register are always tail-
+     * agnostic
+     */
+    /* set tail elements to 1s */
+    if (vta_all_1s) {
+        for (; i < total_elems; i++) {
+            vext_set_elem_mask(vd, i, 1);
+        }
+    }
+}
