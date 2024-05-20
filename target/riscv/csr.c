@@ -4884,6 +4884,12 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_MATTRI3_MASK]         = { "mattri3_mask",          any,    read_zero, write_ignore},
     [CSR_NUCLEI_MATTRI4_BASE]         = { "mattri4_base",          any,    read_zero, write_ignore},
     [CSR_NUCLEI_MATTRI4_MASK]         = { "mattri4_mask",          any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MATTRI5_BASE]         = { "mattri5_base",          any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MATTRI5_MASK]         = { "mattri5_mask",          any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MATTRI6_BASE]         = { "mattri6_base",          any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MATTRI6_MASK]         = { "mattri6_mask",          any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MATTRI7_BASE]         = { "mattri7_base",          any,    read_zero, write_ignore},
+    [CSR_NUCLEI_MATTRI7_MASK]         = { "mattri7_mask",          any,    read_zero, write_ignore},
     /*
      * In privileged mode, the monitor will have to emulate TIME CSRs only if
      * rdtime callback is not provided by machine/platform emulation.
