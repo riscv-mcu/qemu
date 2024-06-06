@@ -137,7 +137,7 @@
 enum {
     PRIV_VERSION_1_10_0 = 0,
     PRIV_VERSION_1_11_0,
-    PRIV_VERSION_1_12_0,
+    PRIV_VERSION_1_12_0
 };
 
 #define VEXT_VERSION_1_00_0 0x00010000
@@ -642,6 +642,9 @@ struct RISCVCPUConfig {
     bool ext_xtheadmempair;
     bool ext_xtheadsync;
     bool ext_XVentanaCondOps;
+
+    bool ext_zilsd;
+    bool ext_zcmlsd;
 
     uint8_t pmu_num;
     char *priv_spec;

@@ -155,6 +155,8 @@ static const struct isa_ext_data isa_edata_arr[] = {
     ISA_EXT_DATA_ENTRY(xxlczbri, true, PRIV_VERSION_1_12_0, ext_xxlczbri),
     ISA_EXT_DATA_ENTRY(xxlczbitrev, true, PRIV_VERSION_1_12_0, ext_xxlczbitrev),
     ISA_EXT_DATA_ENTRY(xxlczgp, true, PRIV_VERSION_1_12_0, ext_xxlczgp),
+    ISA_EXT_DATA_ENTRY(zilsd, true, PRIV_VERSION_1_12_0, ext_zilsd),
+    ISA_EXT_DATA_ENTRY(zcmlsd, true, PRIV_VERSION_1_12_0, ext_zcmlsd),
 };
 
 static bool isa_ext_is_enabled(RISCVCPU *cpu,
@@ -1462,6 +1464,19 @@ static void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
     if (cpu->cfg.ext_j) {
         ext |= RVJ;
     }
+    
+    if(cpu->cfg.ext_zcmlsd){
+        if(cpu->cfg.ext_c&&cpu->cfg.ext_f){
+            error_setg(errp,
+                    "Zcmlsd cannot be supported together with C and F extension");
+            return;
+        }
+        if(cpu->cfg.ext_zcf){
+            error_setg(errp,
+                    "Zcmlsd cannot be supported together with ZCF extension");
+            return;
+        }
+    }
 
     set_misa(env, env->misa_mxl, ext);
 }
@@ -1912,6 +1927,9 @@ static Property riscv_cpu_extensions[] = {
 
     DEFINE_PROP_BOOL("x-zvfh", RISCVCPU, cfg.ext_zvfh, false),
     DEFINE_PROP_BOOL("x-zvfhmin", RISCVCPU, cfg.ext_zvfhmin, false),
+
+    DEFINE_PROP_BOOL("x-zilsd", RISCVCPU, cfg.ext_zilsd, false),
+    DEFINE_PROP_BOOL("x-zcmlsd", RISCVCPU, cfg.ext_zcmlsd, false),
 
     DEFINE_PROP_END_OF_LIST(),
 };
