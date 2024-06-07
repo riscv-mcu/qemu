@@ -240,7 +240,7 @@ target_ulong HELPER(xl_bitrev)(target_ulong a, target_ulong b)
 target_ulong HELPER(xl_addibne)(target_ulong rd, target_ulong rs1, uint32_t scale, uint32_t imm, uint32_t pc)
 {
     target_ulong val = pc;
-    if((rd + 1) != (rs1))
+    if((rd + scale) != (rs1))
     {
         if(imm <= 1024)
         {
