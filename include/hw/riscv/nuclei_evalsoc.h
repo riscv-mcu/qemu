@@ -75,6 +75,7 @@ typedef struct EvalSoCSoCState {
     MemoryRegion internal_rom;
     MemoryRegion xip_mem;
     MemoryRegion ddr;
+    MemoryRegion sram;
     MemoryRegion smp;
 
     NucLeiSYSTIMERState timer;
@@ -88,6 +89,13 @@ typedef struct EvalSoCSoCState {
 
 } EvalSoCSoCState;
 
+typedef struct {
+    uint64_t addr_base;
+    uint64_t addr_size;
+    uint64_t irq;
+    uint64_t startup_addr;
+} evalsoc_device_info;
+
 typedef struct
 {
     /*< private >*/
@@ -99,20 +107,17 @@ typedef struct
     const char *download;
     const char *soccfg;
     uint64_t iregion;
-    uint64_t ddr_base;
-    uint64_t ddr_size;
-    uint64_t norflash_base;
-    uint64_t norflash_size;
-    uint64_t uart0_base;
-    uint64_t uart0_irq;
-    uint64_t uart1_base;
-    uint64_t uart1_irq;
-    uint64_t qspi0_base;
-    uint64_t qspi0_irq;
-    uint64_t qspi1_base;
-    uint64_t qspi1_irq;
-    uint64_t qspi2_base;
-    uint64_t qspi2_irq;
+    evalsoc_device_info ddr;
+    evalsoc_device_info ilm;
+    evalsoc_device_info dlm;
+    evalsoc_device_info norflash;
+    evalsoc_device_info sram;
+    evalsoc_device_info flash;
+    evalsoc_device_info uart0;
+    evalsoc_device_info uart1;
+    evalsoc_device_info qspi0;
+    evalsoc_device_info qspi1;
+    evalsoc_device_info qspi2;
     uint64_t cpu_freq;
     uint64_t timer_freq;
     uint64_t irqmax;
@@ -143,10 +148,11 @@ enum {
     EVALSOC_QSPI1,
     EVALSOC_QSPI2,
     EVALSOC_SMP,
+    EVALSOC_DDR,
     EVALSOC_XIP,
     EVALSOC_ILM,
     EVALSOC_DLM,
-    EVALSOC_DDR,
+    EVALSOC_SRAM,
     EVALSOC_DEV_END
 };
 
@@ -247,9 +253,12 @@ enum
 #define EVALSOC_XIP_SIZE            (0x20000000)
 #define EVALSOC_DDR_BASE            (0x80000000)
 #define EVALSOC_DDR_SIZE            (0x80000000)
-#define EVALSOC_ILM_ADDR            (0x80000000)
-#define EVALSOC_DLM_ADDR            (0x90000000)
-#define EVALSOC_DDR_MODE_ADDR       (0xA0000000)
+#define EVALSOC_ILM_BASE            (0x80000000)
+#define EVALSOC_ILM_SIZE            (0x80000000)
+#define EVALSOC_DLM_BASE            (0x90000000)
+#define EVALSOC_DLM_SIZE            (0x70000000)
+#define EVALSOC_SRAM_BASE           (0xA0000000)
+#define EVALSOC_SRAM_SIZE           (0x60000000)
 
 /* IREGION Offsets */
 #define IREGION_IINFO_OFS           (0x0)

@@ -54,6 +54,10 @@
 
 #define OTP_SERIAL 1
 
+uint32_t debug_flag = 0;
+
+#define DEBUGF(fmt, args...)    {if(debug_flag)printf(fmt ,##args);}
+
 #if defined(TARGET_RISCV32)
 #define BIOS_FILENAME "opensbi-riscv32-generic-fw_dynamic.bin"
 #else
@@ -84,6 +88,9 @@ static const struct MemmapEntry
     [EVALSOC_CIDU]  = { IREGION_IDU_OFS,                IREGION_IDU_SIZE   },
     [EVALSOC_SMP]   = { IREGION_SMP_OFS,                IREGION_SMP_SIZE   },
     [EVALSOC_DDR]   = { EVALSOC_DDR_BASE,               EVALSOC_DDR_SIZE   },
+    [EVALSOC_ILM]   = { EVALSOC_ILM_BASE,               EVALSOC_ILM_SIZE   },
+    [EVALSOC_DLM]   = { EVALSOC_DLM_BASE,               EVALSOC_DLM_SIZE   },
+    [EVALSOC_SRAM]  = { EVALSOC_SRAM_BASE,              EVALSOC_SRAM_SIZE  },
     [EVALSOC_CLINT] = { IREGION_TIMER_OFS + 0x1000,     0xF000 },//MTIME in CLINT mode
 };
 
@@ -189,7 +196,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
                                (long)EVALSOC_DDR_BASE);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
-        (hwaddr)s->ddr_base >> 32, (hwaddr)s->ddr_base,
+        (hwaddr)s->ddr.addr_base >> 32, (hwaddr)s->ddr.addr_base,
         mem_size >> 32, mem_size);
     qemu_fdt_setprop_string(fdt, nodename, "device_type", "memory");
     g_free(nodename);
@@ -347,25 +354,25 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     g_free(nodename);
 
     nodename = g_strdup_printf("/soc/spi@%lx",
-                               (long)s->qspi0_base);
+                               (long)s->qspi0.addr_base);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,spi0");
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           0x0, (hwaddr)s->qspi0_base,
+                           0x0, (hwaddr)s->qspi0.addr_base,
                            0x0, memmap[EVALSOC_QSPI0].size,
                            0x0, 0x20000000,
                            0x0, 0x10000000);
     qemu_fdt_setprop_string(fdt, nodename, "reg-names", "control");
     qemu_fdt_setprop_cells(fdt, nodename, "clocks", hfclk_phandle);
     qemu_fdt_setprop_cells(fdt, nodename, "interrupt-parent", plic_phandle);
-    qemu_fdt_setprop_cells(fdt, nodename, "interrupts", s->qspi0_irq);
+    qemu_fdt_setprop_cells(fdt, nodename, "interrupts", s->qspi0.irq);
     qemu_fdt_setprop_cell(fdt, nodename, "#address-cells", 1);
     qemu_fdt_setprop_cell(fdt, nodename, "#size-cells", 0);
     qemu_fdt_setprop_string(fdt, nodename, "status", "disabled");
     g_free(nodename);
 
     nodename = g_strdup_printf("/soc/spi@%lx/flash@0",
-                               (long)s->qspi0_base);
+                               (long)s->qspi0.addr_base);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_cell(fdt, nodename, "spi-rx-bus-width", 4);
     qemu_fdt_setprop_cell(fdt, nodename, "spi-tx-bus-width", 4);
@@ -377,23 +384,23 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     g_free(nodename);
 
     nodename = g_strdup_printf("/soc/spi@%lx",
-                               (long)s->qspi2_base);
+                               (long)s->qspi2.addr_base);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,spi0");
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           0x0, (hwaddr)s->qspi2_base,
+                           0x0, (hwaddr)s->qspi2.addr_base,
                            0x0, memmap[EVALSOC_QSPI2].size);
     qemu_fdt_setprop_string(fdt, nodename, "reg-names", "control");
     qemu_fdt_setprop_cells(fdt, nodename, "clocks", hfclk_phandle);
     qemu_fdt_setprop_cells(fdt, nodename, "interrupt-parent", plic_phandle);
-    qemu_fdt_setprop_cells(fdt, nodename, "interrupts", s->qspi2_irq);
+    qemu_fdt_setprop_cells(fdt, nodename, "interrupts", s->qspi2.irq);
     qemu_fdt_setprop_cell(fdt, nodename, "#address-cells", 1);
     qemu_fdt_setprop_cell(fdt, nodename, "#size-cells", 0);
     qemu_fdt_setprop_string(fdt, nodename, "status", "disabled");
     g_free(nodename);
 
     nodename = g_strdup_printf("/soc/spi@%lx/mmc@0",
-                               (long)s->qspi2_base);
+                               (long)s->qspi2.addr_base);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "mmc-spi-slot");
     qemu_fdt_setprop_cells(fdt, nodename, "reg", 0x0);
@@ -405,15 +412,15 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     uart_phandle = phandle++;
     qemu_fdt_add_subnode(fdt, "/aliases");
     nodename = g_strdup_printf("/soc/serial@%lx",
-                               (long)s->uart0_base);
+                               (long)s->uart0.addr_base);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,uart0");
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           0x0, s->uart0_base,
+                           0x0, s->uart0.addr_base,
                            0x0, memmap[EVALSOC_UART0].size);
     qemu_fdt_setprop_cell(fdt, nodename, "clocks", hfclk_phandle);
     qemu_fdt_setprop_cell(fdt, nodename, "interrupt-parent", plic_phandle);
-    qemu_fdt_setprop_cell(fdt, nodename, "interrupts", s->uart0_irq);
+    qemu_fdt_setprop_cell(fdt, nodename, "interrupts", s->uart0.irq);
     qemu_fdt_setprop_cell(fdt, nodename, "phandle", uart_phandle);
     qemu_fdt_setprop_string(fdt, nodename, "status", "okay");
     qemu_fdt_setprop_string(fdt, "/aliases", "serial0", nodename);
@@ -429,7 +436,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
                            0x0, memmap[EVALSOC_UART1].size);
     qemu_fdt_setprop_cell(fdt, nodename, "clocks", hfclk_phandle);
     qemu_fdt_setprop_cell(fdt, nodename, "interrupt-parent", plic_phandle);
-    qemu_fdt_setprop_cell(fdt, nodename, "interrupts", s->uart1_irq);
+    qemu_fdt_setprop_cell(fdt, nodename, "interrupts", s->uart1.irq);
     qemu_fdt_setprop_cell(fdt, nodename, "phandle", uart_phandle);
     qemu_fdt_setprop_string(fdt, nodename, "status", "okay");
     qemu_fdt_setprop_string(fdt, "/aliases", "serial1", nodename);
@@ -488,12 +495,12 @@ static unsigned long string_to_uint64(const char *str)
 
     if (end == str) {
         printf("No digits were found:%s\n", str);
-        return -1;  
+        return -1;
     }
 
     if (*end == 'G' || *end == 'g') {
         num = num * 1024 * 1024 * 1024;
-    } 
+    }
     else if(*end == 'M' || *end == 'm') {
         num = num * 1024 * 1024;
     }
@@ -524,7 +531,7 @@ static void parse_json_config(MachineState *machine)
             if(options_page0 != NULL)
             {
                 for (page0 = qdict_first(options_page0); page0; page0 = qdict_next(options_page0, page0))
-                {    
+                {
                     options_page1 = qobject_to(QDict, page0->value);
                     if(options_page1 != NULL && !strcmp(page0->key, "general_config"))
                     {
@@ -548,12 +555,49 @@ static void parse_json_config(MachineState *machine)
                                 page2 = qdict_first(options_page2);
                                 if(!strcmp(page2->key, "base"))//ddr base
                                 {
-                                    s->ddr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                    s->ddr.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                                 page2 = qdict_next(options_page2, page2);
                                 if(!strcmp(page2->key, "size"))//ddr size
                                 {
-                                    s->ddr_size = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                    s->ddr.addr_size = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                }
+                            }
+                            else if(!strcmp(page1->key, "ilm"))//ilm
+                            {
+                                page2 = qdict_first(options_page2);
+                                if(!strcmp(page2->key, "base"))//ilm base
+                                {
+                                    s->ilm.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                }
+                                page2 = qdict_next(options_page2, page2);
+                                if(!strcmp(page2->key, "size"))//ilm size
+                                {
+                                    s->ilm.addr_size = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                }
+                            }else if(!strcmp(page1->key, "dlm"))//dlm
+                            {
+                                page2 = qdict_first(options_page2);
+                                if(!strcmp(page2->key, "base"))//dlm base
+                                {
+                                    s->dlm.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                }
+                                page2 = qdict_next(options_page2, page2);
+                                if(!strcmp(page2->key, "size"))//dlm size
+                                {
+                                    s->dlm.addr_size = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                }
+                            }else if(!strcmp(page1->key, "sram"))//sram
+                            {
+                                page2 = qdict_first(options_page2);
+                                if(!strcmp(page2->key, "base"))//sram base
+                                {
+                                    s->sram.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                }
+                                page2 = qdict_next(options_page2, page2);
+                                if(!strcmp(page2->key, "size"))//sram size
+                                {
+                                    s->sram.addr_size = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                             }
                             else if(!strcmp(page1->key, "norflash"))//norflash
@@ -561,19 +605,19 @@ static void parse_json_config(MachineState *machine)
                                 page2 = qdict_first(options_page2);
                                 if(!strcmp(page2->key, "base"))//norflash base
                                 {
-                                    s->norflash_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                    s->norflash.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                                 page2 = qdict_next(options_page2, page2);
                                 if(!strcmp(page2->key, "size"))//norflash size
                                 {
-                                    s->norflash_size = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                    s->norflash.addr_size = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                             }
                             else if(!strcmp(page1->key, "iregion"))//iregion
                             {
                                 page2 = qdict_first(options_page2);
                                 if(!strcmp(page2->key, "base"))
-                                {  
+                                {
                                      s->iregion = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
 
                                 }
@@ -583,12 +627,12 @@ static void parse_json_config(MachineState *machine)
                                 page2 = qdict_first(options_page2);
                                 if(!strcmp(page2->key, "base"))//uart0 base
                                 {
-                                    s->uart0_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                    s->uart0.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                                 page2 = qdict_next(options_page2, page2);
                                 if(!strcmp(page2->key, "irq"))//uart0 irq
                                 {
-                                    s->uart0_irq = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                    s->uart0.irq = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                             }
                             else if(!strcmp(page1->key, "uart1"))//uart1
@@ -596,12 +640,12 @@ static void parse_json_config(MachineState *machine)
                                 page2 = qdict_first(options_page2);
                                 if(!strcmp(page2->key, "base"))//uart1 base
                                 {
-                                    s->uart1_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                    s->uart1.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                                 page2 = qdict_next(options_page2, page2);
                                 if(!strcmp(page2->key, "irq"))//uart1 irq
                                 {
-                                    s->uart1_irq = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                    s->uart1.irq = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                             }
                             else if(!strcmp(page1->key, "qspi0"))//qspi0
@@ -609,12 +653,12 @@ static void parse_json_config(MachineState *machine)
                                 page2 = qdict_first(options_page2);
                                 if(!strcmp(page2->key, "base"))//qspi0 base
                                 {
-                                    s->qspi0_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                    s->qspi0.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                                 page2 = qdict_next(options_page2, page2);
                                 if(!strcmp(page2->key, "irq"))//qspi0 irq
                                 {
-                                    s->qspi0_irq = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                    s->qspi0.irq = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                             }
                             else if(!strcmp(page1->key, "qspi1"))//qspi1
@@ -622,12 +666,12 @@ static void parse_json_config(MachineState *machine)
                                 page2 = qdict_first(options_page2);
                                 if(!strcmp(page2->key, "base"))//qspi1 base
                                 {
-                                    s->qspi1_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                    s->qspi1.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                                 page2 = qdict_next(options_page2, page2);
                                 if(!strcmp(page2->key, "irq"))//qspi1 irq
                                 {
-                                    s->qspi1_irq = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                    s->qspi1.irq = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                             }
                             else if(!strcmp(page1->key, "qspi2"))//qspi2
@@ -635,12 +679,57 @@ static void parse_json_config(MachineState *machine)
                                 page2 = qdict_first(options_page2);
                                 if(!strcmp(page2->key, "base"))//qspi2 base
                                 {
-                                    s->qspi2_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                    s->qspi2.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                                 page2 = qdict_next(options_page2, page2);
                                 if(!strcmp(page2->key, "irq"))//qspi2 irq
                                 {
-                                    s->qspi2_irq = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                    s->qspi2.irq = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                }
+                            }
+                        }
+                    }
+                    else if(options_page1 != NULL && !strcmp(page0->key, "download"))
+                    {
+                        //"evalsoc": ("ilm", "flash", "flashxip", "ddr", "sram")
+                        for (page1 = qdict_first(options_page1); page1; page1 = qdict_next(options_page1, page1))
+                        {
+                            options_page2 = qobject_to(QDict, page1->value);
+                            if(!strcmp(page1->key, "ilm"))//ilm
+                            {
+                                page2 = qdict_first(options_page2);
+                                if(!strcmp(page2->key, "startaddr"))
+                                {
+                                     s->ilm.startup_addr = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+
+                                }
+                            }else if(!strcmp(page1->key, "flashxip"))//flashxip
+                            {
+                                page2 = qdict_first(options_page2);
+                                if(!strcmp(page2->key, "startaddr"))
+                                {
+                                     s->norflash.startup_addr = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                }
+                            }else if(!strcmp(page1->key, "flash"))//flash
+                            {
+                                page2 = qdict_first(options_page2);
+                                if(!strcmp(page2->key, "startaddr"))
+                                {
+                                     s->flash.startup_addr = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                }
+                            }else if(!strcmp(page1->key, "sram"))//sram
+                            {
+                                page2 = qdict_first(options_page2);
+                                if(!strcmp(page2->key, "startaddr"))
+                                {
+                                     s->sram.startup_addr = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                }
+                            }else if(!strcmp(page1->key, "ddr"))//ddr
+                            {
+                                page2 = qdict_first(options_page2);
+                                if(!strcmp(page2->key, "startaddr"))
+                                {
+                                     s->ddr.startup_addr = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                             }
                         }
@@ -660,15 +749,21 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
     struct MemmapEntry *memoryRegion = g_new0(struct MemmapEntry, EVALSOC_DEV_END);
     memcpy(memoryRegion, evalsoc_memmap, sizeof(struct MemmapEntry) * EVALSOC_DEV_END);
     //json config
-    memoryRegion[EVALSOC_DDR].base = s->ddr_base;
-    memoryRegion[EVALSOC_DDR].size = s->ddr_size;
-    memoryRegion[EVALSOC_XIP].base = s->norflash_base;
-    memoryRegion[EVALSOC_XIP].size = s->norflash_size;
-    memoryRegion[EVALSOC_UART0].base = s->uart0_base;
-    memoryRegion[EVALSOC_UART1].base = s->uart1_base;
-    memoryRegion[EVALSOC_QSPI0].base = s->qspi0_base;
-    memoryRegion[EVALSOC_QSPI1].base = s->qspi1_base;
-    memoryRegion[EVALSOC_QSPI2].base = s->qspi2_base;
+    memoryRegion[EVALSOC_ILM].base = s->ilm.addr_base;
+    memoryRegion[EVALSOC_ILM].size = s->ilm.addr_size;
+    memoryRegion[EVALSOC_DLM].base = s->dlm.addr_base;
+    memoryRegion[EVALSOC_DLM].size = s->dlm.addr_size;
+    memoryRegion[EVALSOC_SRAM].base = s->sram.addr_base;
+    memoryRegion[EVALSOC_SRAM].size = s->sram.addr_size;
+    memoryRegion[EVALSOC_DDR].base = s->ddr.addr_base;
+    memoryRegion[EVALSOC_DDR].size = s->ddr.addr_size;
+    memoryRegion[EVALSOC_XIP].base = s->norflash.addr_base;
+    memoryRegion[EVALSOC_XIP].size = s->norflash.addr_size;
+    memoryRegion[EVALSOC_UART0].base = s->uart0.addr_base;
+    memoryRegion[EVALSOC_UART1].base = s->uart1.addr_base;
+    memoryRegion[EVALSOC_QSPI0].base = s->qspi0.addr_base;
+    memoryRegion[EVALSOC_QSPI1].base = s->qspi1.addr_base;
+    memoryRegion[EVALSOC_QSPI2].base = s->qspi2.addr_base;
     //iregion offset
     memoryRegion[EVALSOC_DEBUG].base = memmap[EVALSOC_DEBUG].base + s->iregion;
     memoryRegion[EVALSOC_TIMER].base = memmap[EVALSOC_TIMER].base + s->iregion;
@@ -678,16 +773,16 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
     memoryRegion[EVALSOC_CLINT].base = memmap[EVALSOC_CLINT].base + s->iregion;
 
     for (size_t i = 0; i < EVALSOC_DEV_END; ++i) {
-        if (i == EVALSOC_CLINT) continue;
+        if (i == EVALSOC_CLINT || i == EVALSOC_ILM || i == EVALSOC_DLM || i == EVALSOC_SRAM) continue;
         hwaddr start1 = memoryRegion[i].base;
         hwaddr end1 = start1 + memoryRegion[i].size;
-  
+
         for (size_t j = 0; j < EVALSOC_DEV_END; ++j) {
-            if (i == j || j == EVALSOC_CLINT) continue; // Skip comparing with itself
-  
+            if (i == j || j == EVALSOC_CLINT || j == EVALSOC_ILM || j == EVALSOC_DLM || j == EVALSOC_SRAM) continue; // Skip comparing with itself
+
             hwaddr start2 = memoryRegion[j].base;
             hwaddr end2 = start2 + memoryRegion[j].size;
-  
+
             // If there is overlap, return true
             if (!(end1 <= start2 || end2 <= start1)) {
                 printf("memory is overlap, [%lx:%lx] and [%lx:%lx]\n", (long)start1, (long)end1, (long)start2, (long)end2);
@@ -719,96 +814,22 @@ static void evalsoc_machine_init(MachineState *machine)
 
     parse_json_config(machine);
 
-    if(s->timer_freq == -1)
+    if(s->ddr.addr_base == -1)
     {
-        s->timer_freq = EVALSOC_TIMEBASE_FREQ;
+        s->ddr.addr_base = memmap[EVALSOC_DDR].base;
+        s->ddr.startup_addr = (s->ddr.startup_addr == -1) ? 0xA0000000 : s->ddr.startup_addr;
     }
-
-    if(s->irqmax == -1)
+    else
     {
-        /* irqmax: max irq number for external irq
-            1.eclic core irq:irq[0~18] external irq:irq[19...4095] 
-            2.plic  irq 0: wire 0 external irq:irq[1...1023] 
-        */ 
-        s->irqmax = EVALSOC_PLIC_INT_MAX;
+        s->ddr.startup_addr = (s->ddr.startup_addr == -1) ? s->ddr.addr_base : s->ddr.startup_addr;
     }
+    s->ilm.startup_addr = (s->ilm.startup_addr == -1) ? s->ilm.addr_base : s->ilm.startup_addr;
+    s->sram.startup_addr = (s->sram.startup_addr == -1) ? s->sram.addr_base : s->sram.startup_addr;
+    s->norflash.startup_addr = (s->norflash.startup_addr == -1) ? s->norflash.addr_base : s->norflash.startup_addr;
+    s->dlm.startup_addr = (s->dlm.startup_addr == -1) ? s->dlm.addr_base : s->dlm.startup_addr;
 
-    if(s->iregion == -1)
-    {
-        s->iregion = IREGION_BASE_ADDR;
-    }
-
-    if(s->ddr_base == -1)
-    {
-        s->ddr_base = memmap[EVALSOC_DDR].base;
-    }
-
-    start_addr = s->ddr_base;
-
-    if(s->ddr_size == -1)
-    {
-        s->ddr_size = memmap[EVALSOC_DDR].size;
-    }
-
-    if(s->norflash_base == -1)
-    {
-        s->norflash_base = memmap[EVALSOC_XIP].base;
-    }
-
-    if(s->norflash_size == -1)
-    {
-        s->norflash_size = memmap[EVALSOC_XIP].size;
-    }
-
-    if(s->uart0_base == -1)
-    {
-        s->uart0_base = memmap[EVALSOC_UART0].base;
-    }
-
-    if(s->uart0_irq == -1)
-    {
-        s->uart0_irq = EVALSOC_PLIC_UART0_IRQ;
-    }
-
-    if(s->uart1_base == -1)
-    {
-        s->uart1_base = memmap[EVALSOC_UART1].base;
-    }
-
-    if(s->uart1_irq == -1)
-    {
-        s->uart1_irq = EVALSOC_PLIC_UART1_IRQ;
-    }
-
-    if(s->qspi0_base == -1)
-    {
-        s->qspi0_base = memmap[EVALSOC_QSPI0].base;
-    }
-
-    if(s->qspi0_irq == -1)
-    {
-        s->qspi0_irq = EVALSOC_PLIC_SPI0_IRQ;
-    }
-
-    if(s->qspi1_base == -1)
-    {
-        s->qspi1_base = memmap[EVALSOC_QSPI1].base;
-    }
-
-    if(s->qspi1_irq == -1)
-    {
-        s->qspi1_irq = EVALSOC_PLIC_SPI1_IRQ;
-    }
-
-    if(s->qspi2_base == -1)
-    {
-        s->qspi2_base = memmap[EVALSOC_QSPI2].base;
-    }
-
-    if(s->qspi2_irq == -1)
-    {
-        s->qspi2_irq = EVALSOC_PLIC_SPI2_IRQ;
-    }
+    /*if flash startup_addr not set, use flashxip startup_addr*/
+    s->flash.startup_addr = (s->flash.startup_addr == -1) ? s->norflash.startup_addr: s->flash.startup_addr;
 
     if(is_iregion_addr_overlap(memmap, s) == true)
     {
@@ -825,20 +846,36 @@ static void evalsoc_machine_init(MachineState *machine)
                             &error_abort);
     qdev_realize(DEVICE(&s->soc), NULL, &error_abort);
 
+    //ilm
+    memory_region_init_ram(&s->soc.ilm, NULL, "riscv.evalsoc.ram.ilm",
+                           s->ilm.addr_size, &error_fatal);
+    memory_region_add_subregion(system_memory, s->ilm.addr_base,
+                                &s->soc.ilm);
+    //dlm
+    memory_region_init_ram(&s->soc.dlm, NULL, "riscv.evalsoc.ram.dlm",
+                           s->dlm.addr_size, &error_fatal);
+    memory_region_add_subregion(system_memory, s->dlm.addr_base,
+                                &s->soc.dlm);
+    //sram
+    memory_region_init_ram(&s->soc.sram, NULL, "riscv.evalsoc.ram.sram",
+                           s->sram.addr_size, &error_fatal);
+    memory_region_add_subregion(system_memory, s->sram.addr_base,
+                                &s->soc.sram);
+
     memory_region_init_ram(&s->soc.ddr, NULL, "riscv.evalsoc.ram.ddr",
-                           s->ddr_size, &error_fatal);
-    memory_region_add_subregion(system_memory, s->ddr_base,
+                           s->ddr.addr_size, &error_fatal);
+    memory_region_add_subregion(system_memory, s->ddr.addr_base,
                                 &s->soc.ddr);
 
     memory_region_init_ram(&s->soc.xip_mem, NULL, "riscv.evalsoc.flashxip",
-        s->norflash_size, &error_fatal);
-    memory_region_add_subregion(system_memory, 
-        s->norflash_base, &s->soc.xip_mem);
+        s->norflash.addr_size, &error_fatal);
+    memory_region_add_subregion(system_memory,
+        s->norflash.addr_base, &s->soc.xip_mem);
 
     // Evalsoc custom csr info init
     for (i = 0; i < machine->smp.cpus; i ++) {
-        s->soc.cpus.harts[i].env.milm_ctl |= EVALSOC_ILM_ADDR & 0x1;
-        s->soc.cpus.harts[i].env.mdlm_ctl |= EVALSOC_DLM_ADDR & 0x1;
+        s->soc.cpus.harts[i].env.milm_ctl |= s->ilm.addr_base & 0x1;
+        s->soc.cpus.harts[i].env.mdlm_ctl |= s->dlm.addr_base & 0x1;
         s->soc.cpus.harts[i].env.mstack_bound = EVALSOC_MSTACK_BOUND;
         s->soc.cpus.harts[i].env.mstack_base = EVALSOC_MSTACK_BASE;
         s->soc.cpus.harts[i].env.mcache_ctl = EVALSOC_MCACHE_CTL;
@@ -869,19 +906,47 @@ static void evalsoc_machine_init(MachineState *machine)
         create_fdt(s, memmap, machine->ram_size, machine->kernel_cmdline);
     }
 
-    if (s->download == NULL) {
-        start_addr = s->norflash_base;
-    } else if (!strcmp(s->download, "ilm")) {
-        start_addr = EVALSOC_ILM_ADDR;
-    } else if(!strcmp(s->download, "ddr")) {
+    if (s->download == NULL)
+    {
+        start_addr = s->norflash.startup_addr;
+    }
+    else if (!strcmp(s->download, "ilm"))
+    {
+        start_addr = s->ilm.startup_addr;
+    }
+    else if (!strcmp(s->download, "ddr"))
+    {
         // For cpu release after 2023.06, the DDR base changed from 0xA0000000 to 0x80000000
         // But we want to keep DOWNLOAD=ddr still use old 0xA0000000 base
-        start_addr = EVALSOC_DDR_MODE_ADDR;
-    } else if (!strcmp(s->download, "sram")) { // sram mode = ddr mode base address
-        start_addr = EVALSOC_DDR_MODE_ADDR;
-    } else {
-        start_addr = s->norflash_base;
+        start_addr = s->ddr.startup_addr; // sram mode = ddr mode base address
     }
+    else if (!strcmp(s->download, "sram"))
+    {
+        start_addr = s->sram.startup_addr;
+    }
+    else if (!strcmp(s->download, "flash"))
+    {
+        start_addr = s->flash.startup_addr;
+    }
+    else
+    {
+        start_addr = s->norflash.startup_addr;
+    }
+    DEBUGF("download mode is %s\n", s->download);
+    DEBUGF("ddr     : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->ddr.addr_base,(long)s->ddr.addr_size,(long)s->ddr.startup_addr);
+    DEBUGF("ilm     : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->ilm.addr_base,(long)s->ilm.addr_size,(long)s->ilm.startup_addr);
+    DEBUGF("dlm     : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->dlm.addr_base,(long)s->dlm.addr_size,(long)s->dlm.startup_addr);
+    DEBUGF("sram    : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->sram.addr_base,(long)s->sram.addr_size,(long)s->sram.startup_addr);
+    DEBUGF("norflash: base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->norflash.addr_base,(long)s->norflash.addr_size,(long)s->norflash.startup_addr);
+    DEBUGF("flash   : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->flash.addr_base,(long)s->flash.addr_size,(long)s->flash.startup_addr);
+    DEBUGF("uart0   : base:0x%lx, irq:%d\n", (long)s->uart0.addr_base,(int)s->uart0.irq);
+    DEBUGF("uart1   : base:0x%lx, irq:%d\n", (long)s->uart1.addr_base,(int)s->uart1.irq);
+    DEBUGF("qspi0   : base:0x%lx, irq:%d\n", (long)s->qspi0.addr_base,(int)s->qspi0.irq);
+    DEBUGF("qspi1   : base:0x%lx, irq:%d\n", (long)s->qspi1.addr_base,(int)s->qspi1.irq);
+    DEBUGF("qspi2   : base:0x%lx, irq:%d\n", (long)s->qspi2.addr_base,(int)s->qspi2.irq);
+    DEBUGF("iregion : 0x%lx\n", (long)s->iregion);
+    DEBUGF("irqmax  : %d\n", (int)s->irqmax);
+    DEBUGF("firmware startup addr:0x%lx\n", (long)start_addr);
 
     if (machine->firmware) {
         firmware_end_addr = riscv_find_and_load_firmware(machine, BIOS_FILENAME,
@@ -918,7 +983,7 @@ static void evalsoc_machine_init(MachineState *machine)
         */
         kernel_entry = 0;
 
-        fdt_load_addr = riscv_compute_fdt_addr(s->ddr_base,
+        fdt_load_addr = riscv_compute_fdt_addr(s->ddr.addr_base,
                                             machine->ram_size,
                                            machine);
         riscv_load_fdt(fdt_load_addr, machine->fdt);
@@ -996,30 +1061,54 @@ static void evalsoc_machine_init(MachineState *machine)
 static void evalsoc_machine_instance_init(Object *obj)
 {
     EvalSoCState *s = RISCV_EVALSOC_MACHINE(obj);
+    const struct MemmapEntry *memmap = evalsoc_memmap;
 
-    s->cpu_freq = -1;
-    s->timer_freq = -1;
-    s->irqmax = -1;
-    s->iregion = -1;
-    s->ddr_base = -1;
-    s->ddr_size = -1;
-    s->norflash_base = -1;
-    s->norflash_size = -1;
-    s->uart0_base = -1;
-    s->uart0_irq = -1;
-    s->uart1_base = -1;
-    s->uart1_irq = -1;
-    s->qspi0_base = -1;
-    s->qspi0_irq = -1;
-    s->qspi1_base = -1;
-    s->qspi1_irq = -1;
-    s->qspi2_base = -1;
-    s->qspi2_irq = -1;
+    s->cpu_freq = -1; //qemu no use
+    s->timer_freq = EVALSOC_TIMEBASE_FREQ;
+    /* irqmax: max irq number for external irq
+            1.eclic core irq:irq[0~18] external irq:irq[19...4095]
+            2.plic  irq 0: wire 0 external irq:irq[1...1023]
+    */
+    s->irqmax = EVALSOC_PLIC_INT_MAX;
+    s->iregion = IREGION_BASE_ADDR;
+    s->ddr.addr_base = -1;
+    s->ddr.addr_size = memmap[EVALSOC_DDR].size;
+    s->ddr.startup_addr = -1;
+    s->sram.addr_base = memmap[EVALSOC_SRAM].base;
+    s->sram.addr_size = memmap[EVALSOC_SRAM].size;
+    s->sram.startup_addr = -1;
+    s->ilm.addr_base = memmap[EVALSOC_ILM].base;
+    s->ilm.addr_size = memmap[EVALSOC_ILM].size;
+    s->ilm.startup_addr = -1;
+    s->dlm.addr_base = memmap[EVALSOC_DLM].base;
+    s->dlm.addr_size = memmap[EVALSOC_DLM].size;
+    s->dlm.startup_addr = -1;
+    s->flash.addr_base = memmap[EVALSOC_XIP].base;
+    s->flash.addr_size = memmap[EVALSOC_XIP].size;
+    s->flash.startup_addr = -1;
+    s->norflash.addr_base = memmap[EVALSOC_XIP].base;
+    s->norflash.addr_size = memmap[EVALSOC_XIP].size;
+    s->norflash.startup_addr = -1;
+    s->uart0.addr_base = memmap[EVALSOC_UART0].base;
+    s->uart0.irq = EVALSOC_PLIC_UART0_IRQ;
+    s->uart1.addr_base = memmap[EVALSOC_UART1].base;
+    s->uart1.irq = EVALSOC_PLIC_UART1_IRQ;
+    s->qspi0.addr_base = memmap[EVALSOC_QSPI0].base;
+    s->qspi0.irq = EVALSOC_PLIC_SPI0_IRQ;
+    s->qspi1.addr_base = memmap[EVALSOC_QSPI1].base;
+    s->qspi1.irq = EVALSOC_PLIC_SPI1_IRQ;
+    s->qspi2.addr_base = memmap[EVALSOC_QSPI2].base;
+    s->qspi2.irq = EVALSOC_PLIC_SPI2_IRQ;
 
     object_property_add_uint64_ptr(obj, "iregion", &s->iregion,
                                    OBJ_PROP_FLAG_READWRITE);
     object_property_set_description(obj, "iregion",
                                     "Set iregion");
+
+    object_property_add_uint32_ptr(obj, "debug", &debug_flag,
+                                   OBJ_PROP_FLAG_READWRITE);
+    object_property_set_description(obj, "debug",
+                                    "debug nuclei evalsoc");
 }
 
 static char* evalsoc_machine_get_download(Object *obj, Error **errp)
@@ -1057,7 +1146,7 @@ static void evalsoc_machine_class_init(ObjectClass *oc, void *data)
     mc->default_cpu_type = EVALSOC_CPU;
     mc->default_cpus = mc->min_cpus;
 
-    object_class_property_add_str(oc, "soc-cfg",                                    
+    object_class_property_add_str(oc, "soc-cfg",
                                    evalsoc_machine_get_soccfg,
                                    evalsoc_machine_set_soccfg);
     object_class_property_set_description(oc, "soc-cfg",
@@ -1194,10 +1283,10 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     {
         /* Create and connect UART interrupts to the ECLIC */
         nuclei_uart_create(sys_mem,
-                        mst->uart0_base,
+                        mst->uart0.addr_base,
                         memmap[EVALSOC_UART0].size,
                         serial_hd(0),
-                        PLIC_IRQ_TO_ECLIC_IRQ(mst->uart0_irq),
+                        PLIC_IRQ_TO_ECLIC_IRQ(mst->uart0.irq),
                         s->cidu,
                         s->eclic);
 
@@ -1206,11 +1295,11 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     }
     else
     {
-        sifive_uart_create(sys_mem, mst->uart0_base,
-                       serial_hd(0), qdev_get_gpio_in(DEVICE(s->plic), mst->uart0_irq));
+        sifive_uart_create(sys_mem, mst->uart0.addr_base,
+                       serial_hd(0), qdev_get_gpio_in(DEVICE(s->plic), mst->uart0.irq));
 
-        sifive_uart_create(sys_mem, mst->uart1_base,
-                        serial_hd(1), qdev_get_gpio_in(DEVICE(s->plic), mst->uart1_irq));
+        sifive_uart_create(sys_mem, mst->uart1.addr_base,
+                        serial_hd(1), qdev_get_gpio_in(DEVICE(s->plic), mst->uart1.irq));
 
         nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion,
                 memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, NULL, mst->timer_freq);
@@ -1242,15 +1331,15 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     sysbus_realize(SYS_BUS_DEVICE(&s->spi0), errp);
 
     sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi0), 0,
-                    mst->qspi0_base);
+                    mst->qspi0.addr_base);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi0), 0,
-                       qdev_get_gpio_in(DEVICE(s->plic), mst->qspi0_irq));
+                       qdev_get_gpio_in(DEVICE(s->plic), mst->qspi0.irq));
 
     sysbus_realize(SYS_BUS_DEVICE(&s->spi2), errp);
     sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi2), 0,
-                    mst->qspi2_base);
+                    mst->qspi2.addr_base);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi2), 0,
-                       qdev_get_gpio_in(DEVICE(s->plic), mst->qspi2_irq));
+                       qdev_get_gpio_in(DEVICE(s->plic), mst->qspi2.irq));
 
     /* SiFive Test MMIO device */
     sifive_test_create(memmap[EVALSOC_TEST].base);
