@@ -84,6 +84,9 @@ static const struct MemmapEntry
     [EVALSOC_CIDU]  = { IREGION_IDU_OFS,                IREGION_IDU_SIZE   },
     [EVALSOC_SMP]   = { IREGION_SMP_OFS,                IREGION_SMP_SIZE   },
     [EVALSOC_DDR]   = { EVALSOC_DDR_BASE,               EVALSOC_DDR_SIZE   },
+    [EVALSOC_ILM]   = { EVALSOC_ILM_BASE,               EVALSOC_ILM_SIZE   },
+    [EVALSOC_DLM]   = { EVALSOC_DLM_BASE,               EVALSOC_DLM_SIZE   },
+    [EVALSOC_SRAM]  = { EVALSOC_SRAM_BASE,              EVALSOC_SRAM_SIZE  },
     [EVALSOC_CLINT] = { IREGION_TIMER_OFS + 0x1000,     0xF000 },//MTIME in CLINT mode
 };
 
@@ -647,6 +650,53 @@ static void parse_json_config(MachineState *machine)
                                 }
                             }
                         }
+                    }else if(options_page1 != NULL && !strcmp(page0->key, "download"))
+                    {
+                        //"evalsoc": ("ilm", "flash", "flashxip", "ddr", "sram")
+                        for (page1 = qdict_first(options_page1); page1; page1 = qdict_next(options_page1, page1))
+                        {
+                            options_page2 = qobject_to(QDict, page1->value);
+                            if(!strcmp(page1->key, "start_addr"))//start_addr
+                            {
+                                s->start_addr = string_to_uint64(qstring_get_str(qobject_to(QString, page1->value)));
+                            }else if(!strcmp(page1->key, "ilm"))//ilm
+                            {
+                                page2 = qdict_first(options_page2);
+                                if(!strcmp(page2->key, "base"))//ilm base
+                                {
+                                    s->ilm_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                }
+                                page2 = qdict_next(options_page2, page2);
+                                if(!strcmp(page2->key, "size"))//ilm size
+                                {
+                                    s->ilm_size = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                }
+                            }else if(!strcmp(page1->key, "dlm"))//dlm
+                            {
+                                page2 = qdict_first(options_page2);
+                                if(!strcmp(page2->key, "base"))//dlm base
+                                {
+                                    s->dlm_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                }
+                                page2 = qdict_next(options_page2, page2);
+                                if(!strcmp(page2->key, "size"))//dlm size
+                                {
+                                    s->dlm_size = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                }
+                            }else if(!strcmp(page1->key, "sram"))//sram
+                            {
+                                page2 = qdict_first(options_page2);
+                                if(!strcmp(page2->key, "base"))//sram base
+                                {
+                                    s->sram_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                }
+                                page2 = qdict_next(options_page2, page2);
+                                if(!strcmp(page2->key, "size"))//sram size
+                                {
+                                    s->sram_size = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -663,6 +713,12 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
     struct MemmapEntry *memoryRegion = g_new0(struct MemmapEntry, EVALSOC_DEV_END);
     memcpy(memoryRegion, evalsoc_memmap, sizeof(struct MemmapEntry) * EVALSOC_DEV_END);
     //json config
+    memoryRegion[EVALSOC_ILM].base = s->ilm_base;
+    memoryRegion[EVALSOC_ILM].size = s->ilm_size;
+    memoryRegion[EVALSOC_DLM].base = s->dlm_base;
+    memoryRegion[EVALSOC_DLM].size = s->dlm_size;
+    memoryRegion[EVALSOC_SRAM].base = s->sram_base;
+    memoryRegion[EVALSOC_SRAM].size = s->sram_size;
     memoryRegion[EVALSOC_DDR].base = s->ddr_base;
     memoryRegion[EVALSOC_DDR].size = s->ddr_size;
     memoryRegion[EVALSOC_XIP].base = s->norflash_base;
@@ -681,12 +737,12 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
     memoryRegion[EVALSOC_CLINT].base = memmap[EVALSOC_CLINT].base + s->iregion;
 
     for (size_t i = 0; i < EVALSOC_DEV_END; ++i) {
-        if (i == EVALSOC_CLINT) continue;
+        if (i == EVALSOC_CLINT || i == EVALSOC_ILM || i == EVALSOC_DLM || i == EVALSOC_SRAM) continue;
         hwaddr start1 = memoryRegion[i].base;
         hwaddr end1 = start1 + memoryRegion[i].size;
   
         for (size_t j = 0; j < EVALSOC_DEV_END; ++j) {
-            if (i == j || j == EVALSOC_CLINT) continue; // Skip comparing with itself
+            if (i == j || j == EVALSOC_CLINT || j == EVALSOC_ILM || j == EVALSOC_DLM || j == EVALSOC_SRAM) continue; // Skip comparing with itself
   
             hwaddr start2 = memoryRegion[j].base;
             hwaddr end2 = start2 + memoryRegion[j].size;
@@ -741,12 +797,40 @@ static void evalsoc_machine_init(MachineState *machine)
         s->iregion = IREGION_BASE_ADDR;
     }
 
+    if(s->ilm_base == -1)
+    {
+        s->ilm_base = memmap[EVALSOC_ILM].base;
+    }
+
+    if(s->ilm_size == -1)
+    {
+        s->ilm_size = memmap[EVALSOC_ILM].size;
+    }
+
+    if(s->dlm_base == -1)
+    {
+        s->dlm_base = memmap[EVALSOC_DLM].base;
+    }
+
+    if(s->dlm_size == -1)
+    {
+        s->dlm_size = memmap[EVALSOC_DLM].size;
+    }
+
+    if(s->sram_base == -1)
+    {
+        s->sram_base = memmap[EVALSOC_SRAM].base;
+    }
+
+    if(s->sram_size == -1)
+    {
+        s->sram_size = memmap[EVALSOC_SRAM].size;
+    }
+
     if(s->ddr_base == -1)
     {
         s->ddr_base = memmap[EVALSOC_DDR].base;
     }
-
-    start_addr = s->ddr_base;
 
     if(s->ddr_size == -1)
     {
@@ -828,6 +912,22 @@ static void evalsoc_machine_init(MachineState *machine)
                             &error_abort);
     qdev_realize(DEVICE(&s->soc), NULL, &error_abort);
 
+    //ilm
+    memory_region_init_ram(&s->soc.ilm, NULL, "riscv.evalsoc.ram.ilm",
+                           s->ilm_size, &error_fatal);
+    memory_region_add_subregion(system_memory, s->ilm_base,
+                                &s->soc.ilm);
+    //dlm
+    memory_region_init_ram(&s->soc.dlm, NULL, "riscv.evalsoc.ram.dlm",
+                           s->dlm_size, &error_fatal);
+    memory_region_add_subregion(system_memory, s->dlm_base,
+                                &s->soc.dlm);
+    //sram
+    memory_region_init_ram(&s->soc.sram, NULL, "riscv.evalsoc.ram.sram",
+                           s->sram_size, &error_fatal);
+    memory_region_add_subregion(system_memory, s->sram_base,
+                                &s->soc.sram);
+
     memory_region_init_ram(&s->soc.ddr, NULL, "riscv.evalsoc.ram.ddr",
                            s->ddr_size, &error_fatal);
     memory_region_add_subregion(system_memory, s->ddr_base,
@@ -840,8 +940,8 @@ static void evalsoc_machine_init(MachineState *machine)
 
     // Evalsoc custom csr info init
     for (i = 0; i < machine->smp.cpus; i ++) {
-        s->soc.cpus.harts[i].env.milm_ctl |= EVALSOC_ILM_ADDR & 0x1;
-        s->soc.cpus.harts[i].env.mdlm_ctl |= EVALSOC_DLM_ADDR & 0x1;
+        s->soc.cpus.harts[i].env.milm_ctl |= s->ilm_base & 0x1;
+        s->soc.cpus.harts[i].env.mdlm_ctl |= s->dlm_base & 0x1;
         s->soc.cpus.harts[i].env.mstack_bound = EVALSOC_MSTACK_BOUND;
         s->soc.cpus.harts[i].env.mstack_base = EVALSOC_MSTACK_BASE;
         s->soc.cpus.harts[i].env.mcache_ctl = EVALSOC_MCACHE_CTL;
@@ -872,19 +972,23 @@ static void evalsoc_machine_init(MachineState *machine)
         create_fdt(s, memmap, machine->ram_size, machine->kernel_cmdline);
     }
 
-    if (s->download == NULL) {
-        start_addr = s->norflash_base;
-    } else if (!strcmp(s->download, "ilm")) {
-        start_addr = EVALSOC_ILM_ADDR;
-    } else if(!strcmp(s->download, "ddr")) {
-        // For cpu release after 2023.06, the DDR base changed from 0xA0000000 to 0x80000000
-        // But we want to keep DOWNLOAD=ddr still use old 0xA0000000 base
-        start_addr = EVALSOC_DDR_MODE_ADDR;
-    } else if (!strcmp(s->download, "sram")) { // sram mode = ddr mode base address
-        start_addr = EVALSOC_DDR_MODE_ADDR;
-    } else {
-        start_addr = s->norflash_base;
+    if(s->start_addr == -1)
+    {
+        if (s->download == NULL) {
+            s->start_addr = s->norflash_base;
+        } else if (!strcmp(s->download, "ilm")) {
+            s->start_addr = s->ilm_base;
+        } else if(!strcmp(s->download, "ddr")) {
+            // For cpu release after 2023.06, the DDR base changed from 0xA0000000 to 0x80000000
+            // But we want to keep DOWNLOAD=ddr still use old 0xA0000000 base
+            s->start_addr = s->sram_base; // sram mode = ddr mode base address
+        } else if (!strcmp(s->download, "sram")) {
+            s->start_addr = s->sram_base;
+        } else {
+            s->start_addr = s->norflash_base;
+        }
     }
+    start_addr = s->start_addr;
 
     if (machine->firmware) {
         firmware_end_addr = riscv_find_and_load_firmware(machine, BIOS_FILENAME,
@@ -1005,6 +1109,13 @@ static void evalsoc_machine_instance_init(Object *obj)
     s->timer_freq = -1;
     s->irqmax = -1;
     s->iregion = -1;
+    s->start_addr = -1;
+    s->dlm_base = -1;
+    s->dlm_size = -1;
+    s->ilm_base = -1;
+    s->ilm_size = -1;
+    s->sram_base = -1;
+    s->sram_size = -1;
     s->ddr_base = -1;
     s->ddr_size = -1;
     s->norflash_base = -1;

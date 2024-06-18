@@ -75,6 +75,7 @@ typedef struct EvalSoCSoCState {
     MemoryRegion internal_rom;
     MemoryRegion xip_mem;
     MemoryRegion ddr;
+    MemoryRegion sram;
     MemoryRegion smp;
 
     NucLeiSYSTIMERState timer;
@@ -115,6 +116,13 @@ typedef struct
     uint64_t qspi2_irq;
     uint64_t cpu_freq;
     uint64_t timer_freq;
+    uint64_t start_addr;
+    uint64_t ilm_base;
+    uint64_t ilm_size;
+    uint64_t dlm_base;
+    uint64_t dlm_size;
+    uint64_t sram_base;
+    uint64_t sram_size;
     uint64_t irqmax;
     /*< public >*/
     EvalSoCSoCState soc;
@@ -143,10 +151,11 @@ enum {
     EVALSOC_QSPI1,
     EVALSOC_QSPI2,
     EVALSOC_SMP,
+    EVALSOC_DDR,
     EVALSOC_XIP,
     EVALSOC_ILM,
     EVALSOC_DLM,
-    EVALSOC_DDR,
+    EVALSOC_SRAM,
     EVALSOC_DEV_END
 };
 
@@ -247,9 +256,12 @@ enum
 #define EVALSOC_XIP_SIZE            (0x20000000)
 #define EVALSOC_DDR_BASE            (0x80000000)
 #define EVALSOC_DDR_SIZE            (0x80000000)
-#define EVALSOC_ILM_ADDR            (0x80000000)
-#define EVALSOC_DLM_ADDR            (0x90000000)
-#define EVALSOC_DDR_MODE_ADDR       (0xA0000000)
+#define EVALSOC_ILM_BASE            (0x80000000)
+#define EVALSOC_ILM_SIZE            (0x80000000)
+#define EVALSOC_DLM_BASE            (0x90000000)
+#define EVALSOC_DLM_SIZE            (0x70000000)
+#define EVALSOC_SRAM_BASE           (0xA0000000)
+#define EVALSOC_SRAM_SIZE           (0x60000000)
 
 /* IREGION Offsets */
 #define IREGION_IINFO_OFS           (0x0)
