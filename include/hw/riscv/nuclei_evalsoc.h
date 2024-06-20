@@ -92,13 +92,9 @@ typedef struct EvalSoCSoCState {
 typedef struct {
     uint64_t addr_base;
     uint64_t addr_size;
-    uint64_t startup_addr;
-} evalsoc_memory_info;
-
-typedef struct {
-    uint64_t addr_base;
     uint64_t irq;
-} evalsoc_device_irq_info;
+    uint64_t startup_addr;
+} evalsoc_device_info;
 
 typedef struct
 {
@@ -111,17 +107,17 @@ typedef struct
     const char *download;
     const char *soccfg;
     uint64_t iregion;
-    evalsoc_memory_info evalsoc_ddr;
-    evalsoc_memory_info evalsoc_ilm;
-    evalsoc_memory_info evalsoc_dlm;
-    evalsoc_memory_info evalsoc_norflash;
-    evalsoc_memory_info evalsoc_sram;
-    evalsoc_memory_info evalsoc_flash;
-    evalsoc_device_irq_info evalsoc_uart0;
-    evalsoc_device_irq_info evalsoc_uart1;
-    evalsoc_device_irq_info evalsoc_qspi0;
-    evalsoc_device_irq_info evalsoc_qspi1;
-    evalsoc_device_irq_info evalsoc_qspi2;
+    evalsoc_device_info ddr;
+    evalsoc_device_info ilm;
+    evalsoc_device_info dlm;
+    evalsoc_device_info norflash;
+    evalsoc_device_info sram;
+    evalsoc_device_info flash;
+    evalsoc_device_info uart0;
+    evalsoc_device_info uart1;
+    evalsoc_device_info qspi0;
+    evalsoc_device_info qspi1;
+    evalsoc_device_info qspi2;
     uint64_t cpu_freq;
     uint64_t timer_freq;
     uint64_t irqmax;
