@@ -54,6 +54,10 @@
 
 #define OTP_SERIAL 1
 
+uint32_t debug_flag = 0;
+
+#define DEBUGF(fmt, args...)    {if(debug_flag)printf(fmt ,##args);}
+
 #if defined(TARGET_RISCV32)
 #define BIOS_FILENAME "opensbi-riscv32-generic-fw_dynamic.bin"
 #else
@@ -707,7 +711,7 @@ static void parse_json_config(MachineState *machine)
                                 page2 = qdict_first(options_page2);
                                 if(!strcmp(page2->key, "startaddr"))
                                 {  
-                                     s->ilm.startup_addr = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
+                                     s->norflash.startup_addr = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                             }else if(!strcmp(page1->key, "flash"))//flash
                             {
@@ -930,6 +934,21 @@ static void evalsoc_machine_init(MachineState *machine)
     {
         start_addr = s->norflash.startup_addr;
     }
+    DEBUGF("download mode is %s\n", s->download);
+    DEBUGF("ddr     : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->ddr.addr_base,(long)s->ddr.addr_size,(long)s->ddr.startup_addr);
+    DEBUGF("ilm     : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->ilm.addr_base,(long)s->ilm.addr_size,(long)s->ilm.startup_addr);
+    DEBUGF("dlm     : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->dlm.addr_base,(long)s->dlm.addr_size,(long)s->dlm.startup_addr);
+    DEBUGF("sram    : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->sram.addr_base,(long)s->sram.addr_size,(long)s->sram.startup_addr);
+    DEBUGF("norflash: base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->norflash.addr_base,(long)s->norflash.addr_size,(long)s->norflash.startup_addr);
+    DEBUGF("flash   : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->flash.addr_base,(long)s->flash.addr_size,(long)s->flash.startup_addr);
+    DEBUGF("uart0   : base:0x%lx, irq:%d\n", (long)s->uart0.addr_base,(int)s->uart0.irq);
+    DEBUGF("uart1   : base:0x%lx, irq:%d\n", (long)s->uart1.addr_base,(int)s->uart1.irq);
+    DEBUGF("qspi0   : base:0x%lx, irq:%d\n", (long)s->qspi0.addr_base,(int)s->qspi0.irq);
+    DEBUGF("qspi1   : base:0x%lx, irq:%d\n", (long)s->qspi1.addr_base,(int)s->qspi1.irq);
+    DEBUGF("qspi2   : base:0x%lx, irq:%d\n", (long)s->qspi1.addr_base,(int)s->qspi2.irq);
+    DEBUGF("iregion : 0x%lx\n", (long)s->iregion);
+    DEBUGF("irqmax  : %d\n", (int)s->irqmax);
+    DEBUGF("firmware startup addr:0x%lx\n", (long)start_addr);
 
     if (machine->firmware) {
         firmware_end_addr = riscv_find_and_load_firmware(machine, BIOS_FILENAME,
@@ -1088,6 +1107,11 @@ static void evalsoc_machine_instance_init(Object *obj)
                                    OBJ_PROP_FLAG_READWRITE);
     object_property_set_description(obj, "iregion",
                                     "Set iregion");
+
+    object_property_add_uint32_ptr(obj, "debug", &debug_flag,
+                                   OBJ_PROP_FLAG_READWRITE);
+    object_property_set_description(obj, "debug",
+                                    "debug nuclei evalsoc");
 }
 
 static char* evalsoc_machine_get_download(Object *obj, Error **errp)
