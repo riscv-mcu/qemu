@@ -498,12 +498,12 @@ static unsigned long string_to_uint64(const char *str)
 
     if (end == str) {
         printf("No digits were found:%s\n", str);
-        return -1;  
+        return -1;
     }
 
     if (*end == 'G' || *end == 'g') {
         num = num * 1024 * 1024 * 1024;
-    } 
+    }
     else if(*end == 'M' || *end == 'm') {
         num = num * 1024 * 1024;
     }
@@ -534,7 +534,7 @@ static void parse_json_config(MachineState *machine)
             if(options_page0 != NULL)
             {
                 for (page0 = qdict_first(options_page0); page0; page0 = qdict_next(options_page0, page0))
-                {    
+                {
                     options_page1 = qobject_to(QDict, page0->value);
                     if(options_page1 != NULL && !strcmp(page0->key, "general_config"))
                     {
@@ -620,7 +620,7 @@ static void parse_json_config(MachineState *machine)
                             {
                                 page2 = qdict_first(options_page2);
                                 if(!strcmp(page2->key, "base"))
-                                {  
+                                {
                                      s->iregion = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
 
                                 }
@@ -702,7 +702,7 @@ static void parse_json_config(MachineState *machine)
                             {
                                 page2 = qdict_first(options_page2);
                                 if(!strcmp(page2->key, "startaddr"))
-                                {  
+                                {
                                      s->ilm.startup_addr = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
 
                                 }
@@ -710,28 +710,28 @@ static void parse_json_config(MachineState *machine)
                             {
                                 page2 = qdict_first(options_page2);
                                 if(!strcmp(page2->key, "startaddr"))
-                                {  
+                                {
                                      s->norflash.startup_addr = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                             }else if(!strcmp(page1->key, "flash"))//flash
                             {
                                 page2 = qdict_first(options_page2);
                                 if(!strcmp(page2->key, "startaddr"))
-                                {  
+                                {
                                      s->flash.startup_addr = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                             }else if(!strcmp(page1->key, "sram"))//sram
                             {
                                 page2 = qdict_first(options_page2);
                                 if(!strcmp(page2->key, "startaddr"))
-                                {  
+                                {
                                      s->sram.startup_addr = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                             }else if(!strcmp(page1->key, "ddr"))//ddr
                             {
                                 page2 = qdict_first(options_page2);
                                 if(!strcmp(page2->key, "startaddr"))
-                                {  
+                                {
                                      s->ddr.startup_addr = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
                                 }
                             }
@@ -779,13 +779,13 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
         if (i == EVALSOC_CLINT || i == EVALSOC_ILM || i == EVALSOC_DLM || i == EVALSOC_SRAM) continue;
         hwaddr start1 = memoryRegion[i].base;
         hwaddr end1 = start1 + memoryRegion[i].size;
-  
+
         for (size_t j = 0; j < EVALSOC_DEV_END; ++j) {
             if (i == j || j == EVALSOC_CLINT || j == EVALSOC_ILM || j == EVALSOC_DLM || j == EVALSOC_SRAM) continue; // Skip comparing with itself
-  
+
             hwaddr start2 = memoryRegion[j].base;
             hwaddr end2 = start2 + memoryRegion[j].size;
-  
+
             // If there is overlap, return true
             if (!(end1 <= start2 || end2 <= start1)) {
                 printf("memory is overlap, [%lx:%lx] and [%lx:%lx]\n", (long)start1, (long)end1, (long)start2, (long)end2);
@@ -872,7 +872,7 @@ static void evalsoc_machine_init(MachineState *machine)
 
     memory_region_init_ram(&s->soc.xip_mem, NULL, "riscv.evalsoc.flashxip",
         s->norflash.addr_size, &error_fatal);
-    memory_region_add_subregion(system_memory, 
+    memory_region_add_subregion(system_memory,
         s->norflash.addr_base, &s->soc.xip_mem);
 
     // Evalsoc custom csr info init
@@ -1070,9 +1070,9 @@ static void evalsoc_machine_instance_init(Object *obj)
     s->cpu_freq = -1; //qemu no use
     s->timer_freq = EVALSOC_TIMEBASE_FREQ;
     /* irqmax: max irq number for external irq
-            1.eclic core irq:irq[0~18] external irq:irq[19...4095] 
-            2.plic  irq 0: wire 0 external irq:irq[1...1023] 
-    */ 
+            1.eclic core irq:irq[0~18] external irq:irq[19...4095]
+            2.plic  irq 0: wire 0 external irq:irq[1...1023]
+    */
     s->irqmax = EVALSOC_PLIC_INT_MAX;
     s->iregion = IREGION_BASE_ADDR;
     s->ddr.addr_base = -1;
@@ -1150,7 +1150,7 @@ static void evalsoc_machine_class_init(ObjectClass *oc, void *data)
     mc->default_cpu_type = EVALSOC_CPU;
     mc->default_cpus = mc->min_cpus;
 
-    object_class_property_add_str(oc, "soc-cfg",                                    
+    object_class_property_add_str(oc, "soc-cfg",
                                    evalsoc_machine_get_soccfg,
                                    evalsoc_machine_set_soccfg);
     object_class_property_set_description(oc, "soc-cfg",
@@ -1293,7 +1293,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                         PLIC_IRQ_TO_ECLIC_IRQ(mst->uart0.irq),
                         s->cidu,
                         s->eclic);
-        
+
         nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion,
                 memmap[EVALSOC_TIMER].size, false, 0, ms->smp.cpus, s->eclic, mst->timer_freq);
     }
