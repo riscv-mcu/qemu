@@ -829,6 +829,7 @@ static void evalsoc_machine_init(MachineState *machine)
     s->ilm.startup_addr = (s->ilm.startup_addr == -1) ? s->ilm.addr_base : s->ilm.startup_addr;
     s->sram.startup_addr = (s->sram.startup_addr == -1) ? s->sram.addr_base : s->sram.startup_addr;
     s->norflash.startup_addr = (s->norflash.startup_addr == -1) ? s->norflash.addr_base : s->norflash.startup_addr;
+    s->dlm.startup_addr = (s->dlm.startup_addr == -1) ? s->dlm.addr_base : s->dlm.startup_addr;
 
     /*if flash startup_addr not set, use flashxip startup_addr*/
     s->flash.startup_addr = (s->flash.startup_addr == -1) ? s->norflash.startup_addr: s->flash.startup_addr;
@@ -945,7 +946,7 @@ static void evalsoc_machine_init(MachineState *machine)
     DEBUGF("uart1   : base:0x%lx, irq:%d\n", (long)s->uart1.addr_base,(int)s->uart1.irq);
     DEBUGF("qspi0   : base:0x%lx, irq:%d\n", (long)s->qspi0.addr_base,(int)s->qspi0.irq);
     DEBUGF("qspi1   : base:0x%lx, irq:%d\n", (long)s->qspi1.addr_base,(int)s->qspi1.irq);
-    DEBUGF("qspi2   : base:0x%lx, irq:%d\n", (long)s->qspi1.addr_base,(int)s->qspi2.irq);
+    DEBUGF("qspi2   : base:0x%lx, irq:%d\n", (long)s->qspi2.addr_base,(int)s->qspi2.irq);
     DEBUGF("iregion : 0x%lx\n", (long)s->iregion);
     DEBUGF("irqmax  : %d\n", (int)s->irqmax);
     DEBUGF("firmware startup addr:0x%lx\n", (long)start_addr);
@@ -1342,7 +1343,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi2), 0,
                     mst->qspi2.addr_base);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi2), 0,
-                       qdev_get_gpio_in(DEVICE(s->plic), mst->qspi0.irq));
+                       qdev_get_gpio_in(DEVICE(s->plic), mst->qspi2.irq));
 
     /* SiFive Test MMIO device */
     sifive_test_create(memmap[EVALSOC_TEST].base);
