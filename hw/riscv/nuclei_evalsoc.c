@@ -865,6 +865,13 @@ static void evalsoc_machine_init(MachineState *machine)
     memory_region_add_subregion(system_memory, s->sram.addr_base,
                                 &s->soc.sram);
 
+    // ddr
+    //if -m 128M or no -m,s->ddr.addr_size is first json,then EVALSOC_DDR_SIZE
+    if(machine->ram_size != 128 * MiB)
+    {
+        s->ddr.addr_size = machine->ram_size;
+    }
+
     memory_region_init_ram(&s->soc.ddr, NULL, "riscv.evalsoc.ram.ddr",
                            s->ddr.addr_size, &error_fatal);
     memory_region_add_subregion(system_memory, s->ddr.addr_base,
