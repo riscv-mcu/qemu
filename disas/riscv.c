@@ -27,6 +27,7 @@
 #include "disas/riscv-xthead.h"
 #include "disas/riscv-xventana.h"
 #include "disas/riscv-xxlcz.h"
+#include "disas/riscv-xxldsp.h"
 
 typedef enum {
     /* 0 is reserved for rv_op_illegal. */
@@ -4151,6 +4152,16 @@ static uint32_t operand_rm(rv_inst inst)
     return (inst << 49) >> 61;
 }
 
+static uint32_t operand_shamt3(rv_inst inst)
+{
+    return (inst << 41) >> 61;
+}
+
+static uint32_t operand_shamt4(rv_inst inst)
+{
+    return (inst << 40) >> 60;
+}
+
 static uint32_t operand_shamt5(rv_inst inst)
 {
     return (inst << 39) >> 59;
@@ -4611,6 +4622,18 @@ static void decode_inst_operands(rv_decode *dec, rv_isa isa)
         dec->rs2 = rv_ireg_zero;
         dec->imm = operand_imm8(inst) << 3;
         break;
+    case rv_codec_i_sh3:
+        dec->rd = operand_rd(inst);
+        dec->rs1 = operand_rs1(inst);
+        dec->rs2 = rv_ireg_zero;
+        dec->imm = operand_shamt3(inst);
+        break;
+    case rv_codec_i_sh4:
+        dec->rd = operand_rd(inst);
+        dec->rs1 = operand_rs1(inst);
+        dec->rs2 = rv_ireg_zero;
+        dec->imm = operand_shamt4(inst);
+        break;
     case rv_codec_i_sh5:
         dec->rd = operand_rd(inst);
         dec->rs1 = operand_rs1(inst);
@@ -4683,6 +4706,13 @@ static void decode_inst_operands(rv_decode *dec, rv_isa isa)
         dec->rs2 = operand_rs2(inst);
         dec->imm = 0;
         dec->rm = operand_rm(inst);
+        break;
+    case rv_codec_r4:
+        dec->rd = operand_rd(inst);
+        dec->rs1 = operand_rs1(inst);
+        dec->rs2 = operand_rs2(inst);
+        dec->rs3 = operand_rs3(inst);
+        dec->imm = 0;
         break;
     case rv_codec_r4_m:
         dec->rd = operand_rd(inst);
@@ -5187,6 +5217,8 @@ static size_t inst_length(rv_inst inst)
          : (inst &  0b111111) == 0b011111  ? 6
          : (inst & 0b1111111) == 0b0111111 ? 8
          : (inst & 0b1111111) == 0b1011011 ? 4
+         : (inst & 0b1111111) == 0b1111011 ? 4
+         : (inst & 0b1111111) == 0b1111111 ? 4
          : 0;
 }
 
@@ -5271,6 +5303,9 @@ static GString *format_inst(size_t tab, rv_decode *dec)
                 g_string_append_c(buf, ' ');
             }
             g_string_append_printf(buf, "# 0x%" PRIx64, dec->pc + dec->imm);
+            break;
+        case 't':
+            g_string_append(buf, rv_ireg_name_sym[dec->rs3]);
             break;
         case 'U':
             fmt++;
@@ -5533,8 +5568,9 @@ static GString *disasm_inst(rv_isa isa, uint64_t pc, rv_inst inst,
         const rv_opcode_data *opcode_data;
         void (*decode_func)(rv_decode *, rv_isa);
     } decoders[] = {
-        /* Place the Xxlcz decoders at the top to prevent Xxlcz instructions
-           from being disassembled into RV128 instructions. */
+        /* Place the Xxldsp and Xxlcz decoders at the top to prevent Xxldsp and
+           Xxlcz instructions from being disassembled into RV128 instructions. */
+        { has_xxldsp_p, xxldsp_opcode_data, decode_xxldsp },
         { has_xxlcz_p, xxlcz_opcode_data, decode_xxlcz },
         { always_true_p, rvi_opcode_data, decode_inst_opcode },
         { has_xtheadba_p, xthead_opcode_data, decode_xtheadba },

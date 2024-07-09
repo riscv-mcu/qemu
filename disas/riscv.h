@@ -105,6 +105,8 @@ typedef enum {
     rv_codec_i8_sh1,
     rv_codec_i8_sh2,
     rv_codec_i8_sh3,
+    rv_codec_i_sh3,
+    rv_codec_i_sh4,
     rv_codec_i_sh5,
     rv_codec_i_sh6,
     rv_codec_i_sh7,
@@ -117,6 +119,7 @@ typedef enum {
     rv_codec_sb,
     rv_codec_r,
     rv_codec_r_m,
+    rv_codec_r4,
     rv_codec_r4_m,
     rv_codec_r_a,
     rv_codec_r_l,
@@ -327,5 +330,6 @@ enum {
 #define rv_fmt_rd_rs1_immh_imml_addr  "O\t0,(1),i,j"
 #define rv_fmt_rd2_imm                "O\t0,2,(1),i"
 #define rv_fmt_fli                    "O\t3,h"
+#define rv_fmt_rd_rs1_rs2_rs3         "O\t0,1,2,t"
 
 #endif /* DISAS_RISCV_H */
