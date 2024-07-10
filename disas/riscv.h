@@ -101,6 +101,10 @@ typedef enum {
     rv_codec_u,
     rv_codec_uj,
     rv_codec_i,
+    rv_codec_i8,
+    rv_codec_i8_sh1,
+    rv_codec_i8_sh2,
+    rv_codec_i8_sh3,
     rv_codec_i_sh3,
     rv_codec_i_sh4,
     rv_codec_i_sh5,
@@ -108,6 +112,10 @@ typedef enum {
     rv_codec_i_sh7,
     rv_codec_i_csr,
     rv_codec_s,
+    rv_codec_s8,
+    rv_codec_s8_sh1,
+    rv_codec_s8_sh2,
+    rv_codec_s8_sh3,
     rv_codec_sb,
     rv_codec_r,
     rv_codec_r_m,
@@ -169,6 +177,22 @@ typedef enum {
     rv_codec_r2_immhl,
     rv_codec_r2_imm2_imm5,
     rv_codec_fli,
+    rv_codec_xxlcz_lgp15,
+    rv_codec_xxlcz_lgp15_sh1,
+    rv_codec_xxlcz_lgp15_sh2,
+    rv_codec_xxlcz_lgp15_sh3,
+    rv_codec_xxlcz_lgp16,
+    rv_codec_xxlcz_sgp15,
+    rv_codec_xxlcz_sgp15_sh1,
+    rv_codec_xxlcz_sgp15_sh2,
+    rv_codec_xxlcz_sgp15_sh3,
+    rv_codec_xxlcz_sgp16,
+    rv_codec_xxlcz_b12,
+    rv_codec_xxlcz_mac,
+    rv_codec_xxlcz_bitop,
+    rv_codec_xxlcz_brib,
+    rv_codec_xxlcz_bitrev,
+    rv_codec_xxlcz_addib,
 } rv_codec;
 
 /* structures */
@@ -229,6 +253,7 @@ enum {
 #define rv_fmt_offset                 "O\to"
 #define rv_fmt_pred_succ              "O\tp,s"
 #define rv_fmt_rs1_rs2                "O\t1,2"
+#define rv_fmt_r2_imm                 "O\t2,i"
 #define rv_fmt_rd_imm                 "O\t0,i"
 #define rv_fmt_rd_uimm                "O\t0,Ui"
 #define rv_fmt_rd_offset              "O\t0,o"
@@ -253,6 +278,7 @@ enum {
 #define rv_fmt_rd_csr_zimm            "O\t0,c,7"
 #define rv_fmt_rs2_offset_rs1         "O\t2,i(1)"
 #define rv_fmt_frs2_offset_rs1        "O\t5,i(1)"
+#define rv_fmt_rs1_imm_offset         "O\t1,i,j"
 #define rv_fmt_rs1_rs2_offset         "O\t1,2,o"
 #define rv_fmt_rs2_rs1_offset         "O\t2,1,o"
 #define rv_fmt_aqrl_rd_rs2_rs1        "OAR\t0,2,(1)"
