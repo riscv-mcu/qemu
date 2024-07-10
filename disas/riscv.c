@@ -26,6 +26,7 @@
 /* Vendor extensions */
 #include "disas/riscv-xthead.h"
 #include "disas/riscv-xventana.h"
+#include "disas/riscv-xxlcz.h"
 
 typedef enum {
     /* 0 is reserved for rv_op_illegal. */
@@ -4230,6 +4231,11 @@ static uint32_t operand_csr12(rv_inst inst)
     return (inst << 32) >> 52;
 }
 
+static int32_t operand_imm8(rv_inst inst)
+{
+    return ((int64_t)inst << 36) >> 56;
+}
+
 static int32_t operand_imm12(rv_inst inst)
 {
     return ((int64_t)inst << 32) >> 52;
@@ -4246,6 +4252,12 @@ static int32_t operand_jimm20(rv_inst inst)
         ((inst << 33) >> 54) << 1 |
         ((inst << 43) >> 63) << 11 |
         ((inst << 44) >> 56) << 12;
+}
+
+static int32_t operand_simm8(rv_inst inst)
+{
+    return (((int64_t)inst << 36) >> 61) << 5 |
+        (inst << 52) >> 59;
 }
 
 static int32_t operand_simm12(rv_inst inst)
@@ -4469,6 +4481,65 @@ static uint32_t operand_imml(rv_inst inst)
     return (inst << 38) >> 58;
 }
 
+static int32_t operand_lgp16_imm(rv_inst inst)
+{
+    return ((int64_t)inst << 34) >> 48;
+}
+
+static int32_t operand_lgp15_imm(rv_inst inst)
+{
+    return ((int64_t)inst << 34) >> 49;
+}
+
+static int32_t operand_sgp16_imm(rv_inst inst)
+{
+    return (((int64_t)inst << 34) >> 59) << 11 |
+            ((inst << 44) >> 58) << 5 |
+            (inst << 52) >> 59;
+}
+
+static int32_t operand_sgp15_imm(rv_inst inst)
+{
+    return (((int64_t)inst << 34) >> 59) << 10 |
+            ((inst << 44) >> 59) << 5 |
+            (inst << 52) >> 59;
+}
+
+static int32_t oprand_b12_imm(rv_inst inst)
+{
+    return (((int64_t)inst << 56) >> 63) << 11 |
+            ((inst << 33) >> 58) << 5 |
+            ((inst << 52) >> 60) << 1;
+}
+
+static int32_t oprand_mac_imm(rv_inst inst)
+{
+    return ((int64_t)inst << 35) >> 55;
+}
+
+static uint32_t operand_bitop_imm(rv_inst inst)
+{
+    return (inst << 34) >> 54;
+}
+
+static int32_t operand_brib_offset(rv_inst inst)
+{
+    return (((int64_t)inst << 32) >> 63) << 12 |
+            ((inst << 56) >> 63) << 11 |
+            ((inst << 33) >> 58) << 5 |
+            ((inst << 52) >> 60) << 1;
+}
+
+static uint32_t operand_bitrev_imm(rv_inst inst)
+{
+    return (inst << 37) >> 57;
+}
+
+static uint32_t operand_addib_imm(rv_inst inst)
+{
+    return (inst << 33) >> 53;
+}
+
 static uint32_t calculate_stack_adj(rv_isa isa, uint32_t rlist, uint32_t spimm)
 {
     int xlen_bytes_log2 = isa == rv64 ? 3 : 2;
@@ -4516,6 +4587,30 @@ static void decode_inst_operands(rv_decode *dec, rv_isa isa)
         dec->rs2 = rv_ireg_zero;
         dec->imm = operand_imm12(inst);
         break;
+    case rv_codec_i8:
+        dec->rd = operand_rd(inst);
+        dec->rs1 = operand_rs1(inst);
+        dec->rs2 = rv_ireg_zero;
+        dec->imm = operand_imm8(inst);
+        break;
+    case rv_codec_i8_sh1:
+        dec->rd = operand_rd(inst);
+        dec->rs1 = operand_rs1(inst);
+        dec->rs2 = rv_ireg_zero;
+        dec->imm = operand_imm8(inst) << 1;
+        break;
+    case rv_codec_i8_sh2:
+        dec->rd = operand_rd(inst);
+        dec->rs1 = operand_rs1(inst);
+        dec->rs2 = rv_ireg_zero;
+        dec->imm = operand_imm8(inst) << 2;
+        break;
+    case rv_codec_i8_sh3:
+        dec->rd = operand_rd(inst);
+        dec->rs1 = operand_rs1(inst);
+        dec->rs2 = rv_ireg_zero;
+        dec->imm = operand_imm8(inst) << 3;
+        break;
     case rv_codec_i_sh5:
         dec->rd = operand_rd(inst);
         dec->rs1 = operand_rs1(inst);
@@ -4545,6 +4640,30 @@ static void decode_inst_operands(rv_decode *dec, rv_isa isa)
         dec->rs1 = operand_rs1(inst);
         dec->rs2 = operand_rs2(inst);
         dec->imm = operand_simm12(inst);
+        break;
+    case rv_codec_s8:
+        dec->rd = rv_ireg_zero;
+        dec->rs1 = operand_rs1(inst);
+        dec->rs2 = operand_rs2(inst);
+        dec->imm = operand_simm8(inst);
+        break;
+    case rv_codec_s8_sh1:
+        dec->rd = rv_ireg_zero;
+        dec->rs1 = operand_rs1(inst);
+        dec->rs2 = operand_rs2(inst);
+        dec->imm = operand_simm8(inst) << 1;
+        break;
+    case rv_codec_s8_sh2:
+        dec->rd = rv_ireg_zero;
+        dec->rs1 = operand_rs1(inst);
+        dec->rs2 = operand_rs2(inst);
+        dec->imm = operand_simm8(inst) << 2;
+        break;
+    case rv_codec_s8_sh3:
+        dec->rd = rv_ireg_zero;
+        dec->rs1 = operand_rs1(inst);
+        dec->rs2 = operand_rs2(inst);
+        dec->imm = operand_simm8(inst) << 3;
         break;
     case rv_codec_sb:
         dec->rd = rv_ireg_zero;
@@ -4875,6 +4994,71 @@ static void decode_inst_operands(rv_decode *dec, rv_isa isa)
         dec->imm = sextract32(operand_rs2(inst), 0, 5);
         dec->imm1 = operand_imm2(inst);
         break;
+    case rv_codec_xxlcz_lgp16:
+        dec->rd = operand_rd(inst);
+        dec->imm = operand_lgp16_imm(inst);
+        break;
+    case rv_codec_xxlcz_lgp15_sh1:
+        dec->rd = operand_rd(inst);
+        dec->imm = operand_lgp15_imm(inst) << 1;
+        break;
+    case rv_codec_xxlcz_lgp15_sh2:
+        dec->rd = operand_rd(inst);
+        dec->imm = operand_lgp15_imm(inst) << 2;
+        break;
+    case rv_codec_xxlcz_lgp15_sh3:
+        dec->rd = operand_rd(inst);
+        dec->imm = operand_lgp15_imm(inst) << 3;
+        break;
+    case rv_codec_xxlcz_sgp16:
+        dec->rs2 = operand_rs2(inst);
+        dec->imm = operand_sgp16_imm(inst);
+        break;
+    case rv_codec_xxlcz_sgp15_sh1:
+        dec->rs2 = operand_rs2(inst);
+        dec->imm = operand_sgp15_imm(inst) << 1;
+        break;
+    case rv_codec_xxlcz_sgp15_sh2:
+        dec->rs2 = operand_rs2(inst);
+        dec->imm = operand_sgp15_imm(inst) << 2;
+        break;
+    case rv_codec_xxlcz_sgp15_sh3:
+        dec->rs2 = operand_rs2(inst);
+        dec->imm = operand_sgp15_imm(inst) << 3;
+        break;
+    case rv_codec_xxlcz_b12:
+        dec->rs1 = operand_rs1(inst);
+        dec->rs2 = operand_rs2(inst);
+        dec->imm = oprand_b12_imm(inst);
+        break;
+    case rv_codec_xxlcz_mac:
+        dec->rd = operand_rd(inst);
+        dec->rs1 = operand_rs1(inst);
+        dec->imm = oprand_mac_imm(inst);
+        break;
+    case rv_codec_xxlcz_bitop:
+        dec->rd = operand_rd(inst);
+        dec->rs1 = operand_rs1(inst);
+        dec->imm = extract32(operand_bitop_imm(inst), 5, 5);
+        dec->imm1 = extract32(operand_bitop_imm(inst), 0, 5);
+        break;
+    case rv_codec_xxlcz_brib:
+        dec->rs1 = operand_rs1(inst);
+        dec->imm = sextract32(operand_rs2(inst), 0, 5);
+        dec->imm1 = operand_brib_offset(inst);
+        break;
+    case rv_codec_xxlcz_bitrev:
+        dec->rd = operand_rd(inst);
+        dec->rs1 = operand_rs1(inst);
+        dec->imm = extract32(operand_bitrev_imm(inst), 5, 2);
+        dec->imm1 = extract32(operand_bitrev_imm(inst), 0, 5);
+        break;
+    case rv_codec_xxlcz_addib:
+        dec->rd = operand_rd(inst);
+        dec->rs1 = operand_rs1(inst);
+        dec->imm = extract32(operand_addib_imm(inst), 9, 2);
+        dec->imm1 = extract32(operand_addib_imm(inst), 0, 9) << 1;
+        break;
     };
 }
 
@@ -5002,6 +5186,7 @@ static size_t inst_length(rv_inst inst)
          : (inst &   0b11100) != 0b11100   ? 4
          : (inst &  0b111111) == 0b011111  ? 6
          : (inst & 0b1111111) == 0b0111111 ? 8
+         : (inst & 0b1111111) == 0b1011011 ? 4
          : 0;
 }
 
@@ -5348,6 +5533,9 @@ static GString *disasm_inst(rv_isa isa, uint64_t pc, rv_inst inst,
         const rv_opcode_data *opcode_data;
         void (*decode_func)(rv_decode *, rv_isa);
     } decoders[] = {
+        /* Place the Xxlcz decoders at the top to prevent Xxlcz instructions
+           from being disassembled into RV128 instructions. */
+        { has_xxlcz_p, xxlcz_opcode_data, decode_xxlcz },
         { always_true_p, rvi_opcode_data, decode_inst_opcode },
         { has_xtheadba_p, xthead_opcode_data, decode_xtheadba },
         { has_xtheadbb_p, xthead_opcode_data, decode_xtheadbb },
