@@ -331,6 +331,8 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
     size_t hartid = nuclei_systimer_get_current_cpu(s);
     CPUState *cpu = qemu_get_cpu(hartid);
     CPURISCVState *env = cpu ? cpu_env(cpu) : NULL;
+    uint64_t timecmp_hi;
+    uint64_t timecmp_lo;
 
     if(s->prv_s && (s->mtime_srw_ctrl & 0x1))
         return;
@@ -353,15 +355,24 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
         env->mtimer->expire_time |= (value << 32);
         break;
     case NUCLEI_SYSTIMER_REG_MTIMECMPLO:
-        s->mtimecmp_lo = value;
-        //s->mtimecmp_hi = 0xFFFFFFFF;
-        //env->mtimecmp  |= (value &0xFFFFFFFF);
-        nuclei_timer_update_compare(s);
+        if (riscv_intc_is_clic_mode(env)) {
+            s->mtimecmp_lo = value;
+            nuclei_timer_update_compare(s);
+        } else {
+            timecmp_hi = env->timecmp >> 32;
+            sifive_clint_write_timecmp(RISCV_CPU(cpu),
+                timecmp_hi << 32 | (value & 0xFFFFFFFF), s->timebase_freq);
+        }
         break;
     case NUCLEI_SYSTIMER_REG_MTIMECMPHI:
-        s->mtimecmp_hi = value;
-        //env->mtimecmp  |= ((value << 32)&0xFFFFFFFF);
-        nuclei_timer_update_compare(s);
+        if (riscv_intc_is_clic_mode(env)) {
+            s->mtimecmp_hi = value;
+            nuclei_timer_update_compare(s);
+        } else {
+            timecmp_lo = env->timecmp;
+            sifive_clint_write_timecmp(RISCV_CPU(cpu),
+                value << 32 | (timecmp_lo & 0xFFFFFFFF), s->timebase_freq);
+        }
         break;
     case NUCLEI_SYSTIMER_REG_MTIMER_SRW_CTRL:
         s->mtime_srw_ctrl = value;
@@ -374,13 +385,16 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
         s->mtimectl = value;
         break;
     case NUCLEI_SYSTIMER_REG_MSIP:
-        s->msip = value;
-        if ((s->msip & 0x1) == 1) {
-            qemu_set_irq(*(s->soft_irq[hartid]), 1);
-        }else{
-            qemu_set_irq(*(s->soft_irq[hartid]), 0);
+        if (riscv_intc_is_clic_mode(env)) {
+            s->msip = value;
+            if ((s->msip & 0x1) == 1) {
+                qemu_set_irq(*(s->soft_irq[hartid]), 1);
+            } else {
+                qemu_set_irq(*(s->soft_irq[hartid]), 0);
+            }
+        } else {
+            riscv_cpu_update_mip(env, MIP_MSIP, BOOL_TO_MASK(value));
         }
-
         break;
     default:
         break;
