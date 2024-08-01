@@ -26,6 +26,7 @@
 #include "hw/hw.h"
 #include "hw/irq.h"
 #include "hw/char/nuclei_uart.h"
+#include "hw/qdev-properties-system.h"
 
 /*
  * Not yet implemented:
@@ -168,7 +169,9 @@ static const MemoryRegionOps uart_ops = {
     .endianness = DEVICE_NATIVE_ENDIAN,
     .valid = {
         .min_access_size = 4,
-        .max_access_size = 4}};
+        .max_access_size = 4
+    }
+};
 
 static void uart_rx(void *opaque, const uint8_t *buf, int size)
 {
@@ -205,21 +208,67 @@ static int uart_be_change(void *opaque)
     return 0;
 }
 
+static void nuclei_uart_reset(DeviceState *dev)
+{
+    NucLeiUARTState *s = NUCLEI_UART(dev);
+
+    s->txdata = 0;
+    s->rxdata = 0;
+    s->txctrl = 0;
+    s->rxctrl = 0;
+    s->ie = 0;
+    s->ip = 0x208000;
+    s->div = 0;
+    s->setup = 0xc0050030;
+}
+
+static void nuclei_uart_class_init(ObjectClass *klass, void *data)
+{
+    DeviceClass *dc = DEVICE_CLASS(klass);
+
+    dc->reset = nuclei_uart_reset;
+    dc->desc = "Nuclei Uart";
+}
+
+static const TypeInfo nuclei_uart_info = {
+    .name = TYPE_NUCLEI_UART,
+    .parent = TYPE_SYS_BUS_DEVICE,
+    .instance_size = sizeof(NucLeiUARTState),
+    .class_init = nuclei_uart_class_init,
+};
+
+static void nuclei_uart_register_types(void)
+{
+    type_register_static(&nuclei_uart_info);
+}
+
+type_init(nuclei_uart_register_types);
+
 /*
  * Create UART device.
  */
 NucLeiUARTState *nuclei_uart_create(MemoryRegion *address_space, hwaddr base, uint64_t size,
-                            Chardev *chr, uint32_t id, DeviceState *cidu, DeviceState *eclic)
+                    Chardev *chr, uint32_t id, DeviceState *cidu, DeviceState *eclic, qemu_irq irq)
 {
-    NucLeiUARTState *s = g_malloc0(sizeof(NucLeiUARTState));
+    DeviceState *dev;
+    NucLeiUARTState *s;
+    SysBusDevice *sbd;
 
-    if (cidu != NULL)
-    {
-        s->irq = NUCLEI_CIDU(cidu)->external_irq[id - CIDU_EXT_INT_OFST];
-    }
-    else
-    {
-        s->irq = NUCLEI_ECLIC(eclic)->irqs[id][0];
+    dev = qdev_new("riscv.nuclei.uart");
+    sbd = SYS_BUS_DEVICE(dev);
+    s = NUCLEI_UART(dev);
+
+    if (eclic) {
+        if (cidu != NULL) {
+            s->irq = NUCLEI_CIDU(cidu)->external_irq[id - CIDU_EXT_INT_OFST];
+        } else {
+            s->irq = NUCLEI_ECLIC(eclic)->irqs[id][0];
+        }
+    } else {
+        sysbus_init_mmio(sbd, &s->mmio);
+        sysbus_init_irq(sbd, &s->irq);
+        sysbus_realize_and_unref(sbd, &error_fatal);
+        sysbus_connect_irq(sbd, 0, irq);
     }
 
     qemu_chr_fe_init(&s->chr, chr, &error_abort);

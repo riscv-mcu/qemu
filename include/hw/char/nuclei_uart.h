@@ -75,6 +75,6 @@ typedef struct NucLeiUARTState
 } NucLeiUARTState;
 
 NucLeiUARTState *nuclei_uart_create(MemoryRegion *address_space, hwaddr base, uint64_t size,
-                            Chardev *chr, uint32_t id, DeviceState *cidu, DeviceState *eclic);
+                    Chardev *chr, uint32_t id, DeviceState *cidu, DeviceState *eclic, qemu_irq irq);
 
 #endif

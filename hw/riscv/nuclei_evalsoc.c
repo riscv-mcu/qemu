@@ -35,7 +35,6 @@
 #include "hw/riscv/numa.h"
 #include "hw/intc/riscv_aclint.h"
 #include "hw/intc/sifive_plic.h"
-#include "hw/char/sifive_uart.h"
 #include "hw/misc/sifive_test.h"
 #include "chardev/char.h"
 #include "sysemu/arch_init.h"
@@ -1295,18 +1294,31 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                         serial_hd(0),
                         PLIC_IRQ_TO_ECLIC_IRQ(mst->uart0.irq),
                         s->cidu,
-                        s->eclic);
+                        s->eclic,
+                        NULL);
 
         nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion,
                 memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, s->eclic, mst->timer_freq);
     }
     else
     {
-        sifive_uart_create(sys_mem, mst->uart0.addr_base,
-                       serial_hd(0), qdev_get_gpio_in(DEVICE(s->plic), mst->uart0.irq));
+        nuclei_uart_create(sys_mem,
+                        mst->uart0.addr_base,
+                        memmap[EVALSOC_UART0].size,
+                        serial_hd(0),
+                        0,
+                        NULL,
+                        NULL,
+                        qdev_get_gpio_in(DEVICE(s->plic), mst->uart0.irq));
 
-        sifive_uart_create(sys_mem, mst->uart1.addr_base,
-                        serial_hd(1), qdev_get_gpio_in(DEVICE(s->plic), mst->uart1.irq));
+        nuclei_uart_create(sys_mem,
+                        mst->uart1.addr_base,
+                        memmap[EVALSOC_UART1].size,
+                        serial_hd(1),
+                        0,
+                        NULL,
+                        NULL,
+                        qdev_get_gpio_in(DEVICE(s->plic), mst->uart1.irq));
 
         nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion,
                 memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, NULL, mst->timer_freq);
