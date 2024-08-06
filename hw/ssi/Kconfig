@@ -28,3 +28,7 @@ config BCM2835_SPI
 config PNV_SPI
     bool
     select SSI
+
+config NUCLEI_SPI
+    bool
+    select SSI
