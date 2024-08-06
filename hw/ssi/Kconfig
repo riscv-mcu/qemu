@@ -24,3 +24,7 @@ config STM32F2XX_SPI
 config BCM2835_SPI
     bool
     select SSI
+
+config NUCLEI_SPI
+    bool
+    select SSI

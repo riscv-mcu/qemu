@@ -28,7 +28,7 @@
 #include "hw/misc/sifive_u_prci.h"
 #include "hw/intc/nuclei_systimer.h"
 #include "hw/sd/sd.h"
-#include "hw/ssi/sifive_spi.h"
+#include "hw/ssi/nuclei_spi.h"
 
 #include "hw/cpu/cluster.h"
 #include "hw/riscv/riscv_hart.h"
@@ -39,7 +39,6 @@
 #include "hw/smpcc/nuclei_smpcc.h"
 #include "hw/sysbus.h"
 #include "hw/sd/sd.h"
-#include "hw/ssi/sifive_spi.h"
 
 #include "hw/riscv/sifive_cpu.h"
 #include "hw/misc/sifive_u_otp.h"
@@ -81,8 +80,8 @@ typedef struct EvalSoCSoCState {
     NucLeiSYSTIMERState timer;
     
     SIFIVEGPIOState gpio;
-    SiFiveSPIState spi0;
-    SiFiveSPIState spi2;
+    NucleiSPIState spi0;
+    NucleiSPIState spi2;
 
     uint32_t serial;
     char *cpu_type;

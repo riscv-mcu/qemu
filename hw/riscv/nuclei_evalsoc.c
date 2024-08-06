@@ -1195,8 +1195,8 @@ static void riscv_evalsoc_soc_init(Object *obj)
                             TYPE_RISCV_HART_ARRAY);
 
     object_initialize_child(obj, "gpio", &s->gpio, TYPE_SIFIVE_GPIO);
-    object_initialize_child(obj, "spi0", &s->spi0, TYPE_SIFIVE_SPI);
-    object_initialize_child(obj, "spi2", &s->spi2, TYPE_SIFIVE_SPI);
+    object_initialize_child(obj, "spi0", &s->spi0, TYPE_NUCLEI_SPI);
+    object_initialize_child(obj, "spi2", &s->spi2, TYPE_NUCLEI_SPI);
     object_initialize_child(obj, "timer", &s->timer, TYPE_NUCLEI_SYSTIMER);
 }
 
