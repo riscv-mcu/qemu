@@ -111,3 +111,4 @@ config NUCLEI_EVALSOC
     select NUCLEI_UART
     select NUCLEI_SMPCC
     select NUCLEI_IREGION
+    select NUCLEI_TEST

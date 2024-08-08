@@ -35,6 +35,7 @@ system_ss.add(when: 'CONFIG_SIFIVE_E_AON', if_true: files('sifive_e_aon.c'))
 system_ss.add(when: 'CONFIG_SIFIVE_U_OTP', if_true: files('sifive_u_otp.c'))
 system_ss.add(when: 'CONFIG_SIFIVE_U_PRCI', if_true: files('sifive_u_prci.c'))
 system_ss.add(when: 'CONFIG_NUCLEI_IREGION', if_true: files('nuclei_iregion.c'))
+system_ss.add(when: 'CONFIG_NUCLEI_TEST', if_true: files('nuclei_test.c'))
 
 subdir('macio')
 

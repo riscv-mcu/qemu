@@ -35,7 +35,7 @@
 #include "hw/riscv/numa.h"
 #include "hw/intc/riscv_aclint.h"
 #include "hw/intc/sifive_plic.h"
-#include "hw/misc/sifive_test.h"
+#include "hw/misc/nuclei_test.h"
 #include "chardev/char.h"
 #include "sysemu/arch_init.h"
 #include "sysemu/device_tree.h"
@@ -294,7 +294,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     qemu_fdt_add_subnode(fdt, nodename);
     {
         static const char * const compat[3] = {
-            "sifive,test1", "sifive,test0", "syscon"
+            "nuclei,test1", "nuclei,test0", "syscon"
         };
         qemu_fdt_setprop_string_array(fdt, nodename, "compatible", (char **)&compat,
                                       ARRAY_SIZE(compat));
@@ -1360,8 +1360,8 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi2), 0,
                        qdev_get_gpio_in(DEVICE(s->plic), mst->qspi2.irq));
 
-    /* SiFive Test MMIO device */
-    sifive_test_create(memmap[EVALSOC_TEST].base);
+    /* Nuclei Test MMIO device */
+    nuclei_test_create(memmap[EVALSOC_TEST].base);
 }
 
 static Property evalsoc_soc_props[] = {
