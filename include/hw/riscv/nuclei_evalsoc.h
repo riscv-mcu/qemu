@@ -23,7 +23,6 @@
 #include "hw/dma/sifive_pdma.h"
 #include "hw/riscv/riscv_hart.h"
 #include "hw/riscv/sifive_cpu.h"
-#include "hw/gpio/sifive_gpio.h"
 #include "hw/misc/sifive_u_otp.h"
 #include "hw/misc/sifive_u_prci.h"
 #include "hw/intc/nuclei_systimer.h"
@@ -33,7 +32,7 @@
 #include "hw/cpu/cluster.h"
 #include "hw/riscv/riscv_hart.h"
 #include "hw/char/nuclei_uart.h"
-#include "hw/gpio/sifive_gpio.h"
+#include "hw/gpio/nuclei_gpio.h"
 #include "hw/intc/nuclei_eclic.h"
 #include "hw/intc/nuclei_cidu.h"
 #include "hw/smpcc/nuclei_smpcc.h"
@@ -79,7 +78,7 @@ typedef struct EvalSoCSoCState {
 
     NucLeiSYSTIMERState timer;
     
-    SIFIVEGPIOState gpio;
+    NucleiGPIOState gpio;
     NucleiSPIState spi0;
     NucleiSPIState spi2;
 

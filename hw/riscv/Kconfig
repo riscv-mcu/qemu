@@ -93,7 +93,6 @@ config NUCLEI_EVALSOC
     select CADENCE
     select MSI_NONBROKEN
     select RISCV_ACLINT
-    select SIFIVE_GPIO
     select SIFIVE_PDMA
     select SIFIVE_PLIC
     select SIFIVE_UART
@@ -112,3 +111,4 @@ config NUCLEI_EVALSOC
     select NUCLEI_SMPCC
     select NUCLEI_IREGION
     select NUCLEI_TEST
+    select NUCLEI_GPIO
