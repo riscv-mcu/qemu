@@ -6015,14 +6015,14 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
                              .min_priv_ver = PRIV_VERSION_1_12_0 },
 
     /* nuclei custom tee csr */
-    [CSR_NUCLEI_SPMPCFG0]       = { "spmpcfg0",     any, read_zero, write_ignore },
-    [CSR_NUCLEI_SPMPCFG1]       = { "spmpcfg1",     any, read_zero, write_ignore },
-    [CSR_NUCLEI_SPMPCFG2]       = { "spmpcfg2",     any, read_zero, write_ignore },
-    [CSR_NUCLEI_SPMPCFG3]       = { "spmpcfg3",     any, read_zero, write_ignore },
+    [CSR_NUCLEI_SMPUCFG0]       = { "smpucfg0",     any, read_zero, write_ignore },
+    [CSR_NUCLEI_SMPUCFG1]       = { "smpucfg1",     any, read_zero, write_ignore },
+    [CSR_NUCLEI_SMPUCFG2]       = { "smpucfg2",     any, read_zero, write_ignore },
+    [CSR_NUCLEI_SMPUCFG3]       = { "smpucfg3",     any, read_zero, write_ignore },
 
-    [CSR_NUCLEI_SPMPADDR0]      = { "spmpaddr0",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SPMPADDR1]      = { "spmpaddr1",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SPMPADDR2]      = { "spmpaddr2",    any, read_zero, write_ignore },
+    [CSR_NUCLEI_SMPUADDR0]      = { "smpuaddr0",    any, read_zero, write_ignore },
+    [CSR_NUCLEI_SMPUADDR1]      = { "smpuaddr1",    any, read_zero, write_ignore },
+    [CSR_NUCLEI_SMPUADDR2]      = { "smpuaddr2",    any, read_zero, write_ignore },
 
     [CSR_NUCLEI_JALSNXTI]       = { "jalsnxti",     any, read_zero, write_ignore },
     [CSR_NUCLEI_STVT2]          = { "stvt2",        any, read_zero, write_ignore },

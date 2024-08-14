@@ -420,13 +420,13 @@
 #define CSR_DSCRATCH        0x7b2
 
 /* === TEE CSR Registers === */
-#define CSR_NUCLEI_SPMPCFG0            0x1a0
-#define CSR_NUCLEI_SPMPCFG1            0x1a1
-#define CSR_NUCLEI_SPMPCFG2            0x1a2
-#define CSR_NUCLEI_SPMPCFG3            0x1a3
-#define CSR_NUCLEI_SPMPADDR0           0x1b0
-#define CSR_NUCLEI_SPMPADDR1           0x1b1
-#define CSR_NUCLEI_SPMPADDR2           0x1b2
+#define CSR_NUCLEI_SMPUCFG0            0x1a0
+#define CSR_NUCLEI_SMPUCFG1            0x1a1
+#define CSR_NUCLEI_SMPUCFG2            0x1a2
+#define CSR_NUCLEI_SMPUCFG3            0x1a3
+#define CSR_NUCLEI_SMPUADDR0           0x1b0
+#define CSR_NUCLEI_SMPUADDR1           0x1b1
+#define CSR_NUCLEI_SMPUADDR2           0x1b2
 #define CSR_NUCLEI_SMPUSWITCH0         0x170
 #define CSR_NUCLEI_SMPUSWITCH1         0x171
 #define CSR_NUCLEI_JALSNXTI            0x947
