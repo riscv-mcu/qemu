@@ -1163,6 +1163,9 @@ static uint32_t opcode_at(DisasContextBase *dcbase, target_ulong pc)
 #include "decode-xxldsp.c.inc"
 #include "insn_trans/trans_xxldsp.c.inc"
 
+/* Include decoders for Nuclei nice extensions */
+#include "insn_trans/trans_nice.c.inc"
+
 /* The specification allows for longer insns, but not supported by qemu. */
 #define MAX_INSN_LEN  4
 
