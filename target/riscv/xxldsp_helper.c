@@ -43,11 +43,91 @@ rvpr(CPURISCVState *env, target_ulong a, target_ulong b,
     return result;
 }
 
+static inline uint64_t
+rvprd(CPURISCVState *env, uint64_t a, uint64_t b,
+     uint8_t step, uint8_t size, PackedFn3i *fn)
+{
+    int i, passes = sizeof(uint64_t) / size;
+    uint64_t result = 0;
+
+    for (i = 0; i < passes; i += step) {
+        fn(env, &result, &a, &b, i);
+    }
+    return result;
+}
+
+static inline uint64_t
+rvprd_d64_s64_s32(CPURISCVState *env, uint64_t a, uint32_t b,
+     uint8_t step, uint8_t size, PackedFn3i *fn)
+{
+    int i, passes = sizeof(uint64_t) / size;
+    uint64_t result = 0;
+
+    for (i = 0; i < passes; i += step) {
+        fn(env, &result, &a, &b, i);
+    }
+    return result;
+}
+
+static inline uint64_t
+rvprd_d64_s32_s32(CPURISCVState *env, uint32_t a, uint32_t b,
+     uint8_t step, uint8_t size, PackedFn3i *fn)
+{
+    int i, passes = sizeof(uint64_t) / size;
+    uint64_t result = 0;
+
+    for (i = 0; i < passes; i += step) {
+        fn(env, &result, &a, &b, i);
+    }
+    return result;
+}
+
+static inline uint32_t
+rvprd_d32_s64_s64(CPURISCVState *env, uint64_t a, uint64_t b,
+     uint8_t step, uint8_t size, PackedFn3i *fn)
+{
+    int i, passes = sizeof(uint64_t) / size;
+    uint32_t result = 0;
+
+    for (i = 0; i < passes; i += step) {
+        fn(env, &result, &a, &b, i);
+    }
+    return result;
+}
+
 #define RVPR(NAME, STEP, SIZE)                                  \
 target_ulong HELPER(NAME)(CPURISCVState *env, target_ulong a,   \
                           target_ulong b)                       \
 {                                                               \
     return rvpr(env, a, b, STEP, SIZE, (PackedFn3i *)do_##NAME);\
+}
+
+#define RVPRD(NAME, STEP, SIZE)                                  \
+uint64_t HELPER(NAME)(CPURISCVState *env, uint64_t a,            \
+                          uint64_t b)                            \
+{                                                                \
+    return rvprd(env, a, b, STEP, SIZE, (PackedFn3i *)do_##NAME);\
+}
+
+#define RVPRD_D64_S64_S32(NAME, STEP, SIZE)                      \
+uint64_t HELPER(NAME)(CPURISCVState *env, uint64_t a,            \
+                          uint32_t b)                            \
+{                                                                \
+    return rvprd_d64_s64_s32(env, a, b, STEP, SIZE, (PackedFn3i *)do_##NAME);\
+}
+
+#define RVPRD_D64_S32_S32(NAME, STEP, SIZE)                      \
+uint64_t HELPER(NAME)(CPURISCVState *env, uint32_t a,            \
+                          uint32_t b)                            \
+{                                                                \
+    return rvprd_d64_s32_s32(env, a, b, STEP, SIZE, (PackedFn3i *)do_##NAME);\
+}
+
+#define RVPRD_D32_S64_S64(NAME, STEP, SIZE)                      \
+uint32_t HELPER(NAME)(CPURISCVState *env, uint64_t a,            \
+                          uint64_t b)                            \
+{                                                                \
+    return rvprd_d32_s64_s64(env, a, b, STEP, SIZE, (PackedFn3i *)do_##NAME);\
 }
 
 static inline int32_t hadd32(int32_t a, int32_t b)
@@ -86,6 +166,15 @@ static inline void do_kadd16(CPURISCVState *env, void *vd, void *va,
 }
 
 RVPR(kadd16, 1, 2);
+
+static inline void do_dkadd16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+    d[i] = sadd16(env, 0, a[i], b[i]);
+}
+
+RVPRD(dkadd16, 1, 2);
 
 static inline void do_ukadd16(CPURISCVState *env, void *vd, void *va,
                               void *vb, uint8_t i)
@@ -141,6 +230,808 @@ static inline void do_ksub16(CPURISCVState *env, void *vd, void *va,
 }
 
 RVPR(ksub16, 1, 2);
+
+static inline void do_dksub16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+    d[i] = ssub16(env, 0, a[i], b[i]);
+}
+
+RVPRD(dksub16, 1, 2);
+
+static inline void do_dkhmx8(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int8_t *d = vd, *a = va, *b = vb;
+    i = i * 2;
+    /*
+     * t[x] = ra.B[x] s* rb.B[y];
+     * rt.B[x] = SAT.Q7(t[x] s>> 7);
+     *
+     * (RV32: (x,y)=(3,2),(2,3),
+     *              (1,0),(0,1),
+     * (RV64: (x,y)=(7,6),(6,7),(5,4),(4,5),
+     *              (3,2),(2,3),(1,0),(0,1))
+     */
+    if (a[H1(i)] == INT8_MIN && b[H1(i + 1)] == INT8_MIN) {
+        env->vxsat = 1;
+        d[H1(i)] = INT8_MAX;
+    } else {
+        d[H1(i)] = (int16_t)a[H1(i)] * b[H1(i + 1)] >> 7;
+    }
+    if (a[H1(i + 1)] == INT8_MIN && b[H1(i)] == INT8_MIN) {
+        env->vxsat = 1;
+        d[H1(i + 1)] = INT8_MAX;
+    } else {
+        d[H1(i + 1)] = (int16_t)a[H1(i + 1)] * b[H1(i)] >> 7;
+    }
+}
+
+RVPRD(dkhmx8, 1, 2);
+
+static inline void do_dkhmx16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+    i = i * 2;
+    /*
+     * t[x] = ra.H[x] s* rb.H[y];
+     * rt.H[x] = SAT.Q15(t[x] s>> 15);
+     *
+     * (RV32: (x,y)=(1,0),(0,1),
+     *  RV64: (x,y)=(3,2),(2,3),
+     *              (1,0),(0,1)
+     */
+    if (a[H2(i)] == INT16_MIN && b[H2(i + 1)] == INT16_MIN) {
+        env->vxsat = 1;
+        d[H2(i)] = INT16_MAX;
+    } else {
+        d[H2(i)] = (int32_t)a[H2(i)] * b[H2(i + 1)] >> 15;
+    }
+    if (a[H2(i + 1)] == INT16_MIN && b[H2(i)] == INT16_MIN) {
+        env->vxsat = 1;
+        d[H2(i + 1)] = INT16_MAX;
+    } else {
+        d[H2(i + 1)] = (int32_t)a[H2(i + 1)] * b[H2(i)] >> 15;
+    }
+}
+
+RVPRD(dkhmx16, 1, 4);
+
+static inline void do_dsmmul(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = (int64_t)a[i] * b[i] >> 32;
+    d[i + 1] = (int64_t)a[i + 1] * b[i + 1] >> 32;
+}
+
+RVPRD(dsmmul, 1, 8);
+
+static inline void do_dsmmul_u(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = ((int64_t)a[i] * b[i] + (uint32_t)INT32_MIN) >> 32;
+    d[i + 1] = ((int64_t)a[i + 1] * b[i + 1] + (uint32_t)INT32_MIN) >> 32;
+}
+
+RVPRD(dsmmul_u, 1, 8);
+
+static inline void do_dkwmmul(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    if (a[i] == INT32_MIN && b[i] == INT32_MIN) {
+        env->vxsat = 0x1;
+        d[i] = INT32_MAX;
+    } else {
+        d[i] = (int64_t)a[i] * b[i] >> 31;
+    }
+
+    if (a[i + 1] == INT32_MIN && b[i + 1] == INT32_MIN) {
+        env->vxsat = 0x1;
+        d[i + 1] = INT32_MAX;
+    } else {
+        d[i + 1] = (int64_t)a[i + 1] * b[i + 1] >> 31;
+    }
+}
+
+RVPRD(dkwmmul, 1, 8);
+
+static inline void do_dkwmmul_u(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    if (a[i] == INT32_MIN && b[i] == INT32_MIN) {
+        env->vxsat = 0x1;
+        d[i] = INT32_MAX;
+    } else {
+        d[i] = ((int64_t)a[i] * b[i] + (1ull << 30)) >> 31;
+    }
+
+    if (a[i + 1] == INT32_MIN && b[i + 1] == INT32_MIN) {
+        env->vxsat = 0x1;
+        d[i + 1] = INT32_MAX;
+    } else {
+        d[i + 1] = ((int64_t)a[i + 1] * b[i + 1] + (1ull << 30)) >> 31;
+    }
+}
+
+RVPRD(dkwmmul_u, 1, 8);
+
+static inline void do_dkadd32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = sadd32(env, 0, a[i], b[i]);
+}
+
+RVPRD(dkadd32, 1, 4);
+
+static inline void do_dksub32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = ssub32(env, 0, a[i], b[i]);
+}
+
+RVPRD(dksub32, 1, 4);
+
+static inline void do_dradd16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+    d[i] = sadd32(env, 0, a[i], b[i]) >> 1;
+}
+
+RVPRD(dradd16, 1, 2);
+
+static inline void do_dsub16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+    d[i] = ssub16(env, 0, a[i], b[i]);
+}
+
+RVPRD(dsub16, 1, 2);
+
+static inline void do_dradd32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = sadd64(env, 0, a[i], b[i]) >> 1;
+}
+
+RVPRD(dradd32, 1, 4);
+
+static inline void do_dsub32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = ssub32(env, 0, a[i], b[i]);
+}
+
+RVPRD(dsub32, 1, 4);
+
+static inline void do_dkmda(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd;
+    int16_t *a = va, *b = vb;
+    if (((a[i * 2] == INT16_MIN) && (b[i * 2] == INT16_MIN))
+        || ((a[i * 2 + 1] == INT16_MIN) && (b[i * 2 + 1] == INT16_MIN))) {
+        env->vxsat = 1;
+        d[i] = INT32_MAX;
+    } else {
+        d[i] = (int32_t)a[i * 2] * b[i * 2] + (int32_t)a[i * 2 + 1] * b[i * 2 + 1];
+    }
+}
+
+RVPRD(dkmda, 1, 4);
+
+static inline void do_dkmxda(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd;
+    int16_t *a = va, *b = vb;
+    if (((a[i * 2] == INT16_MIN) && (b[i * 2] == INT16_MIN))
+        || ((a[i * 2 + 1] == INT16_MIN) && (b[i * 2 + 1] == INT16_MIN))) {
+        env->vxsat = 1;
+        d[i] = INT32_MAX;
+    } else {
+        d[i] = (int32_t)a[i * 2] * b[i * 2 + 1] + (int32_t)a[i * 2 + 1] * b[i * 2];
+    }
+
+}
+
+RVPRD(dkmxda, 1, 4);
+
+static inline void do_dsmdrs(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd;
+    int16_t *a = va, *b = vb;
+    d[i] = (int32_t)a[i * 2] * b[i * 2] - (int32_t)a[i * 2 + 1] * b[i * 2 + 1];
+}
+
+RVPRD(dsmdrs, 1, 4);
+
+static inline void do_dsmxds(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd;
+    int16_t *a = va, *b = vb;
+    d[i] = (int32_t)a[i * 2 + 1] * b[i * 2] - (int32_t)a[i * 2] * b[i * 2 + 1];
+}
+
+RVPRD(dsmxds, 1, 4);
+
+static inline void do_dsmbb32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int64_t *d = vd;
+    int32_t *a = va, *b = vb;
+    d[i] = (int64_t)a[i] * b[i];
+}
+
+RVPRD(dsmbb32, 1, 8);
+
+static inline void do_dsmbb32_sra14(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int64_t *d = vd;
+    int32_t *a = va, *b = vb;
+    d[i] = ((int64_t)a[i] * b[i]) >> 14;
+}
+
+RVPRD(dsmbb32_sra14, 1, 8);
+
+static inline void do_dsmbb32_sra32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int64_t *d = vd;
+    int32_t *a = va, *b = vb;
+    d[i] = ((int64_t)a[i] * b[i]) >> 32;
+}
+
+RVPRD(dsmbb32_sra32, 1, 8);
+
+static inline void do_dsmbt32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int64_t *d = vd;
+    int32_t *a = va, *b = vb;
+    d[i] = (int64_t)a[i] * b[i + 1];
+}
+
+RVPRD(dsmbt32, 1, 8);
+
+static inline void do_dsmbt32_sra14(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int64_t *d = vd;
+    int32_t *a = va, *b = vb;
+    d[i] = ((int64_t)a[i] * b[i + 1]) >> 14;
+}
+
+RVPRD(dsmbt32_sra14, 1, 8);
+
+static inline void do_dsmbt32_sra32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int64_t *d = vd;
+    int32_t *a = va, *b = vb;
+    d[i] = ((int64_t)a[i] * b[i + 1]) >> 32;
+}
+
+RVPRD(dsmbt32_sra32, 1, 8);
+
+static inline void do_dsmtt32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int64_t *d = vd;
+    int32_t *a = va, *b = vb;
+    d[i] = (int64_t)a[i + 1] * b[i + 1];
+}
+
+RVPRD(dsmtt32, 1, 8);
+
+static inline void do_dsmtt32_sra14(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int64_t *d = vd;
+    int32_t *a = va, *b = vb;
+    d[i] = ((int64_t)a[i + 1] * b[i + 1]) >> 14;
+}
+
+RVPRD(dsmtt32_sra14, 1, 8);
+
+static inline void do_dsmtt32_sra32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int64_t *d = vd;
+    int32_t *a = va, *b = vb;
+    d[i] = ((int64_t)a[i + 1] * b[i + 1]) >> 32;
+}
+
+RVPRD(dsmtt32_sra32, 1, 8);
+
+static inline void do_dpkbb32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = b[i];
+    d[i + 1] = a[i];
+}
+
+RVPRD(dpkbb32, 1, 8);
+
+static inline void do_dpkbt32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = b[i + 1];
+    d[i + 1] = a[i];
+}
+
+RVPRD(dpkbt32, 1, 8);
+
+static inline void do_dpack32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = b[i];
+    d[i + 1] = a[i];
+}
+
+RVPRD_D64_S32_S32(dpack32, 1, 8);
+
+static inline void do_dpktt32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = b[i + 1];
+    d[i + 1] = a[i + 1];
+}
+
+RVPRD(dpktt32, 1, 8);
+
+static inline void do_dpktb32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = b[i];
+    d[i + 1] = a[i + 1];
+}
+
+RVPRD(dpktb32, 1, 8);
+
+static inline void do_dpktb16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    uint16_t *d = vd, *a = va, *b = vb;
+    d[i * 2] = b[i * 2];
+    d[i * 2 + 1] = a[i * 2 + 1];
+}
+
+RVPRD(dpktb16, 1, 4);
+
+static inline void do_dpkbb16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    uint16_t *d = vd, *a = va, *b = vb;
+    d[i * 2] = b[i * 2];
+    d[i * 2 + 1] = a[i * 2];
+}
+
+RVPRD(dpkbb16, 1, 4);
+
+static inline void do_dpkbt16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    uint16_t *d = vd, *a = va, *b = vb;
+    d[i * 2] = b[i * 2 + 1];
+    d[i * 2 + 1] = a[i * 2];
+}
+
+RVPRD(dpkbt16, 1, 4);
+
+static inline void do_dpktt16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    uint16_t *d = vd, *a = va, *b = vb;
+    d[i * 2] = b[i * 2 + 1];
+    d[i * 2 + 1] = a[i * 2 + 1];
+}
+
+RVPRD(dpktt16, 1, 4);
+
+static inline void do_dsra16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va;
+    int32_t shift = sextract32((*(target_ulong *)vb), 0, 4);
+    if (shift != 0) {
+        d[i] = a[i] >> shift;
+    } else {
+        d[i] = a[i];
+    }
+}
+
+RVPRD(dsra16, 1, 2);
+
+static inline void do_dadd16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+    d[i] = a[i] + b[i];
+}
+
+RVPRD(dadd16, 1, 2);
+
+static inline void do_dadd32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = a[i] + b[i];
+}
+
+RVPRD(dadd32, 1, 4);
+
+static inline void do_dsmbb16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd;
+    int16_t *a = va, *b = vb;
+    d[i] = (int32_t)a[i * 2] * b[i * 2];
+}
+
+RVPRD(dsmbb16, 1, 4);
+
+static inline void do_dsmbt16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd;
+    int16_t *a = va, *b = vb;
+    d[i] = (int32_t)a[i * 2] * b[i * 2 + 1];
+}
+
+RVPRD(dsmbt16, 1, 4);
+
+static inline void do_dsmtt16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd;
+    int16_t *a = va, *b = vb;
+    d[i] = (int32_t)a[i * 2 + 1] * b[i * 2 + 1];
+}
+
+RVPRD(dsmtt16, 1, 4);
+
+static inline void do_drcrsa16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+    d[i * 2 + 1] = (a[i * 2 + 1] - b[i * 2]) >> 1;
+    d[i * 2] = (a[i * 2] + b[i * 2 + 1]) >> 1;
+}
+
+RVPRD(drcrsa16, 1, 4);
+
+static inline void do_drcras16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+    d[i * 2 + 1] = (a[i * 2 + 1] + b[i * 2]) >> 1;
+    d[i * 2] = (a[i * 2] - b[i * 2 + 1]) >> 1;
+}
+
+RVPRD(drcras16, 1, 4);
+
+static inline void do_dkcrsa16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+    int32_t op1, op2;
+    op1 = a[i * 2 + 1] - b[i * 2];
+    op2 = a[i * 2] + b[i * 2 + 1];
+    if (op1 > INT16_MAX) {
+        op1 = INT16_MAX;
+        env->vxsat = 1;
+    } else if (op1 < INT16_MIN) {
+        op1 = INT16_MIN;
+        env->vxsat = 1;
+    }
+    if (op2 > INT16_MAX) {
+        op2 = INT16_MAX;
+        env->vxsat = 1;
+    } else if (op2 < INT16_MIN) {
+        op2 = INT16_MIN;
+        env->vxsat = 1;
+    }
+    d[i * 2] = op2;
+    d[i * 2 + 1] = op1;
+}
+
+RVPRD(dkcrsa16, 1, 4);
+
+static inline void do_dkcras16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+    int32_t op1, op2;
+    op1 = a[i * 2 + 1] + b[i * 2];
+    op2 = a[i * 2] - b[i * 2 + 1];
+    if (op1 > INT16_MAX) {
+        op1 = INT16_MAX;
+        env->vxsat = 1;
+    } else if (op1 < INT16_MIN) {
+        op1 = INT16_MIN;
+        env->vxsat = 1;
+    }
+    if (op2 > INT16_MAX) {
+        op2 = INT16_MAX;
+        env->vxsat = 1;
+    } else if (op2 < INT16_MIN) {
+        op2 = INT16_MIN;
+        env->vxsat = 1;
+    }
+    d[i * 2] = op2;
+    d[i * 2 + 1] = op1;
+}
+
+RVPRD(dkcras16, 1, 4);
+
+static inline void do_drsub16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+    d[i] = (a[i] - b[i]) >> 1;
+}
+
+RVPRD(drsub16, 1, 2);
+
+static inline void do_drsub32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = (a[i] - b[i]) >> 1;
+}
+
+RVPRD(drsub32, 1, 4);
+
+static inline void do_dstsa32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = a[i] + b[i];
+    d[i + 1] = a[i + 1] - b[i + 1];
+}
+
+RVPRD(dstsa32, 1, 8);
+
+static inline void do_dstas32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = a[i] - b[i];
+    d[i + 1] = a[i + 1] + b[i + 1];
+}
+
+RVPRD(dstas32, 1, 8);
+
+static inline void do_dkcras32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    int64_t op1, op2;
+    op1 = a[i] - b[i + 1];
+    op2 = a[i + 1] + b[i];
+    if (op1 > INT32_MAX) {
+        op1 = INT32_MAX;
+        env->vxsat = 1;
+    } else if (op1 < INT32_MIN) {
+        op1 = INT32_MIN;
+        env->vxsat = 1;
+    }
+    if (op2 > INT32_MAX) {
+        op2 = INT32_MAX;
+        env->vxsat = 1;
+    } else if (op2 < INT32_MIN) {
+        op2 = INT32_MIN;
+        env->vxsat = 1;
+    }
+    d[i] = op1;
+    d[i + 1] = op2;
+}
+
+RVPRD(dkcras32, 1, 8);
+
+static inline void do_dkcrsa32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    int64_t op1, op2;
+    op1 = a[i] + b[i + 1];
+    op2 = a[i + 1] - b[i];
+    if (op1 > INT32_MAX) {
+        op1 = INT32_MAX;
+        env->vxsat = 1;
+    } else if (op1 < INT32_MIN) {
+        op1 = INT32_MIN;
+        env->vxsat = 1;
+    }
+    if (op2 > INT32_MAX) {
+        op2 = INT32_MAX;
+        env->vxsat = 1;
+    } else if (op2 < INT32_MIN) {
+        op2 = INT32_MIN;
+        env->vxsat = 1;
+    }
+    d[i] = op1;
+    d[i + 1] = op2;
+}
+
+RVPRD(dkcrsa32, 1, 8);
+
+static inline void do_dcrsa32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = a[i] + b[i + 1];
+    d[i + 1] = a[i + 1] - b[i];
+}
+
+RVPRD(dcrsa32, 1, 8);
+
+static inline void do_dcras32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = a[i] - b[i + 1];
+    d[i + 1] = a[i + 1] + b[i];
+}
+
+RVPRD(dcras32, 1, 8);
+
+static inline void do_dkstsa16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+    int32_t p1, p2;
+    p1 = a[i * 2 + 1] - b[i * 2 + 1];
+    p2 = a[i * 2] + b[i * 2];
+    if (p1 > INT16_MAX) {
+        p1 = INT16_MAX;
+        env->vxsat = 1;
+    } else if (p1 < INT16_MIN) {
+        p1 = INT16_MIN;
+        env->vxsat = 1;
+    }
+    if (p2 > INT16_MAX) {
+        p2 = INT16_MAX;
+        env->vxsat = 1;
+    } else if (p2 < INT16_MIN) {
+        p2 = INT16_MIN;
+        env->vxsat = 1;
+    }
+    d[i * 2 + 1] = p1;
+    d[i * 2] = p2;
+}
+
+RVPRD(dkstsa16, 1, 4);
+
+static inline void do_dkstas16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+    int32_t p1, p2;
+    p1 = a[i * 2 + 1] + b[i * 2 + 1];
+    p2 = a[i * 2] - b[i * 2];
+    if (p1 > INT16_MAX) {
+        p1 = INT16_MAX;
+        env->vxsat = 1;
+    } else if (p1 < INT16_MIN) {
+        p1 = INT16_MIN;
+        env->vxsat = 1;
+    }
+    if (p2 > INT16_MAX) {
+        p2 = INT16_MAX;
+        env->vxsat = 1;
+    } else if (p2 < INT16_MIN) {
+        p2 = INT16_MIN;
+        env->vxsat = 1;
+    }
+    d[i * 2 + 1] = p1;
+    d[i * 2] = p2;
+}
+
+RVPRD(dkstas16, 1, 4);
+
+static inline void do_drcrsa32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd;
+    int32_t *a = va, *b = vb;
+    d[i + 1] = (a[i + 1] - b[i]) >> 1;
+    d[i] = (a[i] + b[i + 1]) >> 1;
+}
+
+RVPRD(drcrsa32, 1, 8);
+
+static inline void do_drcras32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd;
+    int32_t *a = va, *b = vb;
+    d[i + 1] = (a[i + 1] + b[i]) >> 1;
+    d[i] = (a[i] - b[i + 1]) >> 1;
+}
+
+RVPRD(drcras32, 1, 8);
+
+static inline void do_dsclip8(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int8_t *d = vd, *a = va;
+    uint8_t shift = *(uint8_t *)vb & 0x7;
+    int32_t max = (1ull << shift) - 1;
+    int32_t min = -(1ull << shift);
+
+    if (a[i] > max) {
+        d[i] = max;
+        env->vxsat = 0x1;
+    } else if (a[i] < min) {
+        d[i] = min;
+        env->vxsat = 0x1;
+    } else
+        d[i] = a[i];
+}
+
+RVPRD(dsclip8, 1, 1);
+
+static inline void do_dsclip16(CPURISCVState *env, void *vd, void *va,
+                              void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va;
+    uint8_t shift = *(uint8_t *)vb & 0xf;
+    int32_t max = (1ull << shift) - 1;
+    int32_t min = -(1ull << shift);
+
+    if (a[i] > max) {
+        d[i] = max;
+        env->vxsat = 0x1;
+    } else if (a[i] < min) {
+        d[i] = min;
+        env->vxsat = 0x1;
+    } else
+        d[i] = a[i];
+}
+
+RVPRD(dsclip16, 1, 2);
+
+static inline void do_dsclip32(CPURISCVState *env, void *vd, void *va,
+                              void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va;
+    uint8_t shift = *(uint8_t *)vb & 0x1f;
+    int32_t max = (1ull << shift) - 1;
+    int32_t min = -(1ull << shift);
+
+    if (a[i] > max) {
+        d[i] = max;
+        env->vxsat = 0x1;
+    } else if (a[i] < min) {
+        d[i] = min;
+        env->vxsat = 0x1;
+    } else
+        d[i] = a[i];
+}
+
+RVPRD(dsclip32, 1, 4);
+
 
 static inline void do_uksub16(CPURISCVState *env, void *vd, void *va,
                               void *vb, uint8_t i)
@@ -388,6 +1279,15 @@ static inline void do_ukadd8(CPURISCVState *env, void *vd, void *va,
 
 RVPR(ukadd8, 1, 1);
 
+static inline void do_dkadd8(CPURISCVState *env, void *vd, void *va,
+                            void *vb, uint8_t i)
+{
+    int8_t *d = vd, *a = va, *b = vb;
+    d[i] = sadd8(env, 0, a[i], b[i]);
+}
+
+RVPRD(dkadd8, 1, 1);
+
 static inline void do_rsub8(CPURISCVState *env, void *vd, void *va,
                             void *vb, uint8_t i)
 {
@@ -414,6 +1314,15 @@ static inline void do_ksub8(CPURISCVState *env, void *vd, void *va,
 }
 
 RVPR(ksub8, 1, 1);
+
+static inline void do_dksub8(CPURISCVState *env, void *vd, void *va,
+                            void *vb, uint8_t i)
+{
+    int8_t *d = vd, *a = va, *b = vb;
+    d[i] = ssub8(env, 0, a[i], b[i]);
+}
+
+RVPRD(dksub8, 1, 1);
 
 static inline void do_uksub8(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
@@ -510,6 +1419,23 @@ static inline void do_kslra16(CPURISCVState *env, void *vd, void *va,
 }
 
 RVPR(kslra16, 1, 2);
+
+static inline void do_dkslra16(CPURISCVState *env, void *vd, void *va,
+                              void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va;
+    int32_t shift = sextract32((*(target_ulong *)vb), 0, 5);
+
+    if (shift >= 0) {
+        do_ksll16(env, vd, va, vb, i);
+    } else {
+        shift = -shift;
+        shift = (shift == 16) ? 15 : shift;
+        d[i] = a[i] >> shift;
+    }
+}
+
+RVPRD_D64_S64_S32(dkslra16, 1, 2);
 
 static inline void do_kslra16_u(CPURISCVState *env, void *vd, void *va,
                                 void *vb, uint8_t i)
@@ -612,6 +1538,23 @@ static inline void do_kslra8(CPURISCVState *env, void *vd, void *va,
 }
 
 RVPR(kslra8, 1, 1);
+
+static inline void do_dkslra8(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int8_t *d = vd, *a = va;
+    int32_t shift = sextract32((*(uint32_t *)vb), 0, 4);
+
+    if (shift >= 0) {
+        do_ksll8(env, vd, va, vb, i);
+    } else {
+        shift = -shift;
+        shift = (shift == 8) ? 7 : shift;
+        d[i] = a[i] >> shift;
+    }
+}
+
+RVPRD_D64_S64_S32(dkslra8, 1, 1);
 
 static inline void do_kslra8_u(CPURISCVState *env, void *vd, void *va,
                                void *vb, uint8_t i)
@@ -797,6 +1740,21 @@ static inline void do_khm16(CPURISCVState *env, void *vd, void *va,
 
 RVPR(khm16, 1, 2);
 
+static inline void do_dkhm16(CPURISCVState *env, void *vd, void *va,
+                            void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+
+    if (a[i] == INT16_MIN && b[i] == INT16_MIN) {
+        env->vxsat = 1;
+        d[i] = INT16_MAX;
+    } else {
+        d[i] = (int32_t)a[i] * b[i] >> 15;
+    }
+}
+
+RVPRD(dkhm16, 1, 2);
+
 static inline void do_khmx16(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
 {
@@ -889,6 +1847,21 @@ static inline void do_khm8(CPURISCVState *env, void *vd, void *va,
 }
 
 RVPR(khm8, 1, 1);
+
+static inline void do_dkhm8(CPURISCVState *env, void *vd, void *va,
+                           void *vb, uint8_t i)
+{
+    int8_t *d = vd, *a = va, *b = vb;
+
+    if (a[i] == INT8_MIN && b[i] == INT8_MIN) {
+        env->vxsat = 1;
+        d[i] = INT8_MAX;
+    } else {
+        d[i] = (int16_t)a[i] * b[i] >> 7;
+    }
+}
+
+RVPRD(dkhm8, 1, 1);
 
 static inline void do_khmx8(CPURISCVState *env, void *vd, void *va,
                             void *vb, uint8_t i)
@@ -1033,10 +2006,62 @@ static inline target_ulong rvpr2(CPURISCVState *env, target_ulong a,
     return result;
 }
 
+static inline uint64_t rvpr2d(CPURISCVState *env, uint64_t a,
+                                 uint8_t step, uint8_t size, PackedFn2i *fn)
+{
+    int i, passes = sizeof(uint64_t) / size;
+    uint64_t result;
+    for (i = 0; i < passes; i += step) {
+        fn(env, &result, &a, i);
+    }
+    return result;
+}
+
 #define RVPR2(NAME, STEP, SIZE)                                  \
 target_ulong HELPER(NAME)(CPURISCVState *env, target_ulong a)    \
 {                                                                \
     return rvpr2(env, a, STEP, SIZE, (PackedFn2i *)do_##NAME);   \
+}
+
+static inline uint64_t rvpr2_64_64(CPURISCVState *env, uint64_t a,
+                                 uint8_t step, uint8_t size, PackedFn2i *fn)
+{
+    int i, passes = sizeof(uint64_t) / size;
+    uint64_t result;
+
+    for (i = 0; i < passes; i += step) {
+        fn(env, &result, &a, i);
+    }
+    return result;
+}
+
+#define RVPR2_64_64(NAME, STEP, SIZE)                                  \
+uint64_t HELPER(NAME)(CPURISCVState *env, uint64_t a)    \
+{                                                                \
+    return rvpr2_64_64(env, a, STEP, SIZE, (PackedFn2i *)do_##NAME);   \
+}
+
+#define RVPR2D(NAME, STEP, SIZE)                                  \
+uint64_t HELPER(NAME)(CPURISCVState *env, uint64_t a1)            \
+{                                                                 \
+    return rvpr2d(env, a1, STEP, SIZE, (PackedFn2i *)do_##NAME);  \
+}
+
+static inline uint32_t rvpr2d_d32_s64(CPURISCVState *env, uint64_t a,
+                                 uint8_t step, uint8_t size, PackedFn2i *fn)
+{
+    int i, passes = sizeof(uint64_t) / size;
+    uint32_t result;
+    for (i = 0; i < passes; i += step) {
+        fn(env, &result, &a, i);
+    }
+    return result;
+}
+
+#define RVPR2D_D32_S64(NAME, STEP, SIZE)                          \
+uint32_t HELPER(NAME)(CPURISCVState *env, uint64_t a1)            \
+{                                                                 \
+    return rvpr2d_d32_s64(env, a1, STEP, SIZE, (PackedFn2i *)do_##NAME);  \
 }
 
 static inline void do_kabs16(CPURISCVState *env, void *vd, void *va, uint8_t i)
@@ -1052,6 +2077,20 @@ static inline void do_kabs16(CPURISCVState *env, void *vd, void *va, uint8_t i)
 }
 
 RVPR2(kabs16, 1, 2);
+
+static inline void do_dkabs16(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int16_t *d = vd, *a = va;
+
+    if (a[i] == INT16_MIN) {
+        d[i] = INT16_MAX;
+        env->vxsat = 0x1;
+    } else {
+        d[i] = abs(a[i]);
+    }
+}
+
+RVPR2D(dkabs16, 1, 2);
 
 static inline void do_clrs16(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
@@ -1158,6 +2197,156 @@ static inline void do_kabs8(CPURISCVState *env, void *vd, void *va, uint8_t i)
 }
 
 RVPR2(kabs8, 1, 1);
+
+static inline void do_dkabs8(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int8_t *d = vd, *a = va;
+    if (a[i] == INT8_MIN) {
+        d[i] = INT8_MAX;
+        env->vxsat = 0x1;
+    } else {
+        d[i] = abs(a[i]);
+    }
+}
+
+RVPR2D(dkabs8, 1, 1);
+
+static inline void do_dkclip64(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int16_t *d = vd;
+    int64_t *a = va;
+    int32_t op;
+    const int32_t max = (int32_t)((1U << 15U) - 1U);
+    const int32_t min = -1 - max ;
+    op = (int32_t)(a[i] >> 15);
+    if (op > max) {
+        d[i] = max;
+    } else if (op < min) {
+        d[i] = min;
+    } else {
+        d[i] = (int16_t)op;
+    }
+}
+
+RVPR2D_D32_S64(dkclip64, 1, 8);
+
+static inline void do_dredas16(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int16_t *d = vd, *a = va;
+    d[i] = a[i] - a[i + 1];
+    d[i + 1] = a[i + 2] + a[i + 3];
+}
+
+RVPR2D_D32_S64(dredas16, 1, 8);
+
+static inline void do_dredsa16(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int16_t *d = vd, *a = va;
+    d[i] = a[i] + a[i + 1];
+    d[i + 1] = a[i + 2] - a[i + 3];
+}
+
+RVPR2D_D32_S64(dredsa16, 1, 8);
+
+static inline void do_dsunpkd810(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int16_t *d = vd;
+    int8_t *a = va;
+    d[i * 2] = a[i * 4];
+    d[i * 2 + 1] = a[i * 4 + 1];
+}
+
+RVPR2D(dsunpkd810, 1, 4);
+
+static inline void do_dsunpkd820(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int16_t *d = vd;
+    int8_t *a = va;
+    d[i * 2] = a[i * 4];
+    d[i * 2 + 1] = a[i * 4 + 2];
+}
+
+RVPR2D(dsunpkd820, 1, 4);
+
+static inline void do_dsunpkd830(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int16_t *d = vd;
+    int8_t *a = va;
+    d[i * 2] = a[i * 4];
+    d[i * 2 + 1] = a[i * 4 + 3];
+}
+
+RVPR2D(dsunpkd830, 1, 4);
+
+static inline void do_dsunpkd831(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int16_t *d = vd;
+    int8_t *a = va;
+    d[i * 2] = a[i * 4 + 1];
+    d[i * 2 + 1] = a[i * 4 + 3];
+}
+
+RVPR2D(dsunpkd831, 1, 4);
+
+static inline void do_dsunpkd832(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int16_t *d = vd;
+    int8_t *a = va;
+    d[i * 2] = a[i * 4 + 2];
+    d[i * 2 + 1] = a[i * 4 + 3];
+}
+
+RVPR2D(dsunpkd832, 1, 4);
+
+static inline void do_dzunpkd810(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    uint16_t *d = vd;
+    uint8_t *a = va;
+    d[i * 2] = a[i * 4];
+    d[i * 2 + 1] = a[i * 4 + 1];
+}
+
+RVPR2D(dzunpkd810, 1, 4);
+
+static inline void do_dzunpkd820(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    uint16_t *d = vd;
+    uint8_t *a = va;
+    d[i * 2] = a[i * 4];
+    d[i * 2 + 1] = a[i * 4 + 2];
+}
+
+RVPR2D(dzunpkd820, 1, 4);
+
+static inline void do_dzunpkd830(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    uint16_t *d = vd;
+    uint8_t *a = va;
+    d[i * 2] = a[i * 4];
+    d[i * 2 + 1] = a[i * 4 + 3];
+}
+
+RVPR2D(dzunpkd830, 1, 4);
+
+static inline void do_dzunpkd831(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    uint16_t *d = vd;
+    uint8_t *a = va;
+    d[i * 2] = a[i * 4 + 1];
+    d[i * 2 + 1] = a[i * 4 + 3];
+}
+
+RVPR2D(dzunpkd831, 1, 4);
+
+static inline void do_dzunpkd832(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    uint16_t *d = vd;
+    uint8_t *a = va;
+    d[i * 2] = a[i * 4 + 2];
+    d[i * 2 + 1] = a[i * 4 + 3];
+}
+
+RVPR2D(dzunpkd832, 1, 4);
 
 static inline void do_clrs8(CPURISCVState *env, void *vd, void *va, uint8_t i)
 {
@@ -3386,6 +4575,23 @@ static inline void do_smin32(CPURISCVState *env, void *vd, void *va,
 
 RVPR64_64_64(smin32, 1, 4);
 
+static inline void do_dkslra32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va;
+    int64_t shift = sextract64(*(uint64_t *)vb, 0, 6);
+
+    if (shift >= 0) {
+        do_ksll32(env, vd, va, vb, i);
+    } else {
+        shift = -shift;
+        shift = (shift == 32) ? 31 : shift;
+        d[i] = a[i] >> shift;
+    }
+}
+
+RVPRD_D64_S64_S32(dkslra32, 1, 4);
+
 static inline void do_umin32(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
 {
@@ -3856,3 +5062,946 @@ static inline void do_pktt32(CPURISCVState *env, void *vd, void *va,
 }
 
 RVPR64_64_64(pktt32, 2, 4);
+
+static inline void
+do_expd80(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int8_t *a = va;
+    int8_t *d = vd;
+    d[i] = a[0];
+}
+
+RVPR2(expd80, 1, 1);
+
+static inline void
+do_expd81(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int8_t *a = va;
+    int8_t *d = vd;
+    d[i] = a[1];
+}
+
+RVPR2(expd81, 1, 1);
+
+static inline void
+do_expd82(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int8_t *a = va;
+    int8_t *d = vd;
+    d[i] = a[2];
+}
+
+RVPR2(expd82, 1, 1);
+
+static inline void
+do_expd83(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int8_t *a = va;
+    int8_t *d = vd;
+    d[i] = a[3];
+}
+
+RVPR2(expd83, 1, 1);
+
+static inline void
+do_expd84(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int8_t *a = va;
+    int8_t *d = vd;
+    d[i] = a[4];
+}
+
+RVPR2_64_64(expd84, 1, 1);
+
+static inline void
+do_expd85(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int8_t *a = va;
+    int8_t *d = vd;
+    d[i] = a[5];
+}
+
+RVPR2_64_64(expd85, 1, 1);
+
+static inline void
+do_expd86(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int8_t *a = va;
+    int8_t *d = vd;
+    d[i] = a[6];
+}
+
+RVPR2_64_64(expd86, 1, 1);
+
+static inline void
+do_expd87(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int8_t *a = va;
+    int8_t *d = vd;
+    d[i] = a[7];
+}
+
+RVPR2_64_64(expd87, 1, 1);
+
+static inline void do_dkabs32(CPURISCVState *env, void *vd, void *va, uint8_t i)
+{
+    int32_t *d = vd, *a = va;
+    if (a[i] == INT32_MIN) {
+        d[i] = INT32_MAX;
+        env->vxsat = 0x1;
+    } else {
+        d[i] = abs(a[i]);
+    }
+}
+
+RVPR2D(dkabs32, 1, 4);
+
+typedef void PackedFn4i(CPURISCVState *, void *, void *,
+                        void *, void *, uint8_t);
+
+static inline uint64_t
+rvpr_acc_d(CPURISCVState *env, uint64_t a,
+         uint64_t b, uint64_t c,
+         uint8_t step, uint8_t size, PackedFn4i *fn)
+{
+    int i, passes = sizeof(uint64_t) / size;
+    uint64_t result = 0;
+
+    for (i = 0; i < passes; i += step) {
+        fn(env, &result, &a, &b, &c, i);
+    }
+    return result;
+}
+
+#define RVPR_ACC_D(NAME, STEP, SIZE)                                     \
+uint64_t HELPER(NAME)(CPURISCVState *env, uint64_t a,          \
+                          uint64_t b, uint64_t c)              \
+{                                                                      \
+    return rvpr_acc_d(env, a, b, c, STEP, SIZE, (PackedFn4i *)do_##NAME);\
+}
+
+static inline uint32_t
+rvpr_acc_d32(CPURISCVState *env, uint64_t a,
+         uint64_t b, uint64_t c,
+         uint8_t step, uint8_t size, PackedFn4i *fn)
+{
+    int i, passes = sizeof(uint64_t) / size;
+    uint32_t result = 0;
+
+    for (i = 0; i < passes; i += step) {
+        fn(env, &result, &a, &b, &c, i);
+    }
+    return result;
+}
+
+#define RVPR_ACC_D32(NAME, STEP, SIZE)                                     \
+uint32_t HELPER(NAME)(CPURISCVState *env, uint64_t a,          \
+                          uint64_t b, uint64_t c)              \
+{                                                                      \
+    return rvpr_acc_d32(env, a, b, c, STEP, SIZE, (PackedFn4i *)do_##NAME);\
+}
+
+static inline void do_dkmmac(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb, *c = vc;
+    d[i] = sadd32(env, 0, ((int64_t)a[i] * b[i]) >> 32, c[i]);
+}
+
+RVPR_ACC_D(dkmmac, 1, 4);
+
+static inline void do_dkmmac_u(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb, *c = vc;
+    d[i] = sadd32(env, 0, ((int64_t)a[i] * b[i] +
+                           (uint32_t)INT32_MIN) >> 32, c[i]);
+}
+
+RVPR_ACC_D(dkmmac_u, 1, 4);
+
+static inline void do_dkmmsb(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb, *c = vc;
+    d[i] = ssub32(env, 0, c[i], (int64_t)a[i] * b[i] >> 32);
+}
+
+RVPR_ACC_D(dkmmsb, 1, 4);
+
+static inline void do_dkmmsb_u(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb, *c = vc;
+    d[i] = ssub32(env, 0, c[i], ((int64_t)a[i] * b[i] +
+                                 (uint32_t)INT32_MIN) >> 32);
+}
+
+RVPR_ACC_D(dkmmsb_u, 1, 4);
+
+static inline void do_dkmada(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int32_t *d = vd, *c = vc;
+    int16_t *a = va, *b = vb;
+    int32_t p1, p2;
+    p1 = (int32_t)a[H2(2 * i)] * b[H2(2 * i)];
+    p2 = (int32_t)a[H2(2 * i + 1)] * b[H2(2 * i + 1)];
+
+    if (a[H2(i)] == INT16_MIN && a[H2(i + 1)] == INT16_MIN &&
+        b[H2(i)] == INT16_MIN && b[H2(i + 1)] == INT16_MIN) {
+        if (c[H4(i)] < 0) {
+            d[H4(i)] = INT32_MAX + c[H4(i)] + 1ll;
+        } else {
+            env->vxsat = 0x1;
+            d[H4(i)] = INT32_MAX;
+        }
+    } else {
+        d[H4(i)] = sadd32(env, 0, p1 + p2, c[H4(i)]);
+    }
+}
+
+RVPR_ACC_D(dkmada, 1, 4);
+
+static inline void do_dkmaxda(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int32_t *d = vd, *c = vc;
+    int16_t *a = va, *b = vb;
+    int32_t p1, p2;
+    p1 = (int32_t)a[H2(2 * i + 1)] * b[H2(2 * i)];
+    p2 = (int32_t)a[H2(2 * i)] * b[H2(2 * i + 1)];
+
+    if (a[H2(2 * i)] == INT16_MIN && a[H2(2 * i + 1)] == INT16_MIN &&
+        b[H2(2 * i)] == INT16_MIN && b[H2(2 * i + 1)] == INT16_MIN) {
+        if (c[H4(i)] < 0) {
+            d[H4(i)] = INT32_MAX + c[H4(i)] + 1ll;
+        } else {
+            env->vxsat = 0x1;
+            d[H4(i)] = INT32_MAX;
+        }
+    } else {
+        d[H4(i)] = sadd32(env, 0, p1 + p2, c[H4(i)]);
+    }
+}
+
+RVPR_ACC_D(dkmaxda, 1, 4);
+
+static inline void do_dkmads(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int32_t *d = vd, *c = vc;
+    int16_t *a = va, *b = vb;
+    int32_t p1, p2;
+    p1 =   (int32_t)a[H2(2 * i + 1)] * b[H2(2 * i + 1)];
+    p2 =   (int32_t)a[H2(2 * i)] * b[H2(2 * i)];
+
+    d[H4(i)] = sadd32(env, 0, p1 - p2, c[H4(i)]);
+}
+
+RVPR_ACC_D(dkmads, 1, 4);
+
+static inline void do_dkmadrs(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int32_t *d = vd, *c = vc;
+    int16_t *a = va, *b = vb;
+    int32_t p1, p2;
+    p1 = (int32_t)a[H2(2 * i)] * b[H2(2 * i)];
+    p2 = (int32_t)a[H2(2 * i + 1)] * b[H2(2 * i + 1)];
+
+    d[H4(i)] = sadd32(env, 0, p1 - p2, c[H4(i)]);
+}
+
+RVPR_ACC_D(dkmadrs, 1, 4);
+
+static inline void do_dkmsda(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int32_t *d = vd, *c = vc;
+    int16_t *a = va, *b = vb;
+    int32_t p1, p2;
+    p1 = (int32_t)a[H2(2 * i)] * b[H2(2 * i)];
+    p2 = (int32_t)a[H2(2 * i + 1)] * b[H2(2 * i + 1)];
+
+    if (a[H2(i)] == INT16_MIN && a[H2(i + 1)] == INT16_MIN &&
+        b[H2(i)] == INT16_MIN && b[H2(i + 1)] == INT16_MIN) {
+        if (c[H4(i)] < 0) {
+            env->vxsat = 0x1;
+            d[H4(i)] = INT32_MIN;
+        } else {
+            d[H4(i)] = c[H4(i)] - 1ll - INT32_MAX;
+        }
+    } else {
+        d[H4(i)] = ssub32(env, 0, c[H4(i)], p1 + p2);
+    }
+}
+
+RVPR_ACC_D(dkmsda, 1, 4);
+
+static inline void do_dkmsxda(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int32_t *d = vd, *c = vc;
+    int16_t *a = va, *b = vb;
+    int32_t p1, p2;
+    p1 = (int32_t)a[H2(2 * i)] * b[H2(2 * i + 1)];
+    p2 = (int32_t)a[H2(2 * i + 1)] * b[H2(2 * i)];
+
+    if (a[H2(i)] == INT16_MIN && a[H2(i + 1)] == INT16_MIN &&
+        b[H2(i)] == INT16_MIN && b[H2(i + 1)] == INT16_MIN) {
+        if (d[H4(i)] < 0) {
+            env->vxsat = 0x1;
+            d[H4(i)] = INT32_MIN;
+        } else {
+            d[H4(i)] = c[H4(i)] - 1ll - INT32_MAX;
+        }
+    } else {
+        d[H4(i)] = ssub32(env, 0, c[H4(i)], p1 + p2);
+    }
+}
+
+RVPR_ACC_D(dkmsxda, 1, 4);
+
+static inline void do_dsmaqa(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int8_t *a = va, *b = vb;
+    int32_t *d = vd, *c = vc;
+
+    d[H4(i)] = c[H4(i)] + a[H1(i * 4)] * b[H1(i * 4)] +
+               a[H1(i * 4 + 1)] * b[H1(i * 4 + 1)] +
+               a[H1(i * 4 + 2)] * b[H1(i * 4 + 2)] +
+               a[H1(i * 4 + 3)] * b[H1(i * 4 + 3)];
+}
+
+RVPR_ACC_D(dsmaqa, 1, 4);
+
+static inline void do_dsmaqa_su(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int8_t *a = va;
+    uint8_t *b = vb;
+    int32_t *d = vd, *c = vc;
+
+    d[H4(i)] = c[H4(i)] + a[H1(i * 4)] * b[H1(i * 4)] +
+               a[H1(i * 4 + 1)] * b[H1(i * 4 + 1)] +
+               a[H1(i * 4 + 2)] * b[H1(i * 4 + 2)] +
+               a[H1(i * 4 + 3)] * b[H1(i * 4 + 3)];
+}
+
+RVPR_ACC_D(dsmaqa_su, 1, 4);
+
+static inline void do_dumaqa(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    uint8_t *a = va, *b = vb;
+    uint32_t *d = vd, *c = vc;
+
+    d[H4(i)] = c[H4(i)] + a[H1(i * 4)] * b[H1(i * 4)] +
+               a[H1(i * 4 + 1)] * b[H1(i * 4 + 1)] +
+               a[H1(i * 4 + 2)] * b[H1(i * 4 + 2)] +
+               a[H1(i * 4 + 3)] * b[H1(i * 4 + 3)];
+}
+
+RVPR_ACC_D(dumaqa, 1, 4);
+
+static inline void do_dkmda32(CPURISCVState *env, void *vd, void *va,
+                            void *vb, uint8_t i)
+{
+    int64_t *d = vd;
+    int32_t *a = va, *b = vb;
+    if (a[H4(i)] == INT32_MIN && b[H4(i)] == INT32_MIN &&
+        a[H4(i + 1)] == INT32_MIN && b[H4(i + 1)] == INT32_MIN) {
+        *d = INT64_MAX;
+        env->vxsat = 0x1;
+    } else {
+        *d = (int64_t)a[H4(i)] * b[H4(i)] +
+             (int64_t)a[H4(i + 1)] * b[H4(i + 1)];
+    }
+}
+
+RVPRD(dkmda32, 1, 8);
+
+static inline void do_dkmxda32(CPURISCVState *env, void *vd, void *va,
+                            void *vb, uint8_t i)
+{
+    int64_t *d = vd;
+    int32_t *a = va, *b = vb;
+    if (a[H4(i)] == INT32_MIN && b[H4(i)] == INT32_MIN &&
+        a[H4(i + 1)] == INT32_MIN && b[H4(i + 1)] == INT32_MIN) {
+        *d = INT64_MAX;
+        env->vxsat = 0x1;
+    } else {
+        *d = (int64_t)a[H4(i)] * b[H4(i + 1)] +
+             (int64_t)a[H4(i + 1)] * b[H4(i)];
+    }
+}
+
+RVPRD(dkmxda32, 1, 8);
+
+static inline void do_dkmada32(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd;
+    int64_t *c = vc;
+    int32_t *a = va, *b = vb;
+    int64_t p1, p2;
+
+    p1 = (int64_t)a[i] * b[i];
+    p2 = (int64_t)a[i + 1] * b[i + 1];
+    d[H8(i)] = sadd64(env, 0, p1 + p2, c[H8(i)]);
+}
+
+RVPR_ACC_D(dkmada32, 1, 8);
+
+static inline void do_dkmaxda32(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd;
+    int64_t *c = vc;
+    int32_t *a = va, *b = vb;
+    int64_t p1, p2;
+
+    p1 = (int64_t)a[i] * b[i + 1];
+    p2 = (int64_t)a[i + 1] * b[i];
+    d[H8(i)] = sadd64(env, 0, p1 + p2, c[H8(i)]);
+}
+
+RVPR_ACC_D(dkmaxda32, 1, 8);
+
+static inline void do_dkmads32(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd, *c = vc;
+    int32_t *a = va, *b = vb;
+    int64_t p1, p2;
+    p1 = (int64_t)a[i] * b[i];
+    p2 = (int64_t)a[i + 1] * b[i + 1];
+
+    *d = p2 - p1 + *c;
+
+}
+
+RVPR_ACC_D(dkmads32, 1, 8);
+
+static inline void do_dkmadrs32(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd, *c = vc;
+    int32_t *a = va, *b = vb;
+    int64_t t0, t1;
+    t1 = (int64_t)a[H4(i + 1)] * b[H4(i + 1)];
+    t0 = (int64_t)a[H4(i)] * b[H4(i)];
+
+    *d = sadd64(env, 0, t0 - t1, *c);
+}
+
+RVPR_ACC_D(dkmadrs32, 1, 8);
+
+static inline void do_dkmaxds32(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd, *c = vc;
+    int32_t *a = va, *b = vb;
+    int64_t t01, t10;
+    t01 = (int64_t)a[H4(i)] * b[H4(i + 1)];
+    t10 = (int64_t)a[H4(i + 1)] * b[H4(i)];
+
+    *d = sadd64(env, 0, t10 - t01, *c);
+}
+
+RVPR_ACC_D(dkmaxds32, 1, 8);
+
+static inline void do_dkmaxds(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int32_t *d = vd, *c = vc;
+    int16_t *a = va, *b = vb;
+    int32_t p1, p2;
+    p1 = (int32_t)a[H2(2 * i + 1)] * b[H2(2 * i)];
+    p2 = (int32_t)a[H2(2 * i)] * b[H2(2 * i + 1)];
+
+    d[H4(i)] = sadd32(env, 0, p1 - p2, c[H4(i)]);
+}
+
+RVPR_ACC_D(dkmaxds, 1, 4);
+
+static inline void do_dkmsda32(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd, *c = vc;
+    int32_t *a = va, *b = vb;
+    int64_t p1, p2;
+    p1 = (int64_t)a[i] * b[i];
+    p2 = (int64_t)a[i + 1] * b[i + 1];
+
+    *d = *c - p2 - p1;
+}
+
+RVPR_ACC_D(dkmsda32, 1, 8);
+
+static inline void do_dkmsxda32(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd, *c = vc;
+    int32_t *a = va, *b = vb;
+    int64_t t0, t1;
+    t0 = (int64_t)a[H4(i)] * b[H4(i)];
+    t1 = (int64_t)a[H4(i + 1)] * b[H4(i + 1)];
+
+    if (a[H4(i)] == INT32_MIN && a[H4(i + 1)] == INT32_MIN &&
+        b[H4(i)] == INT32_MIN && b[H4(i + 1)] == INT32_MIN) {
+        if (*c < 0) {
+            env->vxsat = 0x1;
+            *d = INT64_MIN;
+        } else {
+            *d = *c - 1ll - INT64_MAX;
+        }
+    } else {
+        *d = ssub64(env, 0, *c, t0 + t1);
+    }
+}
+
+RVPR_ACC_D(dkmsxda32, 1, 8);
+
+static inline void do_dsmds32(CPURISCVState *env, void *vd, void *va,
+                            void *vb, uint8_t i)
+{
+    int64_t *d = vd;
+    int32_t *a = va, *b = vb;
+    *d = (int64_t)a[H4(i + 1)] * b[H4(i + 1)] -
+         (int64_t)a[H4(i)] * b[H4(i)];
+}
+
+RVPRD(dsmds32, 1, 8);
+
+static inline void do_dsmdrs32(CPURISCVState *env, void *vd, void *va,
+                            void *vb, uint8_t i)
+{
+    int64_t *d = vd;
+    int32_t *a = va, *b = vb;
+    *d = (int64_t)a[H4(i)] * b[H4(i)] -
+         (int64_t)a[H4(i + 1)] * b[H4(i + 1)];
+}
+
+RVPRD(dsmdrs32, 1, 8);
+
+static inline void do_dsmxds32(CPURISCVState *env, void *vd, void *va,
+                            void *vb, uint8_t i)
+{
+    int64_t *d = vd;
+    int32_t *a = va, *b = vb;
+    *d = (int64_t)a[H4(i + 1)] * b[H4(i)] -
+         (int64_t)a[H4(i)] * b[H4(i + 1)];
+}
+
+RVPRD(dsmxds32, 1, 8);
+
+static inline void do_dsmalda(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd, *c = vc;
+    int16_t *a = va, *b = vb;
+
+    if (i == 0) {
+        *d = *c;
+    }
+
+    *d += (int64_t)a[H2(i)] * b[H2(i)]
+        + (int64_t)a[H2(i + 1)] * b[H2(i + 1)]
+        + (int64_t)a[H2(i + 2)] * b[H2(i + 2)]
+        + (int64_t)a[H2(i + 3)] * b[H2(i + 3)];
+}
+
+RVPR_ACC_D(dsmalda, 1, 8);
+
+static inline void do_dsmalxda(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd, *c = vc;
+    int16_t *a = va, *b = vb;
+
+    if (i == 0) {
+        *d = *c;
+    }
+
+    *d += (int64_t)a[H2(i)] * b[H2(i + 1)]
+        + (int64_t)a[H2(i + 1)] * b[H2(i)]
+        + (int64_t)a[H2(i + 2)] * b[H2(i + 3)]
+        + (int64_t)a[H2(i + 3)] * b[H2(i + 2)];
+}
+
+RVPR_ACC_D(dsmalxda, 1, 8);
+
+static inline void do_dsmalds(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd, *c = vc;
+    int16_t *a = va, *b = vb;
+
+    if (i == 0) {
+        *d = *c;
+    }
+
+    *d += (int64_t)a[H2(i + 1)] * b[H2(i + 1)] - (int64_t)a[H2(i)] * b[H2(i)]
+        + (int64_t)a[H2(i + 3)] * b[H2(i + 3)] - (int64_t)a[H2(i + 2)] * b[H2(i + 2)];
+}
+
+RVPR_ACC_D(dsmalds, 1, 8);
+
+static inline void do_dsmaldrs(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd, *c = vc;
+    int16_t *a = va, *b = vb;
+
+    if (i == 0) {
+        *d = *c;
+    }
+
+    *d += (int64_t)a[H2(i)] * b[H2(i)] - (int64_t)a[H2(i + 1)] * b[H2(i + 1)]
+        + (int64_t)a[H2(i + 2)] * b[H2(i + 2)] - (int64_t)a[H2(i + 3)] * b[H2(i + 3)];
+}
+
+RVPR_ACC_D(dsmaldrs, 1, 8);
+
+static inline void do_dsmalxds(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd, *c = vc;
+    int16_t *a = va, *b = vb;
+
+    if (i == 0) {
+        *d = *c;
+    }
+
+    *d += (int64_t)a[H2(i + 1)] * b[H2(i)] - (int64_t)a[H2(i)] * b[H2(i + 1)]
+        + (int64_t)a[H2(i + 3)] * b[H2(i + 2)] - (int64_t)a[H2(i + 2)] * b[H2(i + 3)];
+}
+
+RVPR_ACC_D(dsmalxds, 1, 8);
+
+static inline void do_dsmslda(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd, *c = vc;
+    int16_t *a = va, *b = vb;
+
+    if (i == 0) {
+        *d = *c;
+    }
+
+    *d -= (int64_t)a[H2(i)] * b[H2(i)] + (int64_t)a[H2(i + 1)] * b[H2(i + 1)]
+        + (int64_t)a[H2(i + 2)] * b[H2(i + 2)] + (int64_t)a[H2(i + 3)] * b[H2(i + 3)];
+}
+
+RVPR_ACC_D(dsmslda, 1, 8);
+
+static inline void do_dsmslxda(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd, *c = vc;
+    int16_t *a = va, *b = vb;
+
+    if (i == 0) {
+        *d = *c;
+    }
+
+    *d -= (int64_t)a[H2(i + 1)] * b[H2(i)] + (int64_t)a[H2(i)] * b[H2(i + 1)]
+        + (int64_t)a[H2(i + 3)] * b[H2(i + 2)] + (int64_t)a[H2(i + 2)] * b[H2(i + 3)];
+}
+
+RVPR_ACC_D(dsmslxda, 1, 8);
+
+static inline void do_ddsmaqa(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int8_t *a = va, *b = vb;
+    int64_t *d = vd, *c = vc;
+
+    d[H4(i)] = c[H4(i)] +
+               a[H1(i * 4)] * b[H1(i * 4)] +
+               a[H1(i * 4 + 1)] * b[H1(i * 4 + 1)] +
+               a[H1(i * 4 + 2)] * b[H1(i * 4 + 2)] +
+               a[H1(i * 4 + 3)] * b[H1(i * 4 + 3)] +
+               a[H1(i * 4 + 4)] * b[H1(i * 4 + 4)] +
+               a[H1(i * 4 + 5)] * b[H1(i * 4 + 5)] +
+               a[H1(i * 4 + 6)] * b[H1(i * 4 + 6)] +
+               a[H1(i * 4 + 7)] * b[H1(i * 4 + 7)];
+}
+
+RVPR_ACC_D(ddsmaqa, 1, 8);
+
+static inline void do_ddsmaqa_su(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    int8_t *a = va;
+    uint8_t  *b = vb;
+    int64_t *d = vd, *c = vc;
+
+    d[H4(i)] = c[H4(i)] +
+               a[H1(i * 4)] * b[H1(i * 4)] +
+               a[H1(i * 4 + 1)] * b[H1(i * 4 + 1)] +
+               a[H1(i * 4 + 2)] * b[H1(i * 4 + 2)] +
+               a[H1(i * 4 + 3)] * b[H1(i * 4 + 3)] +
+               a[H1(i * 4 + 4)] * b[H1(i * 4 + 4)] +
+               a[H1(i * 4 + 5)] * b[H1(i * 4 + 5)] +
+               a[H1(i * 4 + 6)] * b[H1(i * 4 + 6)] +
+               a[H1(i * 4 + 7)] * b[H1(i * 4 + 7)];
+}
+
+RVPR_ACC_D(ddsmaqa_su, 1, 8);
+
+static inline void do_ddumaqa(CPURISCVState *env, void *vd, void *va,
+                            void *vb, void *vc, uint8_t i)
+{
+    uint8_t *a = va, *b = vb;
+    uint64_t *d = vd, *c = vc;
+
+    d[H4(i)] = c[H4(i)] +
+               a[H1(i * 4)] * b[H1(i * 4)] +
+               a[H1(i * 4 + 1)] * b[H1(i * 4 + 1)] +
+               a[H1(i * 4 + 2)] * b[H1(i * 4 + 2)] +
+               a[H1(i * 4 + 3)] * b[H1(i * 4 + 3)] +
+               a[H1(i * 4 + 4)] * b[H1(i * 4 + 4)] +
+               a[H1(i * 4 + 5)] * b[H1(i * 4 + 5)] +
+               a[H1(i * 4 + 6)] * b[H1(i * 4 + 6)] +
+               a[H1(i * 4 + 7)] * b[H1(i * 4 + 7)];
+}
+
+RVPR_ACC_D(ddumaqa, 1, 8);
+
+static inline void do_dmsr16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+    d[i] = (int16_t)((int32_t)a[i] * b[i] >> 16);
+    d[i + 1] = (int16_t)((int32_t)a[i + 1] * b[i + 1] >> 16);
+    d[i + 2] = (int16_t)((int32_t)a[i + 1] * b[i] >> 16);
+    d[i + 3] = (int16_t)((int32_t)a[i] * b[i + 1] >> 16);
+}
+
+RVPRD(dmsr16, 1, 8);
+
+static inline void do_dmsr17(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int16_t *d = vd, *a = va, *b = vb;
+    d[i] = (int16_t)((int32_t)a[i] * b[i] >> 17);
+    d[i + 1] = (int16_t)((int32_t)a[i + 1] * b[i + 1] >> 17);
+    d[i + 2] = (int16_t)((int32_t)a[i + 1] * b[i] >> 17);
+    d[i + 3] = (int16_t)((int32_t)a[i] * b[i + 1] >> 17);
+}
+
+RVPRD(dmsr17, 1, 8);
+
+static inline void do_dmsr33(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = (int32_t)((int64_t)a[i] * b[i] >> 33);
+}
+
+RVPRD(dmsr33, 1, 4);
+
+static inline void do_dmxsr33(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = (int32_t)((int64_t)a[i] * b[i + 1] >> 33);
+    d[i + 1] = (int32_t)((int64_t)a[i + 1] * b[i] >> 33);
+}
+
+RVPRD(dmxsr33, 1, 8);
+
+static inline void do_dsmada16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, void *vc, uint8_t i)
+{
+    int32_t *d = vd, *c = vc;
+    int16_t *a = va, *b = vb;
+    d[i] = c[i] +
+           a[i] * b[i] +
+           a[i + 1] * b[i + 1] +
+           a[i + 2] * b[i + 2] +
+           a[i + 3] * b[i + 3];
+}
+
+RVPR_ACC_D32(dsmada16, 1, 8);
+
+static inline void do_dsmaxda16(CPURISCVState *env, void *vd, void *va,
+                             void *vb, void *vc, uint8_t i)
+{
+    int32_t *d = vd;
+    int64_t *c = vc;
+    int16_t *a = va, *b = vb;
+    d[i] = (int32_t)(c[i] +
+           a[i] * b[i + 1] +
+           a[i + 1] * b[i] +
+           a[i + 2] * b[i + 3] +
+           a[i + 3] * b[i + 2]);
+}
+
+RVPR_ACC_D32(dsmaxda16, 1, 8);
+
+static inline void do_dksms32_u(CPURISCVState *env, void *vd, void *va,
+                             void *vb, void *vc, uint8_t i)
+{
+    int32_t *d = vd, *c = vc, *a = va, *b = vb;
+    int64_t mres, round, op;
+    mres = (int64_t)a[i] * b[i];
+    round = extract64(mres, 15, 33) + 1;
+    op = (int64_t)c[i] + extract64(round, 1, 32);
+    if (op > INT32_MAX) {
+        op = INT32_MAX;
+        env->vxsat = 1;
+    } else if (op < INT32_MIN) {
+        op = INT32_MIN;
+        env->vxsat = 1;
+    }
+    d[i] = op;
+}
+
+RVPR_ACC_D(dksms32_u, 1, 4);
+
+static inline void do_dmada32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, void *vc, uint8_t i)
+{
+    int32_t *d = vd, *c = vc, *a = va, *b = vb;
+    d[i] = (int32_t)((((int64_t)c[i] << 32) +
+                       (int64_t)a[i] * b[i + 1] +
+                       (int64_t)a[i + 1] * b[i]) >> 32);
+}
+
+RVPR_ACC_D32(dmada32, 1, 8);
+
+static inline void do_dsma32_u(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = (int32_t)(((int64_t)a[i] * b[i] +
+                      (int64_t)a[i + 1] * b[i + 1] +
+                      0x80000000LL) >> 32);
+}
+
+RVPRD_D32_S64_S64(dsma32_u, 1, 8);
+
+static inline void do_dsmxs32_u(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = (int32_t)(((int64_t)a[i + 1] * b[i] -
+                      (int64_t)a[i] * b[i + 1] +
+                      0x80000000LL) >> 32);
+}
+
+RVPRD_D32_S64_S64(dsmxs32_u, 1, 8);
+
+static inline void do_dsmxa32_u(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = (int32_t)(((int64_t)a[i + 1] * b[i] +
+                      (int64_t)a[i] * b[i + 1] +
+                      0x80000000LL) >> 32);
+}
+
+RVPRD_D32_S64_S64(dsmxa32_u, 1, 8);
+
+static inline void do_dsms32_u(CPURISCVState *env, void *vd, void *va,
+                             void *vb, uint8_t i)
+{
+    int32_t *d = vd, *a = va, *b = vb;
+    d[i] = (int32_t)(((int64_t)a[i] * b[i] -
+                      (int64_t)a[i + 1] * b[i + 1] +
+                      0x80000000LL) >> 32);
+}
+
+RVPRD_D32_S64_S64(dsms32_u, 1, 8);
+
+static inline void do_dsmalbb(CPURISCVState *env, void *vd, void *va,
+                             void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd, *c = vc;
+    int16_t *a = va, *b = vb;
+    d[i] = c[i] + (int64_t)a[i] * b[i] + (int64_t)a[i + 2] * b[i + 2];
+}
+
+RVPR_ACC_D(dsmalbb, 1, 8);
+
+static inline void do_dsmalbt(CPURISCVState *env, void *vd, void *va,
+                             void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd, *c = vc;
+    int16_t *a = va, *b = vb;
+    d[i] = c[i] + (int64_t)a[i] * b[i + 1] + (int64_t)a[i + 2] * b[i + 3];
+}
+
+RVPR_ACC_D(dsmalbt, 1, 8);
+
+static inline void do_dsmaltt(CPURISCVState *env, void *vd, void *va,
+                             void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd, *c = vc;
+    int16_t *a = va, *b = vb;
+    d[i] = c[i] + (int64_t)a[i + 1] * b[i + 1] + (int64_t)a[i + 3] * b[i + 3];
+}
+
+RVPR_ACC_D(dsmaltt, 1, 8);
+
+static inline void do_dkmabb32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd, *c = vc;
+    int32_t *a = va, *b = vb;
+    int64_t res;
+    res = c[i] + (int64_t)a[i] * b[i];
+    if (res > INT64_MAX) {
+        res = INT64_MAX;
+        env->vxsat = 1;
+    } else if (res < INT64_MIN) {
+        res = INT64_MIN;
+        env->vxsat = 1;
+    }
+    d[i] = res;
+}
+
+RVPR_ACC_D(dkmabb32, 1, 8);
+
+static inline void do_dkmabt32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd, *c = vc;
+    int32_t *a = va, *b = vb;
+    int64_t res;
+    res = c[i] + (int64_t)a[i] * b[i + 1];
+    if (res > INT64_MAX) {
+        res = INT64_MAX;
+        env->vxsat = 1;
+    } else if (res < INT64_MIN) {
+        res = INT64_MIN;
+        env->vxsat = 1;
+    }
+    d[i] = res;
+}
+
+RVPR_ACC_D(dkmabt32, 1, 8);
+
+static inline void do_dkmatt32(CPURISCVState *env, void *vd, void *va,
+                             void *vb, void *vc, uint8_t i)
+{
+    int64_t *d = vd, *c = vc;
+    int32_t *a = va, *b = vb;
+    int64_t res;
+    res = c[i] + (int64_t)a[i + 1] * b[i + 1];
+    if (res > INT64_MAX) {
+        res = INT64_MAX;
+        env->vxsat = 1;
+    } else if (res < INT64_MIN) {
+        res = INT64_MIN;
+        env->vxsat = 1;
+    }
+    d[i] = res;
+}
+
+RVPR_ACC_D(dkmatt32, 1, 8);
