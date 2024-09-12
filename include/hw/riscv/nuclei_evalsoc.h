@@ -284,8 +284,8 @@ enum
 #define EVALSOC_MICFG_INFO          0xd0137
 #define EVALSOC_MDCFG_INFO          0xd0137
 #define EVALSOC_MTLBCFG_INFO        0x2d02b4
-#define EVALSOC_MPPICFG_INFO        (EVALSOC_PPI_ADDR | 0x1e)
-#define EVALSOC_MFIOCFG_INFO        (EVALSOC_FIO_ADDR | 0x1e)
+#define EVALSOC_MPPICFG_INFO        (EVALSOC_PPI_ADDR | 0x1f)
+#define EVALSOC_MFIOCFG_INFO        (EVALSOC_FIO_ADDR | 0x1f)
 #define EVALSOC_MECC_CTRL           0x3ff
 #define EVALSOC_MECC_STATUS         0
 #define EVALSOC_MTLB_CTL            0
