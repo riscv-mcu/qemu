@@ -50,6 +50,7 @@
 #include "qapi/qmp/qobject.h"
 #include "qapi/qmp/qdict.h"
 #include "qapi/qmp/qstring.h"
+#include "elf.h"
 
 #define OTP_SERIAL 1
 
@@ -92,46 +93,6 @@ static const struct MemmapEntry
     [EVALSOC_SRAM]  = { EVALSOC_SRAM_BASE,              EVALSOC_SRAM_SIZE  },
     [EVALSOC_CLINT] = { IREGION_TIMER_OFS + 0x1000,     0xF000 },//MTIME in CLINT mode
 };
-
-static void riscv_load_initrd(MachineState *machine, uint64_t kernel_entry)
-{
-    const char *filename = machine->initrd_filename;
-    uint64_t mem_size = machine->ram_size;
-    void *fdt = machine->fdt;
-    hwaddr start, end;
-    ssize_t size;
-
-    g_assert(filename != NULL);
-
-    /*
-     * We want to put the initrd far enough into RAM that when the
-     * kernel is uncompressed it will not clobber the initrd. However
-     * on boards without much RAM we must ensure that we still leave
-     * enough room for a decent sized initrd, and on boards with large
-     * amounts of RAM we must avoid the initrd being so far up in RAM
-     * that it is outside lowmem and inaccessible to the kernel.
-     * So for boards with less  than 256MB of RAM we put the initrd
-     * halfway into RAM, and for boards with 256MB of RAM or more we put
-     * the initrd at 128MB.
-     */
-    start = kernel_entry + MIN(mem_size / 2, 128 * MiB);
-
-    size = load_ramdisk(filename, start, mem_size - start);
-    if (size == -1) {
-        size = load_image_targphys(filename, start, mem_size - start);
-        if (size == -1) {
-            error_report("could not load ramdisk '%s'", filename);
-            exit(1);
-        }
-    }
-
-    /* Some RISC-V machines (e.g. opentitan) don't have a fdt. */
-    if (fdt) {
-        end = start + size;
-        qemu_fdt_setprop_cell(fdt, "/chosen", "linux,initrd-start", start);
-        qemu_fdt_setprop_cell(fdt, "/chosen", "linux,initrd-end", end);
-    }
-}
 
 static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
                        uint64_t mem_size, const char *cmdline)
@@ -805,6 +766,7 @@ static void evalsoc_machine_init(MachineState *machine)
     uint32_t fdt_load_addr = 0;
     uint64_t kernel_entry = 0;
     target_ulong firmware_end_addr, kernel_start_addr;
+    uint64_t kernel_entry_point;
     int i;
     DriveInfo *dinfo;
     BlockBackend *blk;
@@ -972,14 +934,16 @@ static void evalsoc_machine_init(MachineState *machine)
 
         if(machine->kernel_filename)
         {
-            kernel_entry = riscv_load_kernel(machine, &s->soc.cpus,
-                                         kernel_start_addr, true, NULL);
+            if (strstr(s->soc.cpu_type, "n100")) {
+                load_elf_ram_sym(machine->kernel_filename, NULL, NULL, NULL,
+                         &kernel_entry_point, NULL, NULL, NULL, 0,
+                         EM_RISCV, 1, 0, NULL, true, NULL);
+                start_addr = kernel_entry_point;
+            } else {
+                kernel_entry = riscv_load_kernel(machine, &s->soc.cpus,
+                                            kernel_start_addr, true, NULL);
+            }
         }
-
-        if (machine->initrd_filename) {
-            riscv_load_initrd(machine, kernel_entry);
-        }
-
     }
     else
     {
