@@ -2,7 +2,6 @@
  * RISC-V translation routines for the Zilsd Extension.
  */
 
-
 #define REQUIRE_ZILSD(ctx) do {    \
     if (!ctx->cfg_ptr->ext_zilsd)  \
         return false;              \
@@ -17,7 +16,7 @@ static bool gen_load_i32(DisasContext *ctx, arg_ld *a, MemOp memop)
         return false;
     }
     if(a->rd==0){
-        TCGv dest = dest_gpr(ctx, a->rd);  
+        TCGv dest = dest_gpr(ctx, a->rd);
 
         TCGv addr = get_address(ctx, a->rs1, a->imm);
         tcg_gen_qemu_ld_tl(dest, addr, ctx->mem_idx, memop);
@@ -81,4 +80,3 @@ static bool trans_zilsd_sd(DisasContext *ctx, arg_zilsd_sd *a)
 {
     return gen_store_i32(ctx, a, MO_TESL);
 }
-

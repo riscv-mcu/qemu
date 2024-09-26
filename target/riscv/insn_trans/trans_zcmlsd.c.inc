@@ -7,7 +7,6 @@
         return false;               \
 } while (0)
 
- 
 static bool gen_load_ld(DisasContext *ctx, arg_lb *a, MemOp memop, int flag)
 {
     REQUIRE_ZCMLSD(ctx);
