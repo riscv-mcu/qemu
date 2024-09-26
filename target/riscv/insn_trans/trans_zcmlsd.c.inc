@@ -21,7 +21,7 @@ static bool gen_load_ld(DisasContext *ctx, arg_lb *a, MemOp memop, int flag)
     tcg_gen_qemu_ld_tl(dest_low, addr, ctx->mem_idx, memop);
 
     TCGv dest_high= dest_gpr(ctx, a->rd+1);
-    tcg_gen_addi_tl(addr, addr, 32);
+    tcg_gen_addi_tl(addr, addr, 4);
     tcg_gen_qemu_ld_tl(dest_high, addr, ctx->mem_idx, memop);
 
     gen_set_gpr(ctx, a->rd, dest_low);
@@ -52,7 +52,7 @@ static bool gen_store_sd(DisasContext *ctx, arg_sb *a, MemOp memop, int flag)
         TCGv addr = get_address(ctx, a->rs1, a->imm);
         tcg_gen_qemu_st_tl(data, addr, ctx->mem_idx, memop);
 
-        tcg_gen_addi_tl(addr, addr, 32);
+        tcg_gen_addi_tl(addr, addr, 4);
         tcg_gen_qemu_st_tl(data, addr, ctx->mem_idx, memop);  
 
         return true;
@@ -65,7 +65,7 @@ static bool gen_store_sd(DisasContext *ctx, arg_sb *a, MemOp memop, int flag)
     TCGv addr = get_address(ctx, a->rs1, a->imm);
     tcg_gen_qemu_st_tl(data_low, addr, ctx->mem_idx, memop);
 
-    tcg_gen_addi_tl(addr, addr, 32);
+    tcg_gen_addi_tl(addr, addr, 4);
     tcg_gen_qemu_st_tl(data_high, addr, ctx->mem_idx, memop);  
     return true;
 }
