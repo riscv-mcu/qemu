@@ -731,15 +731,15 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         cpu->pmu_avail_ctrs = 0;
     }
 
-    if (cpu->cfg.ext_zcmlsd) {
+    if (cpu->cfg.ext_zclsd) {
         if (riscv_has_ext(env, RVC) && riscv_has_ext(env, RVF)) {
             error_setg(errp,
-                    "Zcmlsd cannot be supported together with C and F extension");
+                    "Zclsd cannot be supported together with C and F extension");
             return;
         }
         if (cpu->cfg.ext_zcf) {
             error_setg(errp,
-                    "Zcmlsd cannot be supported together with ZCF extension");
+                    "Zclsd cannot be supported together with ZCF extension");
             return;
         }
     }

@@ -1,15 +1,15 @@
 /*
- * RISC-V translation routines for the Zcmlsd Extension.
+ * RISC-V translation routines for the Zclsd Extension.
  */
 
-#define REQUIRE_ZCMLSD(ctx) do {    \
-    if (!ctx->cfg_ptr->ext_zcmlsd)  \
+#define REQUIRE_ZCLSD(ctx) do {    \
+    if (!ctx->cfg_ptr->ext_zclsd)  \
         return false;               \
 } while (0)
 
 static bool gen_load_ld(DisasContext *ctx, arg_lb *a, MemOp memop, int flag)
 {
-    REQUIRE_ZCMLSD(ctx);
+    REQUIRE_ZCLSD(ctx);
     REQUIRE_32BIT(ctx);
 
     if (flag&&a->rd==0){
@@ -30,21 +30,21 @@ static bool gen_load_ld(DisasContext *ctx, arg_lb *a, MemOp memop, int flag)
     return true;
 }
 
-// zcmlsd c.ldsp 
-static bool trans_zcmlsd_ldsp(DisasContext *ctx, arg_zcmlsd_ldsp *a)
+// zclsd c.ldsp 
+static bool trans_zclsd_ldsp(DisasContext *ctx, arg_zclsd_ldsp *a)
 {
     return gen_load_ld(ctx, a, MO_TESL, 1);
 }
 
-//zcmlsd c.ld  
-static bool trans_zcmlsd_ld(DisasContext *ctx, arg_zcmlsd_ld *a)
+//zclsd c.ld  
+static bool trans_zclsd_ld(DisasContext *ctx, arg_zclsd_ld *a)
 {
     return gen_load_ld(ctx, a, MO_TESL, 0);
 }
 
 static bool gen_store_sd(DisasContext *ctx, arg_sb *a, MemOp memop, int flag)
 {
-    REQUIRE_ZCMLSD(ctx);
+    REQUIRE_ZCLSD(ctx);
     REQUIRE_32BIT(ctx);
 
     if(flag&&a->rs2==0){
@@ -70,14 +70,14 @@ static bool gen_store_sd(DisasContext *ctx, arg_sb *a, MemOp memop, int flag)
     return true;
 }
 
-//zcmlsd c.sdsp
-static bool trans_zcmlsd_sdsp(DisasContext *ctx, arg_zcmlsd_sdsp *a)
+//zclsd c.sdsp
+static bool trans_zclsd_sdsp(DisasContext *ctx, arg_zclsd_sdsp *a)
 {
     return gen_store_sd(ctx, a, MO_TESL, 1);
 }
 
-//zcmlsd c.sd
-static bool trans_zcmlsd_sd(DisasContext *ctx, arg_zcmlsd_sd *a)
+//zclsd c.sd
+static bool trans_zclsd_sd(DisasContext *ctx, arg_zclsd_sd *a)
 {
     return gen_store_sd(ctx, a, MO_TESL, 0);
 }
