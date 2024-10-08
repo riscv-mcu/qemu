@@ -500,7 +500,7 @@ static bool trans_xl_flh(DisasContext *ctx, arg_xl_flh *a)
     REQUIRE_ZFHMIN_OR_ZFBFMIN(ctx);
     REQUIRE_XXLCZPSTINC(ctx);
 
-    decode_save_opc(ctx);
+    decode_save_opc(ctx, 0);
     t0 = get_gpr(ctx, a->rs1, EXT_NONE);
 
     dest = cpu_fpr[a->rd];
@@ -523,7 +523,7 @@ static bool trans_xl_flw(DisasContext *ctx, arg_xl_flw *a)
     REQUIRE_EXT(ctx, RVF);
     REQUIRE_XXLCZPSTINC(ctx);
 
-    decode_save_opc(ctx);
+    decode_save_opc(ctx, 0);
     addr = get_address(ctx, a->rs1, 0);
     dest = cpu_fpr[a->rd];
     tcg_gen_qemu_ld_i64(dest, addr, ctx->mem_idx, MO_TEUL);
@@ -544,7 +544,7 @@ static bool trans_xl_fld(DisasContext *ctx, arg_xl_fld *a)
     REQUIRE_EXT(ctx, RVD);
     REQUIRE_XXLCZPSTINC(ctx);
 
-    decode_save_opc(ctx);
+    decode_save_opc(ctx, 0);
     addr = get_address(ctx, a->rs1, 0);
     tcg_gen_qemu_ld_i64(cpu_fpr[a->rd], addr, ctx->mem_idx, MO_TEUQ);
 
@@ -563,7 +563,7 @@ static bool trans_xl_fsh(DisasContext *ctx, arg_xl_fsh *a)
     REQUIRE_ZFHMIN_OR_ZFBFMIN(ctx);
     REQUIRE_XXLCZPSTINC(ctx);
 
-    decode_save_opc(ctx);
+    decode_save_opc(ctx, 0);
     t0 = get_gpr(ctx, a->rs1, EXT_NONE);
 
     tcg_gen_qemu_st_i64(cpu_fpr[a->rs2], t0, ctx->mem_idx, MO_TEUW);
@@ -582,7 +582,7 @@ static bool trans_xl_fsw(DisasContext *ctx, arg_xl_fsw *a)
     REQUIRE_EXT(ctx, RVF);
     REQUIRE_XXLCZPSTINC(ctx);
 
-    decode_save_opc(ctx);
+    decode_save_opc(ctx, 0);
     addr = get_address(ctx, a->rs1, 0);
     tcg_gen_qemu_st_i64(cpu_fpr[a->rs2], addr, ctx->mem_idx, MO_TEUL);
 
@@ -600,7 +600,7 @@ static bool trans_xl_fsd(DisasContext *ctx, arg_xl_fsd *a)
     REQUIRE_EXT(ctx, RVD);
     REQUIRE_XXLCZPSTINC(ctx);
 
-    decode_save_opc(ctx);
+    decode_save_opc(ctx, 0);
     addr = get_address(ctx, a->rs1, a->imm);
     tcg_gen_qemu_st_i64(cpu_fpr[a->rs2], addr, ctx->mem_idx, MO_TEUQ);
 
