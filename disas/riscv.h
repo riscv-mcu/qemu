@@ -195,6 +195,7 @@ typedef enum {
     rv_codec_xxlcz_bitrev,
     rv_codec_xxlcz_addib,
     rv_codec_lp,
+    rv_codec_cmop_ss,
 } rv_codec;
 
 /* structures */
