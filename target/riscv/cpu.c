@@ -1419,6 +1419,8 @@ static void riscv_cpu_reset_hold(Object *obj)
 
     /* on reset elp is clear */
     env->elp = false;
+    /* on reset ssp is set to 0 */
+    env->ssp = 0;
 
     env->xl = riscv_cpu_mxl(env);
     riscv_cpu_update_mask(env);
