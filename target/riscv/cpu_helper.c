@@ -32,6 +32,7 @@
 #include "cpu_bits.h"
 #include "debug.h"
 #include "tcg/oversized-guest.h"
+#include "pmp.h"
 #include "exec/cpu_ldst.h"
 
 #ifndef CONFIG_USER_ONLY
@@ -69,6 +70,33 @@ int riscv_env_mmu_index(CPURISCVState *env, bool ifetch)
 
     return mode | (virt ? MMU_2STAGE_BIT : 0);
 #endif
+}
+
+bool cpu_get_fcfien(CPURISCVState *env)
+{
+    /* no cfi extension, return false */
+    if (!env_archcpu(env)->cfg.ext_zicfilp) {
+        return false;
+    }
+
+    switch (env->priv) {
+    case PRV_U:
+        if (riscv_has_ext(env, RVS)) {
+            return env->senvcfg & SENVCFG_LPE;
+        }
+        return env->menvcfg & MENVCFG_LPE;
+#ifndef CONFIG_USER_ONLY
+    case PRV_S:
+        if (env->virt_enabled) {
+            return env->henvcfg & HENVCFG_LPE;
+        }
+        return env->menvcfg & MENVCFG_LPE;
+    case PRV_M:
+        return env->mseccfg & MSECCFG_MLPE;
+#endif
+    default:
+        g_assert_not_reached();
+    }
 }
 
 #ifndef CONFIG_USER_ONLY
@@ -625,6 +653,15 @@ void riscv_cpu_swap_hypervisor_regs(CPURISCVState *env)
         mstatus_mask |= MSTATUS_FS;
     }
     bool current_virt = env->virt_enabled;
+
+    /*
+     * If zicfilp extension available and henvcfg.LPE = 1,
+     * then apply SPELP mask on mstatus
+     */
+    if (env_archcpu(env)->cfg.ext_zicfilp &&
+        get_field(env->henvcfg, HENVCFG_LPE)) {
+        mstatus_mask |= SSTATUS_SPELP;
+    }
 
     g_assert(riscv_has_ext(env, RVH));
 
@@ -2297,6 +2334,11 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         (((deleg >> cause) & 1) || s_injected || vs_injected))
         || (eclic_flag && mode == (PRV_S)))) {
         /* handle the trap in S-mode */
+        /* save elp status */
+        if (cpu_get_fcfien(env)) {
+            env->mstatus = set_field(env->mstatus, MSTATUS_SPELP, env->elp);
+        }
+
         if (eclic_flag) {
             uint32_t riscv_addr_size = 4; 
             if (riscv_cpu_mxl(env) == MXL_RV64) {
@@ -2389,6 +2431,11 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         }
     } else {
         /* handle the trap in M-mode */
+        /* save elp status */
+        if (cpu_get_fcfien(env)) {
+            env->mstatus = set_field(env->mstatus, MSTATUS_MPELP, env->elp);
+        }
+
         if (eclic_flag) {
             uint32_t riscv_addr_size = 4; 
             if (riscv_cpu_mxl(env) == MXL_RV64) {
@@ -2466,6 +2513,13 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     }
 
     env->nuclei_mstack_trap_depth++;
+
+    /*
+     * Interrupt/exception/trap delivery is asynchronous event and as per
+     * zicfilp spec CPU should clear up the ELP state. No harm in clearing
+     * unconditionally.
+     */
+    env->elp = false;
 
     /*
      * NOTE: it is not necessary to yield load reservations here. It is only
