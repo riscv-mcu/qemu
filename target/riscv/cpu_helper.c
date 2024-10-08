@@ -2262,6 +2262,9 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         case RISCV_EXCP_VIRT_INSTRUCTION_FAULT:
             tval = env->bins;
             break;
+        case RISCV_EXCP_SW_CHECK:
+            tval = env->sw_check_code;
+            break;
         default:
             break;
         }
