@@ -194,6 +194,7 @@ typedef enum {
     rv_codec_xxlcz_brib,
     rv_codec_xxlcz_bitrev,
     rv_codec_xxlcz_addib,
+    rv_codec_lp,
 } rv_codec;
 
 /* structures */
@@ -257,6 +258,7 @@ enum {
 #define rv_fmt_r2_imm                 "O\t2,i"
 #define rv_fmt_rd_imm                 "O\t0,i"
 #define rv_fmt_rd_uimm                "O\t0,Ui"
+#define rv_fmt_imm                    "O\ti"
 #define rv_fmt_rd_offset              "O\t0,o"
 #define rv_fmt_rd_uoffset             "O\t0,Uo"
 #define rv_fmt_rd_rs1_rs2             "O\t0,1,2"

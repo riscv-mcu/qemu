@@ -958,6 +958,7 @@ typedef enum {
     rv_c_mop_15    = 925,
     rv_op_beqi     = 926,
     rv_op_bnei     = 927,
+    rv_op_lpad = 928,
 } rv_op;
 
 /* register names */
@@ -2198,6 +2199,7 @@ const rv_opcode_data rvi_opcode_data[] = {
     { "c.mop.15", rv_codec_ci_none, rv_fmt_none, NULL, 0, 0, 0 },
     { "beqi", rv_codec_bi, rv_fmt_rs1_imm_offset, NULL, 0, 0, 0 },
     { "bnei", rv_codec_bi, rv_fmt_rs1_imm_offset, NULL, 0, 0, 0 },
+    { "lpad", rv_codec_lp, rv_fmt_imm, NULL, 0, 0, 0 },
 };
 
 /* CSR names */
@@ -2891,7 +2893,13 @@ static void decode_inst_opcode(rv_decode *dec, rv_isa isa)
             case 7: op = rv_op_andi; break;
             }
             break;
-        case 5: op = rv_op_auipc; break;
+        case 5:
+            op = rv_op_auipc;
+            if (dec->cfg->ext_zicfilp &&
+                (((inst >> 7) & 0b11111) == 0b00000)) {
+                op = rv_op_lpad;
+            }
+            break;
         case 6:
             switch ((inst >> 12) & 0b111) {
             case 0: op = rv_op_addiw; break;
@@ -4510,6 +4518,11 @@ static uint32_t operand_tbl_index(rv_inst inst)
     return ((inst << 54) >> 56);
 }
 
+static uint32_t operand_lpl(rv_inst inst)
+{
+    return inst >> 12;
+}
+
 /* decode operands */
 
 static void decode_inst_operands(rv_decode *dec, rv_isa isa)
@@ -5033,6 +5046,9 @@ static void decode_inst_operands(rv_decode *dec, rv_isa isa)
         dec->rs1 = operand_rs1(inst);
         dec->imm1 = sextract32(operand_rs2(inst), 0, 5);
         dec->imm = operand_sbimm12(inst);
+        break;
+    case rv_codec_lp:
+        dec->imm = operand_lpl(inst);
         break;
     };
 }
