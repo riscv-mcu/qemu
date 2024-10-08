@@ -323,6 +323,8 @@ struct CPUArchState {
 
     target_ulong ucode;
 
+    /* elp state for zicfilp extension */
+    bool      elp;
 #ifdef CONFIG_USER_ONLY
     uint32_t elf_flags;
 #endif
