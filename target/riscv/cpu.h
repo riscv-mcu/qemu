@@ -488,8 +488,8 @@ struct CPUArchState {
     target_ulong safety_crc_ctl;
     target_ulong safety_stl_status;
     target_ulong mmacro_dev_en;
-    target_ulong mmacro_nc_en;
-    target_ulong mmacro_cach_en;
+    target_ulong mmacro_noc_en;
+    target_ulong mmacro_ca_en;
 
     /*nuclei timer comparators */
     uint64_t mtimecmp;

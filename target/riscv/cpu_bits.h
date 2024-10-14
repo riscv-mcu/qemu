@@ -546,8 +546,8 @@
 #define CSR_NUCLEI_MATTRI7_BASE    0xbe4
 #define CSR_NUCLEI_MATTRI7_MASK    0xbe5
 #define CSR_NUCLEI_MMACRO_DEV_EN   0xbc8
-#define CSR_NUCLEI_MMACRO_NC_EN    0xbc9
-#define CSR_NUCLEI_MMACRO_CACH_EN  0xbca
+#define CSR_NUCLEI_MMACRO_NOC_EN   0xbc9
+#define CSR_NUCLEI_MMACRO_CA_EN    0xbca
 
 /* === Nuclei N100 TIMER */
 #define CSR_NUCLEI_MSIP            0xbd8

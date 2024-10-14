@@ -5305,27 +5305,27 @@ static int write_mmacro_dev_en(CPURISCVState *env, int csrno, target_ulong val)
     return RISCV_EXCP_NONE;
 }
 
-static int read_mmacro_nc_en(CPURISCVState *env, int csrno, target_ulong *val)
+static int read_mmacro_noc_en(CPURISCVState *env, int csrno, target_ulong *val)
 {
-    *val = env->mmacro_nc_en;
+    *val = env->mmacro_noc_en;
     return RISCV_EXCP_NONE;
 }
 
-static int write_mmacro_nc_en(CPURISCVState *env, int csrno, target_ulong val)
+static int write_mmacro_noc_en(CPURISCVState *env, int csrno, target_ulong val)
 {
-    env->mmacro_nc_en = val;
+    env->mmacro_noc_en = val;
     return RISCV_EXCP_NONE;
 }
 
-static int read_mmacro_cach_en(CPURISCVState *env, int csrno, target_ulong *val)
+static int read_mmacro_ca_en(CPURISCVState *env, int csrno, target_ulong *val)
 {
-    *val = env->mmacro_cach_en;
+    *val = env->mmacro_ca_en;
     return RISCV_EXCP_NONE;
 }
 
-static int write_mmacro_cach_en(CPURISCVState *env, int csrno, target_ulong val)
+static int write_mmacro_ca_en(CPURISCVState *env, int csrno, target_ulong val)
 {
-    env->mmacro_cach_en = val;
+    env->mmacro_ca_en = val;
     return RISCV_EXCP_NONE;
 }
 #endif
@@ -6133,8 +6133,8 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_SAFETY_CRC_CTL] = { "safety_crc_ctl", any, read_safety_crc_ctl, write_safety_crc_ctl },
     [CSR_NUCLEI_SAFETY_STL_STATUS] = { "safety_stl_status", any, read_safety_stl_status, write_safety_stl_status },
     [CSR_NUCLEI_MMACRO_DEV_EN]  = { "mmacro_dev_en",  any, read_mmacro_dev_en, write_mmacro_dev_en },
-    [CSR_NUCLEI_MMACRO_NC_EN]   = { "mmacro_nc_en",   any, read_mmacro_nc_en, write_mmacro_nc_en },
-    [CSR_NUCLEI_MMACRO_CACH_EN] = { "mmacro_cach_en", any, read_mmacro_cach_en, write_mmacro_cach_en },
+    [CSR_NUCLEI_MMACRO_NOC_EN]  = { "mmacro_noc_en",  any, read_mmacro_noc_en, write_mmacro_noc_en },
+    [CSR_NUCLEI_MMACRO_CA_EN]   = { "mmacro_ca_en",   any, read_mmacro_ca_en, write_mmacro_ca_en },
 
     /* TODO N100 CSR, not really implemented, just some stubs and not implemented */
     [CSR_NUCLEI_MSIP]           = { "msip",           any, read_zero, write_ignore },
