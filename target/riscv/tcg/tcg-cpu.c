@@ -1059,7 +1059,7 @@ static const RISCVCPUMisaExtConfig misa_ext_cfgs[] = {
  */
 static void riscv_cpu_add_misa_properties(Object *cpu_obj)
 {
-    bool use_def_vals = riscv_cpu_is_generic(cpu_obj);
+    // bool use_def_vals = riscv_cpu_is_generic(cpu_obj);
     int i;
 
     for (i = 0; i < ARRAY_SIZE(misa_ext_cfgs); i++) {
@@ -1078,10 +1078,10 @@ static void riscv_cpu_add_misa_properties(Object *cpu_obj)
                             cpu_set_misa_ext_cfg,
                             NULL, (void *)misa_cfg);
         object_property_set_description(cpu_obj, name, desc);
-        if (use_def_vals) {
-            riscv_cpu_write_misa_bit(RISCV_CPU(cpu_obj), bit,
-                                     misa_cfg->enabled);
-        }
+        // if (use_def_vals) {
+        //     riscv_cpu_write_misa_bit(RISCV_CPU(cpu_obj), bit,
+        //                              misa_cfg->enabled);
+        // }
     }
 }
 
