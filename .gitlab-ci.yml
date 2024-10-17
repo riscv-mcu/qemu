@@ -285,13 +285,11 @@ make_qemu_zip:
     - export QEMU_VER=${qemuver}
     - echo "This job deploy qemu release ${QEMU_VER} from the $CI_COMMIT_BRANCH branch."
     - ls -al
-    # clone docs
     - mkdir -p $CI_PROJECT_DIR/prebuilt
     - pushd $CI_PROJECT_DIR/prebuilt
-    - git clone git@gito.corp.nucleisys.com:software/devtools/qemu.wiki.git
     - popd
-    - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/nuclei-qemu-版本发布说明.md windows_qemu/readme.md
-    - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/nuclei-qemu-版本发布说明.md linux_qemu/readme.md
+    - echo "Please refer to the online documentation:https://doc.nucleisys.com/nuclei_tools/qemu/index.html" >> windows_qemu/readme.md
+    - echo "Please refer to the online documentation:https://doc.nucleisys.com/nuclei_tools/qemu/index.html" >> linux_qemu/readme.md
     - mkdir -p windows_qemu_workdir
     - mkdir -p linux_qemu_workdir
     # windows qemu
@@ -307,8 +305,6 @@ make_qemu_zip:
         done
         szafter=$(du -sh . | cut -f1)
         echo "Windows qemu size stripped from $szbefore to $szafter"
-    - mkdir doc
-    - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/NUCLEI-QEMU-用户手册.pdf doc/nuclei_qemu_user_guide.pdf
     - cd ../
     - zip -qr nuclei-qemu-${QEMU_VER}-win32-x64.zip qemu
     - cp nuclei-qemu-${QEMU_VER}-win32-x64.zip $CI_PROJECT_DIR/
@@ -328,16 +324,10 @@ make_qemu_zip:
     - echo "Check Nuclei QEMU ${QEMU_VER} version"
     - ./bin/qemu-system-riscv32 --version
     - ldd ./bin/qemu-system-riscv32
-    - mkdir doc
-    - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/NUCLEI-QEMU-用户手册.pdf doc/nuclei_qemu_user_guide.pdf
     - cd ../
     - tar -zcf nuclei-qemu-${QEMU_VER}-linux-x64.tar.gz qemu
     - cp nuclei-qemu-${QEMU_VER}-linux-x64.tar.gz $CI_PROJECT_DIR/
     - cd ${CI_PROJECT_DIR}
-    # docs
-    - mkdir $CI_PROJECT_DIR/Documents
-    - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/*pdf $CI_PROJECT_DIR/Documents -r
-    - cp $CI_PROJECT_DIR/prebuilt/qemu.wiki/nuclei-qemu-版本发布说明.md $CI_PROJECT_DIR/Documents -r
     # version
     - echo ${QEMU_VER} > $CI_PROJECT_DIR/VERSION
     # copy nuclei qemu to deploy folder
@@ -365,7 +355,6 @@ make_qemu_zip:
     when: always
     paths:
       - $CI_PROJECT_DIR/deploy
-      - $CI_PROJECT_DIR/Documents
       - VERSION
 
 deploy-qemu:
@@ -409,7 +398,6 @@ deploy-qemu:
     when: always
     paths:
       - $CI_PROJECT_DIR/deploy
-      - $CI_PROJECT_DIR/Documents
       - VERSION
 
 link-qemu:
