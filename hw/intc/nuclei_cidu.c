@@ -194,7 +194,7 @@ DeviceState *nuclei_cidu_create(hwaddr addr, uint32_t aperture_size,
     DeviceState *dev = qdev_new(TYPE_NUCLEI_CIDU);
 
     assert(num_sources <= CIDU_MAX_EXTERNAL_INT_NUM);
-    assert(num_harts <= CIDU_MAX_SUPPORT_CORE_NUM);
+    // assert(num_harts <= CIDU_MAX_SUPPORT_CORE_NUM);
 
     qdev_prop_set_uint32(dev, "num-harts", num_harts);
     qdev_prop_set_uint32(dev, "num-sources", num_sources);

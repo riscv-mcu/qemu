@@ -1111,7 +1111,7 @@ static void evalsoc_machine_class_init(ObjectClass *oc, void *data)
 
     mc->desc = "Nuclei RISC-V EvalSoC, support Nuclei RISC-V 200/300/600/900 series processors";
     mc->init = evalsoc_machine_init;
-    mc->max_cpus = 16;
+    mc->max_cpus = 64;
     mc->min_cpus = 1;
     mc->default_cpu_type = EVALSOC_CPU;
     mc->default_cpus = mc->min_cpus;
