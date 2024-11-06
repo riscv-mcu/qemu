@@ -353,7 +353,10 @@ static void nuclei_eclic_irq_request(void *opaque, int id, int new_intip)
     {
         for(int i = 0; i < eclic->num_harts; i++)
         {
-            if(cidu_int_indicator & (1U << i))
+            if (cidu_int_indicator != 0) {
+                if(cidu_int_indicator & (1U << i))
+                    nuclei_eclic_update_intip(eclic, id, i, new_intip);
+            } else
                 nuclei_eclic_update_intip(eclic, id, i, new_intip);
         }
     }
