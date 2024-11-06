@@ -220,6 +220,7 @@ const RISCVIsaExtData isa_edata_arr[] = {
     ISA_EXT_DATA_ENTRY(xxldspn1x, PRIV_VERSION_1_12_0, ext_xxldspn1x),
     ISA_EXT_DATA_ENTRY(xxldspn2x, PRIV_VERSION_1_12_0, ext_xxldspn2x),
     ISA_EXT_DATA_ENTRY(xxldspn3x, PRIV_VERSION_1_12_0, ext_xxldspn3x),
+    ISA_EXT_DATA_ENTRY(xxlvqmacc, PRIV_VERSION_1_12_0, ext_xxlvqmacc),
 
     DEFINE_PROP_END_OF_LIST(),
 };
@@ -1951,6 +1952,7 @@ const RISCVCPUMultiExtConfig riscv_cpu_vendor_exts[] = {
     MULTI_EXT_CFG_BOOL("xxldspn1x", ext_xxldspn1x, false),
     MULTI_EXT_CFG_BOOL("xxldspn2x", ext_xxldspn2x, false),
     MULTI_EXT_CFG_BOOL("xxldspn3x", ext_xxldspn3x, false),
+    MULTI_EXT_CFG_BOOL("xxlvqmacc", ext_xxlvqmacc, false),
 
     DEFINE_PROP_END_OF_LIST(),
 };

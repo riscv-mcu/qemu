@@ -1799,3 +1799,9 @@ DEF_HELPER_5(vnl32, void, ptr, ptr, tl, env, i32)
 DEF_HELPER_5(vns32, void, ptr, ptr, tl, env, i32)
 DEF_HELPER_6(vn_cmpx_mul, void, ptr, ptr, ptr, ptr, env, i32)
 DEF_HELPER_6(vn_cmpx_mul_m, void, ptr, ptr, ptr, ptr, env, i32)
+
+/* Nuclei Matrix Multiply-Add Instructions */
+DEF_HELPER_6(xl_vqmaccu_vv, void, ptr, ptr, ptr, ptr, env, i32)
+DEF_HELPER_6(xl_vqmacc_vv, void, ptr, ptr, ptr, ptr, env, i32)
+DEF_HELPER_6(xl_vqmaccus_vv, void, ptr, ptr, ptr, ptr, env, i32)
+DEF_HELPER_6(xl_vqmaccsu_vv, void, ptr, ptr, ptr, ptr, env, i32)

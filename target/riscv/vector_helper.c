@@ -5266,3 +5266,59 @@ void HELPER(vn_cmpx_mul_m)(void *vd, void *v0, void *vs1,
         }
     }
 }
+
+/* Nuclei Matrix Multiply-Add Instructions */
+#define OP_MATRIX_VV(NAME, TX1, TX2)                            \
+static inline void do_##NAME(void *vd, void *v0, void *vs1,     \
+                                void *vs2, uint32_t vm)         \
+{                                                               \
+    TX1 *a = vs1;                                               \
+    TX2 *b = vs2;                                               \
+    int32_t *c = vd;                                            \
+    for (int i = 0; i < 4; i++) {                               \
+        for (int j = 0; j < 4; j++) {                           \
+            for (int k = 0; k < 4; k++) {                       \
+                if (!vm && !vext_elem_mask(v0, i * 4 + j)) {    \
+                    continue;                                   \
+                }                                               \
+                c[i * 4 + j] += a[i * 4 + k] * b[k * 4 + j];    \
+            }                                                   \
+        }                                                       \
+    }                                                           \
+}
+
+#define GEN_VQMACC_VV(NAME)                                     \
+void HELPER(NAME)(void *vd, void *v0, void *vs1,                \
+                  void *vs2, CPURISCVState *env,                \
+                  uint32_t desc)                                \
+{                                                               \
+    uint32_t vm = vext_vm(desc);                                \
+    uint32_t vl = env->vl;                                      \
+    uint32_t total_elems = riscv_cpu_cfg(env)->vlenb << 3;      \
+    uint32_t vta_all_1s = vext_vta_all_1s(desc);                \
+    uint32_t i;                                                 \
+                                                                \
+    VSTART_CHECK_EARLY_EXIT(env);                               \
+                                                                \
+    for (i = env->vstart; i < vl / 16; i++) {                   \
+        do_##NAME(vd, v0, vs1, vs2, vm);                        \
+        vs2 += 16;                                              \
+        vd += 64;                                               \
+    }                                                           \
+    env->vstart = 0;                                            \
+    /* set tail elements to 1s */                               \
+    if (vta_all_1s) {                                           \
+        for (; i < total_elems; i++) {                          \
+            vext_set_elem_mask(vd, i, 1);                       \
+        }                                                       \
+    }                                                           \
+}
+
+OP_MATRIX_VV(xl_vqmaccu_vv, uint8_t, uint8_t)
+OP_MATRIX_VV(xl_vqmacc_vv, int8_t, int8_t)
+OP_MATRIX_VV(xl_vqmaccus_vv, uint8_t, int8_t)
+OP_MATRIX_VV(xl_vqmaccsu_vv, int8_t, uint8_t)
+GEN_VQMACC_VV(xl_vqmaccu_vv)
+GEN_VQMACC_VV(xl_vqmacc_vv)
+GEN_VQMACC_VV(xl_vqmaccus_vv)
+GEN_VQMACC_VV(xl_vqmaccsu_vv)
