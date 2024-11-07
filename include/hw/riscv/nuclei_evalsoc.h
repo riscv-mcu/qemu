@@ -289,7 +289,7 @@ enum
 #define EVALSOC_MECC_CTRL           0x3ff
 #define EVALSOC_MECC_STATUS         0
 #define EVALSOC_MTLB_CTL            0
-#define EVALSOC_MFP16MODE           0
+#define EVALSOC_MMISC_CTL1          0
 
 #if defined(TARGET_RISCV32)
 #define EVALSOC_CPU TYPE_RISCV_CPU_NUCLEI_N300FD

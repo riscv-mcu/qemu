@@ -856,7 +856,7 @@ static void evalsoc_machine_init(MachineState *machine)
         s->soc.cpus.harts[i].env.mecc_ctrl = EVALSOC_MECC_CTRL;
         s->soc.cpus.harts[i].env.mecc_status = EVALSOC_MECC_STATUS;
         s->soc.cpus.harts[i].env.mtlb_ctl = EVALSOC_MTLB_CTL;
-        s->soc.cpus.harts[i].env.mfp16mode = EVALSOC_MFP16MODE;
+        s->soc.cpus.harts[i].env.mmisc_ctl1 = EVALSOC_MMISC_CTL1;
 
         s->soc.cpus.harts[i].env.msmpcfg_info = ((memmap[EVALSOC_SMP].base + s->iregion) & ~(1<<10)) | 0xF;
 

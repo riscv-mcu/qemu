@@ -4902,6 +4902,18 @@ static int write_mmisc_ctl(CPURISCVState *env, int csrno, target_ulong val)
     return RISCV_EXCP_NONE;
 }
 
+static int read_mmisc_ctl1(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mmisc_ctl1;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mmisc_ctl1(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mmisc_ctl1 = val;
+    return RISCV_EXCP_NONE;
+}
+
 static int read_msavestatus(CPURISCVState *env, int csrno, target_ulong *val)
 {
     *val = env->msavestatus;
@@ -6035,7 +6047,6 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_MECC_CODE]      = { "mecc_code",    any, read_zero, write_ignore },
     [CSR_NUCLEI_MTLB_CTL]       = { "mtlb_ctl",     any, read_zero, write_ignore },
     [CSR_NUCLEI_MECC_LOCK]      = { "mecc_lock",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_MFP16MODE]      = { "mfp16mode",    any, read_zero, write_ignore },
     [CSR_NUCLEI_LSTEPFORC]      = { "lstepforc",    any, read_zero, write_ignore },
     [CSR_NUCLEI_MPPICFG_INFO]   = { "mppicfg_info", any, read_mppicfg_info, write_ignore },
     [CSR_NUCLEI_MFIOCFG_INFO]   = { "mfiocfg_info", any, read_mfiocfg_info, write_ignore },
@@ -6113,6 +6124,7 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_MDCAUSE]        = { "mdcause",        any, read_mdcause, write_mdcause },
     [CSR_NUCLEI_MCACHE_CTL]     = { "mcache_ctl",     any, read_mcache_ctl, write_mcache_ctl },
     [CSR_NUCLEI_MMISC_CTL]      = { "mmisc_ctl",      any, read_mmisc_ctl, write_mmisc_ctl },
+    [CSR_NUCLEI_MMISC_CTL1]     = { "mmisc_ctl1",     any, read_mmisc_ctl1, write_mmisc_ctl1 },
     [CSR_NUCLEI_MSAVESTATUS]    = { "msavestatus",    any, read_msavestatus, write_msavestatus },
     [CSR_NUCLEI_MSAVEEPC1]      = { "msaveepc1",      any, read_msaveepc1, write_msaveepc1 },
     [CSR_NUCLEI_MSAVECAUSE1]    = { "msavecause1",    any, read_msavecause1, write_msavecause1 },

@@ -450,6 +450,7 @@ struct CPUArchState {
     target_ulong mdcause;
     target_ulong mcache_ctl;
     target_ulong mmisc_ctl;
+    target_ulong mmisc_ctl1;
     target_ulong msavestatus;
     target_ulong msaveepc1;
     target_ulong msavecause1;
@@ -484,7 +485,6 @@ struct CPUArchState {
     target_ulong mfiocfg_info;
 
     target_ulong mtlb_ctl;
-    target_ulong mfp16mode;
     target_ulong safety_crc_ctl;
     target_ulong safety_stl_status;
     target_ulong mmacro_dev_en;

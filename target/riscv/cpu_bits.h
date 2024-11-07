@@ -483,6 +483,7 @@
 #define CSR_NUCLEI_MDCAUSE             0x7c9
 #define CSR_NUCLEI_MCACHE_CTL          0x7ca
 #define CSR_NUCLEI_MMISC_CTL           0x7d0
+#define CSR_NUCLEI_MMISC_CTL1          0x7e2
 #define CSR_NUCLEI_MSAVESTATUS         0x7d6
 #define CSR_NUCLEI_MSAVEEPC1           0x7d7
 #define CSR_NUCLEI_MSAVEEPC2           0x7d9
@@ -494,7 +495,6 @@
 #define CSR_NUCLEI_MECC_LOCK           0x7de
 #define CSR_NUCLEI_MECC_CTRL           0xbc0
 #define CSR_NUCLEI_MECC_STATUS         0xbc4
-#define CSR_NUCLEI_MFP16MODE           0x7e2
 #define CSR_NUCLEI_LSTEPFORC           0x7e9
 #define CSR_NUCLEI_PUSHMSUBM           0x7eb
 #define CSR_NUCLEI_MTVT2               0x7ec
