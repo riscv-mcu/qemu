@@ -731,7 +731,14 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         cpu->pmu_avail_ctrs = 0;
     }
 
+    if (cpu->cfg.ext_zilsd && riscv_has_ext(env, RVC)) {
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zclsd), true);
+    }
+
     if (cpu->cfg.ext_zclsd) {
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zca), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zilsd), true);
+
         if (riscv_has_ext(env, RVC) && riscv_has_ext(env, RVF)) {
             error_setg(errp,
                     "Zclsd cannot be supported together with C and F extension");
@@ -739,7 +746,7 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         }
         if (cpu->cfg.ext_zcf) {
             error_setg(errp,
-                    "Zclsd cannot be supported together with ZCF extension");
+                    "Zclsd cannot be supported together with Zcf extension");
             return;
         }
     }
