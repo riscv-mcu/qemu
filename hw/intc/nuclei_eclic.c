@@ -105,17 +105,31 @@ static uint64_t nuclei_eclic_read(void *opaque, hwaddr offset, unsigned size)
     case NUCLEI_ECLIC_REG_CLICINFO:
         value = (CLICINTCTLBITS << 21) | (0x1 << 13) | eclic->num_sources;
         break;
+    case NUCLEI_ECLIC_REG_MINTTHRESH:
+        value = ((uint32_t)eclic->mth[hartid] << 24);
+        break;
     case NUCLEI_ECLIC_REG_MTH:
         value = eclic->mth[hartid] & 0xFF;
         break;
     case NUCLEI_ECLIC_REG_CLICINTIP_BASE:
-        value = eclic->clicintip[hartid][irq] & 0xFF;
+        if (size == 4) {
+            value = (uint32_t)eclic->clicintip[hartid][irq] | ((uint32_t)eclic->clicintie[hartid][irq] << 8) | \
+                    ((uint32_t)eclic->clicintattr[hartid][irq] << 16) | ((uint32_t)eclic->clicintctl[hartid][irq] << 24);
+        } else if (size == 2) {
+            value = (uint32_t)eclic->clicintip[hartid][irq] | ((uint32_t)eclic->clicintie[hartid][irq] << 8);
+        } else {
+            value = eclic->clicintip[hartid][irq] & 0xFF;
+        }
         break;
     case NUCLEI_ECLIC_REG_CLICINTIE_BASE:
         value = eclic->clicintie[hartid][irq] & 0xFF;
         break;
     case NUCLEI_ECLIC_REG_CLICINTATTR_BASE:
-        value = eclic->clicintattr[hartid][irq] & 0xFF;
+        if (size == 2) {
+            value = ((uint32_t)eclic->clicintattr[hartid][irq]) | ((uint32_t)eclic->clicintctl[hartid][irq] << 8);
+        } else {
+            value = eclic->clicintattr[hartid][irq] & 0xFF;
+        }
         break;
     case NUCLEI_ECLIC_REG_CLICINTCTL_BASE:
         value = eclic->clicintctl[hartid][irq] & 0xFF;
@@ -171,6 +185,11 @@ static void nuclei_eclic_write(void *opaque, hwaddr offset, uint64_t value,
         for (irq = 0; irq < eclic->num_sources; irq++)
         {
             update_eclic_int_info(eclic, irq, hartid);
+        }
+        break;
+    case NUCLEI_ECLIC_REG_MINTTHRESH:
+        if (size == 4) {
+            nuclei_eclic_update_intmth(eclic, irq, hartid, (value >> 24) & 0xFF);
         }
         break;
     case NUCLEI_ECLIC_REG_MTH:
