@@ -32,7 +32,7 @@ static bool addr_in_range(uint32_t addr, uint32_t base, uint32_t num)
 
 static uint64_t nuclei_cidu_read(void *opaque, hwaddr addr, unsigned size)
 {
-    NucLeiCIDUState *cidu = opaque;
+    NucleiCIDUState *cidu = opaque;
 
     if (addr_in_range(addr, CIDU_REG_COREN_INT_STATUS_BASE, CIDU_MAX_SUPPORT_CORE_NUM << 2))
     {
@@ -75,7 +75,7 @@ uint32_t cidu_int_indicator = 0;
 static void nuclei_cidu_write(void *opaque, hwaddr addr, uint64_t value,
                                unsigned size)
 {
-    NucLeiCIDUState *cidu = opaque;
+    NucleiCIDUState *cidu = opaque;
     uint32_t send_core = 0;
     uint32_t recv_core = 0;
 
@@ -137,16 +137,16 @@ static const MemoryRegionOps nuclei_cidu_ops = {
 };
 
 static Property nuclei_cidu_properties[] = {
-    DEFINE_PROP_UINT32("num-harts", NucLeiCIDUState, num_harts, 0),
-    DEFINE_PROP_UINT32("num-sources", NucLeiCIDUState, num_sources, 0),
-    DEFINE_PROP_UINT64("mcidubase", NucLeiCIDUState, mcidubase, 0),
-    DEFINE_PROP_UINT32("aperture-size", NucLeiCIDUState, aperture_size, 0),
+    DEFINE_PROP_UINT32("num-harts", NucleiCIDUState, num_harts, 0),
+    DEFINE_PROP_UINT32("num-sources", NucleiCIDUState, num_sources, 0),
+    DEFINE_PROP_UINT64("mcidubase", NucleiCIDUState, mcidubase, 0),
+    DEFINE_PROP_UINT32("aperture-size", NucleiCIDUState, aperture_size, 0),
     DEFINE_PROP_END_OF_LIST(),
 };
 
 static void nuclei_cidu_realize(DeviceState *dev, Error **errp)
 {
-    NucLeiCIDUState *cidu = NUCLEI_CIDU(dev);
+    NucleiCIDUState *cidu = NUCLEI_CIDU(dev);
 
     memory_region_init_io(&cidu->mmio, OBJECT(dev), &nuclei_cidu_ops, cidu,
                           TYPE_NUCLEI_CIDU, cidu->aperture_size);
@@ -174,7 +174,7 @@ static void nuclei_cidu_class_init(ObjectClass *klass, void *data)
 static const TypeInfo nuclei_cidu_info = {
     .name = TYPE_NUCLEI_CIDU,
     .parent = TYPE_SYS_BUS_DEVICE,
-    .instance_size = sizeof(NucLeiCIDUState),
+    .instance_size = sizeof(NucleiCIDUState),
     .class_init = nuclei_cidu_class_init,
 };
 
@@ -200,15 +200,15 @@ DeviceState *nuclei_cidu_create(hwaddr addr, uint32_t aperture_size,
     qdev_prop_set_uint32(dev, "num-sources", num_sources);
     qdev_prop_set_uint64(dev, "mcidubase", addr);
     qdev_prop_set_uint32(dev, "aperture-size", aperture_size);
-    NucLeiCIDUState *s = NUCLEI_CIDU(dev);
+    NucleiCIDUState *s = NUCLEI_CIDU(dev);
 
     if(eclic != NULL)
     {
         for (int i = 0; i < num_harts; i++) {
-            s->soft_irq[i] = NUCLEI_ECLIC(eclic)->irqs[Internal_Reserved14_IRQn][i];
+            s->soft_irq[i] = NUCLEI_ECLIC(eclic)->irqs[i][Internal_Reserved14_IRQn];
 
             for(int j = 0; j < num_sources; j++) {
-                s->external_irq[j] = NUCLEI_ECLIC(eclic)->irqs[j + CIDU_EXT_INT_OFST][i];
+                s->external_irq[j] = NUCLEI_ECLIC(eclic)->irqs[i][j + CIDU_EXT_INT_OFST];
             }
         }
     }

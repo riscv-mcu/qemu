@@ -4,7 +4,7 @@
  * Copyright (c) 2020 Gao ZhiYuan <alapha23@gmail.com>
  * Copyright (c) 2020-2021 PLCT Lab.All rights reserved.
  *
- * This provides a parameterizable timer controller based on NucLei's Systimer.
+ * This provides a parameterizable timer controller based on Nuclei's Systimer.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@
 
 int hart_numbers = 0;
 
-static inline int nuclei_systimer_get_current_cpu(NucLeiSYSTIMERState *s)
+static inline int nuclei_systimer_get_current_cpu(NucleiSYSTIMERState *s)
 {
     if (s->num_harts > 1) {
         return current_cpu ? current_cpu->cpu_index : 0;
@@ -49,7 +49,7 @@ static uint64_t nuclei_cpu_riscv_read_rtc(void *opaque)
         timebase_freq, NANOSECONDS_PER_SECOND);
 }
 
-static void nuclei_timer_update_compare(NucLeiSYSTIMERState *s)
+static void nuclei_timer_update_compare(NucleiSYSTIMERState *s)
 {
     size_t hartid = nuclei_systimer_get_current_cpu(s);
     CPUState *cpu = qemu_get_cpu(hartid);
@@ -122,7 +122,7 @@ static void nuclei_clint_timer_cb(void *opaque)
 static uint64_t nuclei_clint_read(void *opaque, hwaddr addr, unsigned size)
 {
     uint32_t timebase_f = 0;
-    NucLeiSYSTIMERState *clint = NUCLEI_SYSTIMER(opaque);
+    NucleiSYSTIMERState *clint = NUCLEI_SYSTIMER(opaque);
 
     if (addr >= clint->msip_base &&
         addr < clint->msip_base + (clint->num_harts << 2)) {
@@ -175,7 +175,7 @@ static uint64_t nuclei_clint_read(void *opaque, hwaddr addr, unsigned size)
 static void nuclei_clint_write(void *opaque, hwaddr addr, uint64_t value,
         unsigned size)
 {
-    NucLeiSYSTIMERState *clint = NUCLEI_SYSTIMER(opaque);
+    NucleiSYSTIMERState *clint = NUCLEI_SYSTIMER(opaque);
 
     if (addr >= clint->msip_base &&
         addr < clint->msip_base + (clint->num_harts << 2)) {
@@ -237,7 +237,7 @@ static void nuclei_clint_write(void *opaque, hwaddr addr, uint64_t value,
 
 static void nuclei_timer_reset(DeviceState *dev)
 {
-    NucLeiSYSTIMERState *s = NUCLEI_SYSTIMER(dev);
+    NucleiSYSTIMERState *s = NUCLEI_SYSTIMER(dev);
     s->mtime_lo = 0x0;
     s->mtime_hi = 0x0;
     s->mtimecmp_lo = 0xFFFFFFFF;
@@ -252,7 +252,7 @@ static uint64_t nuclei_timer_read(void *opaque, hwaddr offset,
                                     unsigned size)
 {
     uint64_t timebase_f = 0;
-    NucLeiSYSTIMERState *s = NUCLEI_SYSTIMER(opaque);
+    NucleiSYSTIMERState *s = NUCLEI_SYSTIMER(opaque);
 
     if(s->prv_s && (s->mtime_srw_ctrl & 0x1))
         return 0;
@@ -312,7 +312,7 @@ static uint64_t nuclei_timer_read(void *opaque, hwaddr offset,
 static void nuclei_timer_write(void *opaque, hwaddr offset,
                                  uint64_t value, unsigned size)
 {
-    NucLeiSYSTIMERState *s = NUCLEI_SYSTIMER(opaque);
+    NucleiSYSTIMERState *s = NUCLEI_SYSTIMER(opaque);
     size_t hartid = nuclei_systimer_get_current_cpu(s);
     CPUState *cpu = qemu_get_cpu(hartid);
     CPURISCVState *env = cpu ? cpu_env(cpu) : NULL;
@@ -396,20 +396,20 @@ static const MemoryRegionOps nuclei_timer_ops = {
 };
 
 static Property nuclei_systimer_properties[] = {
-    DEFINE_PROP_UINT32("hartid-base", NucLeiSYSTIMERState, hartid_base, 0),
-    DEFINE_PROP_UINT32("num-harts", NucLeiSYSTIMERState, num_harts, 0),
-    DEFINE_PROP_UINT32("msip-base", NucLeiSYSTIMERState, msip_base, 0),
-    DEFINE_PROP_UINT32("mtimecmp-base", NucLeiSYSTIMERState, mtimecmp_base, 0),
-    DEFINE_PROP_UINT32("mtime-base", NucLeiSYSTIMERState, mtime_base, 0),
-    DEFINE_PROP_UINT32("ssip-base", NucLeiSYSTIMERState, ssip_base, 0),
-    DEFINE_PROP_UINT32("aperture-size", NucLeiSYSTIMERState, aperture_size, 0),
-    DEFINE_PROP_UINT64("timebase-freq", NucLeiSYSTIMERState, timebase_freq, 0),
+    DEFINE_PROP_UINT32("hartid-base", NucleiSYSTIMERState, hartid_base, 0),
+    DEFINE_PROP_UINT32("num-harts", NucleiSYSTIMERState, num_harts, 0),
+    DEFINE_PROP_UINT32("msip-base", NucleiSYSTIMERState, msip_base, 0),
+    DEFINE_PROP_UINT32("mtimecmp-base", NucleiSYSTIMERState, mtimecmp_base, 0),
+    DEFINE_PROP_UINT32("mtime-base", NucleiSYSTIMERState, mtime_base, 0),
+    DEFINE_PROP_UINT32("ssip-base", NucleiSYSTIMERState, ssip_base, 0),
+    DEFINE_PROP_UINT32("aperture-size", NucleiSYSTIMERState, aperture_size, 0),
+    DEFINE_PROP_UINT64("timebase-freq", NucleiSYSTIMERState, timebase_freq, 0),
     DEFINE_PROP_END_OF_LIST(),
 };
 
 static void nuclei_timer_realize(DeviceState *dev, Error **errp)
 {
-    NucLeiSYSTIMERState *s = NUCLEI_SYSTIMER(dev);
+    NucleiSYSTIMERState *s = NUCLEI_SYSTIMER(dev);
 
     if( s->aperture_size == 0)
          s->aperture_size = 0x10000;
@@ -445,14 +445,14 @@ static void nuclei_timer_class_init(ObjectClass *klass, void *data)
     DeviceClass *dc = DEVICE_CLASS(klass);
     dc->realize = nuclei_timer_realize;
     dc->reset = nuclei_timer_reset;
-    dc->desc = "NucLei Systimer Timer";
+    dc->desc = "Nuclei Systimer Timer";
     device_class_set_props(dc, nuclei_systimer_properties);
 }
 
 static const TypeInfo nuclei_timer_info = {
     .name = TYPE_NUCLEI_SYSTIMER,
     .parent = TYPE_SYS_BUS_DEVICE,
-    .instance_size = sizeof(NucLeiSYSTIMERState),
+    .instance_size = sizeof(NucleiSYSTIMERState),
     .class_init = nuclei_timer_class_init,
 };
 
@@ -485,7 +485,7 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_ba
     qdev_prop_set_uint32(dev, "ssip-base", NUCLEI_SSIP_BASE);
     qdev_prop_set_uint32(dev, "aperture-size", size);
     qdev_prop_set_uint32(dev, "timebase-freq", timebase_freq);
-    NucLeiSYSTIMERState *s = NUCLEI_SYSTIMER(dev);
+    NucleiSYSTIMERState *s = NUCLEI_SYSTIMER(dev);
 
     s->timer_irq = g_new0(qemu_irq *, s->num_harts);
     s->soft_irq  = g_new0(qemu_irq *, s->num_harts);
@@ -501,8 +501,8 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_ba
         env->mtimecmp = 0;
         if (eclic != NULL) {
             s->eclic = eclic;
-            s->soft_irq[i] =&(NUCLEI_ECLIC(eclic)->irqs[Internal_SysTimerSW_IRQn][i]);
-            s->timer_irq[i] = &(NUCLEI_ECLIC(eclic)->irqs[Internal_SysTimer_IRQn][i]);
+            s->soft_irq[i] =&(NUCLEI_ECLIC(eclic)->irqs[i][Internal_SysTimerSW_IRQn]);
+            s->timer_irq[i] = &(NUCLEI_ECLIC(eclic)->irqs[i][Internal_SysTimer_IRQn]);
             riscv_cpu_set_rdtime_fn(env, nuclei_cpu_riscv_read_rtc, &(s->timebase_freq));
             env->mtimer = timer_new_ns(QEMU_CLOCK_VIRTUAL, &nuclei_mtimecmp_cb, cpu);
         } else {

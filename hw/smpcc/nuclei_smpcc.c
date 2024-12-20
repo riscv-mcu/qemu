@@ -24,7 +24,7 @@
 #include "hw/smpcc/nuclei_smpcc.h"
 #include "hw/loader.h"
 
-static uint64_t nuclei_smpcc_update_cc_ctrl(NucLeiSMPCCState *smpcc, uint64_t value)
+static uint64_t nuclei_smpcc_update_cc_ctrl(NucleiSMPCCState *smpcc, uint64_t value)
 {
     /*
      * Check LOCK_ECC_CFG bit.
@@ -50,7 +50,7 @@ static uint64_t nuclei_smpcc_update_cc_ctrl(NucLeiSMPCCState *smpcc, uint64_t va
 
 }
 
-static uint64_t nuclei_smpcc_get_clm_size(NucLeiSMPCCState *smpcc)
+static uint64_t nuclei_smpcc_get_clm_size(NucleiSMPCCState *smpcc)
 {
     uint32_t way_to_clm_num = 0;
     uint32_t clm_size = 0;
@@ -68,7 +68,7 @@ static uint64_t nuclei_smpcc_get_clm_size(NucLeiSMPCCState *smpcc)
 
 static uint64_t nuclei_smpcc_read(void *opaque, hwaddr addr, unsigned size)
 {
-    NucLeiSMPCCState *smpcc = opaque;
+    NucleiSMPCCState *smpcc = opaque;
     CPURISCVState *env = current_cpu ? cpu_env(current_cpu) : NULL;
 
     uint64_t value = 0;
@@ -172,7 +172,7 @@ static uint64_t nuclei_smpcc_read(void *opaque, hwaddr addr, unsigned size)
 static void nuclei_smpcc_write(void *opaque, hwaddr addr, uint64_t value,
                                unsigned size)
 {
-    NucLeiSMPCCState *smpcc = opaque;
+    NucleiSMPCCState *smpcc = opaque;
     CPURISCVState *env = current_cpu ? cpu_env(current_cpu) : NULL;
     uint32_t clm_size = 0;
 
@@ -322,21 +322,21 @@ static const MemoryRegionOps nuclei_smpcc_ops = {
 };
 
 static Property nuclei_smpcc_properties[] = {
-    DEFINE_PROP_UINT64("msmpccbase", NucLeiSMPCCState, msmpccbase, 0),
-    DEFINE_PROP_UINT32("aperture-size", NucLeiSMPCCState, aperture_size, 0),
-    DEFINE_PROP_UINT32("smp-ver", NucLeiSMPCCState, smp_ver, 0),
-    DEFINE_PROP_UINT32("smp-cfg", NucLeiSMPCCState, smp_cfg, 0),
-    DEFINE_PROP_UINT32("cc-cfg", NucLeiSMPCCState, cc_cfg, 0),
-    DEFINE_PROP_UINT64("clm-addr-base", NucLeiSMPCCState, clm_addr_base, 0),
-    DEFINE_PROP_UINT32("cc-size", NucLeiSMPCCState, cc_size, 0),
-    DEFINE_PROP_UINT32("clm-way-en", NucLeiSMPCCState, clm_way_en, 0),
+    DEFINE_PROP_UINT64("msmpccbase", NucleiSMPCCState, msmpccbase, 0),
+    DEFINE_PROP_UINT32("aperture-size", NucleiSMPCCState, aperture_size, 0),
+    DEFINE_PROP_UINT32("smp-ver", NucleiSMPCCState, smp_ver, 0),
+    DEFINE_PROP_UINT32("smp-cfg", NucleiSMPCCState, smp_cfg, 0),
+    DEFINE_PROP_UINT32("cc-cfg", NucleiSMPCCState, cc_cfg, 0),
+    DEFINE_PROP_UINT64("clm-addr-base", NucleiSMPCCState, clm_addr_base, 0),
+    DEFINE_PROP_UINT32("cc-size", NucleiSMPCCState, cc_size, 0),
+    DEFINE_PROP_UINT32("clm-way-en", NucleiSMPCCState, clm_way_en, 0),
 
     DEFINE_PROP_END_OF_LIST(),
 };
 
 static void nuclei_smpcc_realize(DeviceState *dev, Error **errp)
 {
-    NucLeiSMPCCState *smpcc = NUCLEI_SMPCC(dev);
+    NucleiSMPCCState *smpcc = NUCLEI_SMPCC(dev);
 
     memory_region_init_resizeable_ram(&smpcc->clm, NULL, "riscv.nuclei.smpcc.clm",
                                         nuclei_smpcc_get_clm_size(smpcc), smpcc->cc_size, 
@@ -362,7 +362,7 @@ static void nuclei_smpcc_class_init(ObjectClass *klass, void *data)
 static const TypeInfo nuclei_smpcc_info = {
     .name = TYPE_NUCLEI_SMPCC,
     .parent = TYPE_SYS_BUS_DEVICE,
-    .instance_size = sizeof(NucLeiSMPCCState),
+    .instance_size = sizeof(NucleiSMPCCState),
     .class_init = nuclei_smpcc_class_init,
 };
 
@@ -377,7 +377,7 @@ type_init(nuclei_smpcc_register_types);
  * Create Nuclei smpcc device.
  */
 DeviceState *nuclei_smpcc_create(hwaddr addr, uint32_t aperture_size,
-                                NucLeiSMPCCInit *smpcc)
+                                NucleiSMPCCInit *smpcc)
 {
     DeviceState *dev = qdev_new(TYPE_NUCLEI_SMPCC);
 

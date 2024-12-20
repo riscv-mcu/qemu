@@ -23,8 +23,8 @@
 #include "hw/intc/nuclei_eclic.h"
 
 #define TYPE_NUCLEI_CIDU "riscv.nuclei.cidu"
-typedef struct NucLeiCIDUState NucLeiCIDUState;
-DECLARE_INSTANCE_CHECKER(NucLeiCIDUState, NUCLEI_CIDU,
+typedef struct NucleiCIDUState NucleiCIDUState;
+DECLARE_INSTANCE_CHECKER(NucleiCIDUState, NUCLEI_CIDU,
                         TYPE_NUCLEI_CIDU)
 
 #define CIDU_MAX_SUPPORT_CORE_NUM         (32)
@@ -43,7 +43,7 @@ DECLARE_INSTANCE_CHECKER(NucLeiCIDUState, NUCLEI_CIDU,
 
 #define CIDU_EXT_INT_OFST                (19)
 
-typedef struct NucLeiCIDUState
+typedef struct NucleiCIDUState
 {
     /*< private >*/
     SysBusDevice parent_obj;
@@ -68,7 +68,7 @@ typedef struct NucLeiCIDUState
     uint32_t core_num;
     uint32_t int_num;
 
-} NucLeiCIDUState;
+} NucleiCIDUState;
 
 DeviceState *nuclei_cidu_create(hwaddr addr, uint32_t aperture_size,
                                 uint32_t num_harts, uint32_t num_sources, DeviceState *eclic);

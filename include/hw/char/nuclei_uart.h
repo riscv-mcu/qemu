@@ -26,7 +26,7 @@
 #include "hw/intc/nuclei_cidu.h"
 
 #define TYPE_NUCLEI_UART "riscv.nuclei.uart"
-OBJECT_DECLARE_SIMPLE_TYPE(NucLeiUARTState, NUCLEI_UART)
+OBJECT_DECLARE_SIMPLE_TYPE(NucleiUARTState, NUCLEI_UART)
 
 #define NUCLEI_UART_REG_TXDATA 0x000
 #define NUCLEI_UART_REG_RXDATA 0x004
@@ -52,7 +52,7 @@ enum
     NUCLEI_UART_IP_RXWM = 2  /* Receive watermark interrupt pending */
 };
 
-typedef struct NucLeiUARTState
+typedef struct NucleiUARTState
 {
     /*< private >*/
     SysBusDevice parent_obj;
@@ -72,9 +72,9 @@ typedef struct NucLeiUARTState
     uint32_t ip;
     uint32_t div;
     uint32_t setup;
-} NucLeiUARTState;
+} NucleiUARTState;
 
-NucLeiUARTState *nuclei_uart_create(MemoryRegion *address_space, hwaddr base, uint64_t size,
+NucleiUARTState *nuclei_uart_create(MemoryRegion *address_space, hwaddr base, uint64_t size,
                     Chardev *chr, uint32_t id, DeviceState *cidu, DeviceState *eclic, qemu_irq irq);
 
 #endif

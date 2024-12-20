@@ -4,7 +4,7 @@
  * Copyright (c) 2020 Gao ZhiYuan <alapha23@gmail.com>
  * Copyright (c) 2020-2021 PLCT Lab.All rights reserved.
  *
- * This provides a parameterizable timer controller based on NucLei's Systimer.
+ * This provides a parameterizable timer controller based on Nuclei's Systimer.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@
 #define TYPE_NUCLEI_SYSTIMER "riscv.nuclei.systimer"
 
 #define NUCLEI_SYSTIMER(obj) \
-    OBJECT_CHECK(NucLeiSYSTIMERState, (obj), TYPE_NUCLEI_SYSTIMER)
+    OBJECT_CHECK(NucleiSYSTIMERState, (obj), TYPE_NUCLEI_SYSTIMER)
 
 #define NUCLEI_SYSTIMER_REG_MTIMELO             (0x0000)
 #define NUCLEI_SYSTIMER_REG_MTIMEHI             (0x0004)
@@ -42,7 +42,7 @@
 
 #define NUCLEI_SYSTIMER_CLINT_MSIP_HART0        (0x1000)
 
-typedef struct NucLeiSYSTIMERState
+typedef struct NucleiSYSTIMERState
 {
     /*< private >*/
     SysBusDevice parent_obj;
@@ -74,7 +74,7 @@ typedef struct NucLeiSYSTIMERState
     uint32_t aperture_size;
     uint64_t timebase_freq;
 
-} NucLeiSYSTIMERState;
+} NucleiSYSTIMERState;
 
 #define  DEMOSOC_TIMEBASE_FREQ      (32768)
 #define  EVALSOC_TIMEBASE_FREQ      (32768)

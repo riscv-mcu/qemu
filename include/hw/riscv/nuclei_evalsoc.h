@@ -51,7 +51,6 @@
 //#define NUCLEI_U_ECLIC_INTCTLBITS 3
 
 #define TYPE_EVALSOC_SOC "riscv.evalsoc.soc"
-//#define TYPE_NUCLEI_SYSTIMER "riscv.nuclei.systimer"
 
 #define RISCV_EVALSOC_SOC(obj) \
     OBJECT_CHECK(EvalSoCSoCState, (obj), TYPE_EVALSOC_SOC)
@@ -76,8 +75,7 @@ typedef struct EvalSoCSoCState {
     MemoryRegion sram;
     MemoryRegion smp;
 
-    NucLeiSYSTIMERState timer;
-    
+    NucleiSYSTIMERState timer;
     NucleiGPIOState gpio;
     NucleiSPIState spi0;
     NucleiSPIState spi2;

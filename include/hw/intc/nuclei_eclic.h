@@ -4,7 +4,7 @@
  * Copyright (c) 2020 Gao ZhiYuan <alapha23@gmail.com>
  * Copyright (c) 2020-2021 PLCT Lab.All rights reserved.
  *
- * This provides a parameterizable interrupt controller based on NucLei's ECLIC.
+ * This provides a parameterizable interrupt controller based on Nuclei's ECLIC.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,8 +30,8 @@
 #define INTERRUPT_SOURCE_MIN_ID (18)
 #define INTERRUPT_SOURCE_MAX_ID (4096)
 
-typedef struct NucLeiECLICState NucLeiECLICState;
-DECLARE_INSTANCE_CHECKER(NucLeiECLICState, NUCLEI_ECLIC,
+typedef struct NucleiECLICState NucleiECLICState;
+DECLARE_INSTANCE_CHECKER(NucleiECLICState, NUCLEI_ECLIC,
                          TYPE_NUCLEI_ECLIC)
 
 typedef struct ECLICPendingInterrupt
@@ -56,7 +56,9 @@ typedef struct ECLICPendingInterrupt
 
 #define CLICINTCTLBITS 0x6
 
-typedef struct NucLeiECLICState
+#define ECLIC_MAX_HARTS 64
+
+typedef struct NucleiECLICState
 {
     /*< private >*/
     SysBusDevice parent_obj;
@@ -74,26 +76,26 @@ typedef struct NucLeiECLICState
     uint32_t eclic_mmode_base;
     uint64_t mclicbase;
     /* config */
-    uint8_t cliccfg[32];   /*  nlbits(1~4) */
-    uint32_t clicinfo[32]; /*  NUM_INTERRUPT(0~12)  VERSION(13~20) CLICINTCTLBITS(21~24) */
-    uint8_t mth[32];       /* mth(0~7) */
-    uint8_t clicintip[4096][32];
-    uint8_t clicintie[4096][32];
-    uint8_t clicintattr[4096][32]; /* shv(0) trig(1~2)*/
-    uint8_t clicintctl[4096][32];  /*  level (cliccfg.nlbits) priority( (CLICINTCTLBITS - cliccfg.nlbits)*/
-    ECLICPendingInterrupt clicintlist[4096][32];
+    uint8_t cliccfg[ECLIC_MAX_HARTS];   /*  nlbits(1~4) */
+    uint32_t clicinfo[ECLIC_MAX_HARTS]; /*  NUM_INTERRUPT(0~12)  VERSION(13~20) CLICINTCTLBITS(21~24) */
+    uint8_t mth[ECLIC_MAX_HARTS];       /* mth(0~7) */
+    uint8_t clicintip[ECLIC_MAX_HARTS][4096];
+    uint8_t clicintie[ECLIC_MAX_HARTS][4096];
+    uint8_t clicintattr[ECLIC_MAX_HARTS][4096]; /* shv(0) trig(1~2)*/
+    uint8_t clicintctl[ECLIC_MAX_HARTS][4096];  /*  level (cliccfg.nlbits) priority( (CLICINTCTLBITS - cliccfg.nlbits)*/
+    ECLICPendingInterrupt clicintlist[ECLIC_MAX_HARTS][4096];
 
     uint32_t *exccode;
     uint32_t aperture_size;
 
     QLIST_HEAD(, ECLICPendingInterrupt)
-    pending_list[32];
+    pending_list[ECLIC_MAX_HARTS];
     size_t active_count;
 
     /* ECLIC IRQ handlers */
-    qemu_irq irqs[4096][32];
+    qemu_irq irqs[ECLIC_MAX_HARTS][4096];
 
-} NucLeiECLICState;
+} NucleiECLICState;
 
 enum
 {

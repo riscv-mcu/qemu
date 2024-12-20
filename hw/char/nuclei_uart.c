@@ -33,7 +33,7 @@
  *
  * Transmit FIFO using "qemu/fifo8.h"
  */
-static uint64_t uart_ip(NucLeiUARTState *s)
+static uint64_t uart_ip(NucleiUARTState *s)
 {
     uint64_t ret = 0;
 
@@ -52,7 +52,7 @@ static uint64_t uart_ip(NucLeiUARTState *s)
     return ret;
 }
 
-static void update_irq(NucLeiUARTState *s)
+static void update_irq(NucleiUARTState *s)
 {
     int cond = 0;
     s->txctrl |= 0x1;
@@ -80,7 +80,7 @@ static void update_irq(NucLeiUARTState *s)
 static uint64_t
 uart_read(void *opaque, hwaddr offset, unsigned int size)
 {
-    NucLeiUARTState *s = opaque;
+    NucleiUARTState *s = opaque;
     uint64_t value = 0;
     uint8_t fifo_val;
 
@@ -130,7 +130,7 @@ static void
 uart_write(void *opaque, hwaddr offset,
            uint64_t value, unsigned int size)
 {
-    NucLeiUARTState *s = opaque;
+    NucleiUARTState *s = opaque;
     unsigned char ch = value;
 
     switch (offset)
@@ -175,7 +175,7 @@ static const MemoryRegionOps uart_ops = {
 
 static void uart_rx(void *opaque, const uint8_t *buf, int size)
 {
-    NucLeiUARTState *s = opaque;
+    NucleiUARTState *s = opaque;
 
     /* Got a byte.  */
     if (s->rx_fifo_len >= sizeof(s->rx_fifo))
@@ -190,7 +190,7 @@ static void uart_rx(void *opaque, const uint8_t *buf, int size)
 
 static int uart_can_rx(void *opaque)
 {
-    NucLeiUARTState *s = opaque;
+    NucleiUARTState *s = opaque;
     return s->rx_fifo_len < sizeof(s->rx_fifo);
 }
 
@@ -200,7 +200,7 @@ static void uart_event(void *opaque, QEMUChrEvent event)
 
 static int uart_be_change(void *opaque)
 {
-    NucLeiUARTState *s = opaque;
+    NucleiUARTState *s = opaque;
 
     qemu_chr_fe_set_handlers(&s->chr, uart_can_rx, uart_rx, uart_event,
                              uart_be_change, s, NULL, true);
@@ -210,7 +210,7 @@ static int uart_be_change(void *opaque)
 
 static void nuclei_uart_reset(DeviceState *dev)
 {
-    NucLeiUARTState *s = NUCLEI_UART(dev);
+    NucleiUARTState *s = NUCLEI_UART(dev);
 
     s->txdata = 0;
     s->rxdata = 0;
@@ -233,7 +233,7 @@ static void nuclei_uart_class_init(ObjectClass *klass, void *data)
 static const TypeInfo nuclei_uart_info = {
     .name = TYPE_NUCLEI_UART,
     .parent = TYPE_SYS_BUS_DEVICE,
-    .instance_size = sizeof(NucLeiUARTState),
+    .instance_size = sizeof(NucleiUARTState),
     .class_init = nuclei_uart_class_init,
 };
 
@@ -247,11 +247,11 @@ type_init(nuclei_uart_register_types);
 /*
  * Create UART device.
  */
-NucLeiUARTState *nuclei_uart_create(MemoryRegion *address_space, hwaddr base, uint64_t size,
+NucleiUARTState *nuclei_uart_create(MemoryRegion *address_space, hwaddr base, uint64_t size,
                     Chardev *chr, uint32_t id, DeviceState *cidu, DeviceState *eclic, qemu_irq irq)
 {
     DeviceState *dev;
-    NucLeiUARTState *s;
+    NucleiUARTState *s;
     SysBusDevice *sbd;
 
     dev = qdev_new("riscv.nuclei.uart");
@@ -262,7 +262,7 @@ NucLeiUARTState *nuclei_uart_create(MemoryRegion *address_space, hwaddr base, ui
         if (cidu != NULL) {
             s->irq = NUCLEI_CIDU(cidu)->external_irq[id - CIDU_EXT_INT_OFST];
         } else {
-            s->irq = NUCLEI_ECLIC(eclic)->irqs[id][0];
+            s->irq = NUCLEI_ECLIC(eclic)->irqs[0][id];
         }
     } else {
         sysbus_init_mmio(sbd, &s->mmio);

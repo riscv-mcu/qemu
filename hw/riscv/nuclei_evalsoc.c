@@ -1171,7 +1171,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     EvalSoCSoCState *s = RISCV_EVALSOC_SOC(dev);
     const struct MemmapEntry *memmap = evalsoc_memmap;
     MemoryRegion *sys_mem = get_system_memory();
-    NucLeiSMPCCInit smpcc_cfg = {EVALSOC_SMP_VER,
+    NucleiSMPCCInit smpcc_cfg = {EVALSOC_SMP_VER,
                                 EVALSOC_SMP_CFG | ((ms->smp.cpus - 1) << 1),
                                 EVALSOC_CC_CFG,
                                 EVALSOC_CLM_BASE_ADDR,

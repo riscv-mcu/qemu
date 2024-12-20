@@ -21,11 +21,11 @@
 #include "hw/sysbus.h"
 
 #define TYPE_NUCLEI_SMPCC "riscv.nuclei.smpcc"
-typedef struct NucLeiSMPCCState NucLeiSMPCCState;
-DECLARE_INSTANCE_CHECKER(NucLeiSMPCCState, NUCLEI_SMPCC,
+typedef struct NucleiSMPCCState NucleiSMPCCState;
+DECLARE_INSTANCE_CHECKER(NucleiSMPCCState, NUCLEI_SMPCC,
                         TYPE_NUCLEI_SMPCC)
 
-typedef struct NucLeiSMPCCInit
+typedef struct NucleiSMPCCInit
 {
     uint32_t smp_ver;
     uint32_t smp_cfg;
@@ -34,9 +34,9 @@ typedef struct NucLeiSMPCCInit
     uint32_t cc_size;
     uint32_t clm_way_en;
 
-} NucLeiSMPCCInit;
+} NucleiSMPCCInit;
 
-typedef struct NucLeiSMPCCState
+typedef struct NucleiSMPCCState
 {
     /*< private >*/
     SysBusDevice parent_obj;
@@ -77,8 +77,8 @@ typedef struct NucLeiSMPCCState
     uint64_t client_err_addr[32];
     uint32_t client_way_mask[32];
 
-} NucLeiSMPCCState;
+} NucleiSMPCCState;
 
 DeviceState *nuclei_smpcc_create(hwaddr addr, uint32_t aperture_size,
-                                NucLeiSMPCCInit *smpcc);
+                                NucleiSMPCCInit *smpcc);
 #endif
