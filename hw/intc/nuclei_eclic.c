@@ -74,26 +74,14 @@ static uint64_t nuclei_eclic_read(void *opaque, hwaddr offset, unsigned size)
     NucleiECLICState *eclic = NUCLEI_ECLIC(opaque);
     uint64_t value = 0;
     uint32_t irq = 0;
+    uint32_t shift = 0;
     uint32_t hartid = nuclei_eclic_get_current_cpu(eclic);
 
     if (offset >= NUCLEI_ECLIC_REG_CLICINTIP_BASE)
     {
-        if ((offset - 0x1000) % 4 == 0)
-        {
-            irq = (offset - 0x1000) / 4;
-        }
-        else if ((offset - 0x1001) % 4 == 0)
-        {
-            irq = (offset - 0x1001) / 4;
-        }
-        else if ((offset - 0x1002) % 4 == 0)
-        {
-            irq = (offset - 0x1002) / 4;
-        }
-        else if ((offset - 0x1003) % 4 == 0)
-        {
-            irq = (offset - 0x1003) / 4;
-        }
+        shift = offset & 0x3;
+        irq = (offset - shift - 0x1000) / 4;
+        //返回寄存器列表
         offset = offset - 4 * irq;
     }
 
@@ -156,25 +144,12 @@ static void nuclei_eclic_write(void *opaque, hwaddr offset, uint64_t value,
     NucleiECLICState *eclic = NUCLEI_ECLIC(opaque);
     uint32_t irq = 0;
     uint32_t hartid = nuclei_eclic_get_current_cpu(eclic);
+    uint32_t shift = 0;
 
     if (offset >= NUCLEI_ECLIC_REG_CLICINTIP_BASE)
     {
-        if ((offset - 0x1000) % 4 == 0)
-        {
-            irq = (offset - 0x1000) / 4;
-        }
-        else if ((offset - 0x1001) % 4 == 0)
-        {
-            irq = (offset - 0x1001) / 4;
-        }
-        else if ((offset - 0x1002) % 4 == 0)
-        {
-            irq = (offset - 0x1002) / 4;
-        }
-        else if ((offset - 0x1003) % 4 == 0)
-        {
-            irq = (offset - 0x1003) / 4;
-        }
+        shift = offset & 0x3;
+        irq = (offset - shift - 0x1000) / 4;
         //返回寄存器列表
         offset = offset - 4 * irq;
     }
