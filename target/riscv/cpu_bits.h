@@ -210,6 +210,7 @@
 #define CSR_SNXTI           0x145 /* clic-spec-draft */
 #define CSR_SINTSTATUS      0x146 /* clic-spec-draft */
 #define CSR_SINTTHRESH      0x147 /* clic-spec-draft */
+#define CSR_SSCRATCHCSW     0x148
 
 /* Sstc supervisor CSRs */
 #define CSR_STIMECMP        0x14D

@@ -6163,6 +6163,7 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_MINTSTATUS]            = {"mintstatus",      any, read_mintstatus, write_mintthresh },
     /* Supervisor Mode Core Level Interrupt Controller */
     [CSR_SINTSTATUS]            = {"sintstatus",      any, read_sintstatus, write_sintthresh },
+    [CSR_SSCRATCHCSW]           = {"sscratchcsw",     any, read_zero, write_ignore },
     /* Supervisor Mode Core Level Interrupt Controller */
     [CSR_STVT]                  = { "stvt",           any, read_stvt, write_stvt },
     [CSR_SNXTI]                 = { "snxti",          any, NULL, NULL, rmw_snxti },
