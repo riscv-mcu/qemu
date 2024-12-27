@@ -2763,12 +2763,16 @@ static void cpu_set_ext_state(Object *obj, const char *value, Error **errp)
     const size_t slen = strlen(value) + 1;
     char *isa_ext = g_new(char, slen);
     char *subext = NULL;
+    int ext_match = 0;
 
     memcpy(isa_ext, value, slen);
 
     for (subext = strtok(isa_ext, "_"); subext; subext = strtok(NULL, "_")) {
-        if (strcmp(subext, "v") == 0)
+        ext_match = 0;
+        if (strcmp(subext, "v") == 0) {
             cpu->env.misa_ext |= RVV;
+            ext_match = 1;
+        }
 
         for (prop = riscv_cpu_extensions; prop && prop->name; prop++) {
             if (strcmp(prop->name, subext) == 0) {
@@ -2776,13 +2780,19 @@ static void cpu_set_ext_state(Object *obj, const char *value, Error **errp)
                 if ((strcmp(prop->name, "zve64d") == 0)
                     && (cpu->cfg.vlenb >= 128 >>3))
                     cpu->env.misa_ext |= RVV;
+                ext_match = 1;
             }
         }
 
         for (prop = riscv_cpu_vendor_exts; prop && prop->name; prop++) {
             if (strcmp(prop->name, subext) == 0) {
                 isa_ext_update_enabled(cpu, prop->offset, true);
+                ext_match = 1;
             }
+        }
+        if (!ext_match) {
+            error_report("'%s' is unsupported extension!", subext);
+            exit(1);
         }
     }
     g_free(isa_ext);
