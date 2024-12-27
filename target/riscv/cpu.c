@@ -2791,8 +2791,7 @@ static void cpu_set_ext_state(Object *obj, const char *value, Error **errp)
             }
         }
         if (!ext_match) {
-            error_report("'%s' is unsupported extension!", subext);
-            exit(1);
+            warn_report("'%s' is unsupported extension!", subext);
         }
     }
     g_free(isa_ext);
