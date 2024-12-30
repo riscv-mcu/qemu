@@ -1846,6 +1846,13 @@ const RISCVCPUMultiExtConfig riscv_cpu_extensions[] = {
     MULTI_EXT_CFG_BOOL("zve64f", ext_zve64f, false),
     MULTI_EXT_CFG_BOOL("zve64d", ext_zve64d, false),
     MULTI_EXT_CFG_BOOL("zve64x", ext_zve64x, false),
+    MULTI_EXT_CFG_BOOL("zvl32b", ext_zvl32b, false),
+    MULTI_EXT_CFG_BOOL("zvl64b", ext_zvl64b, false),
+    MULTI_EXT_CFG_BOOL("zvl128b", ext_zvl128b, false),
+    MULTI_EXT_CFG_BOOL("zvl256b", ext_zvl256b, false),
+    MULTI_EXT_CFG_BOOL("zvl512b", ext_zvl512b, false),
+    MULTI_EXT_CFG_BOOL("zvl1024b", ext_zvl1024b, false),
+
     MULTI_EXT_CFG_BOOL("zvfbfmin", ext_zvfbfmin, false),
     MULTI_EXT_CFG_BOOL("zvfbfwma", ext_zvfbfwma, false),
     MULTI_EXT_CFG_BOOL("zvfh", ext_zvfh, false),

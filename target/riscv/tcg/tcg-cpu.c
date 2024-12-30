@@ -485,7 +485,53 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         return;
     }
 
+    if (cpu->cfg.ext_zvl32b) {
+        cpu->cfg.vlenb = 32 >> 3;
+    }
+
+    if (cpu->cfg.ext_zvl64b) {
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvl32b), true);
+        cpu->cfg.vlenb = 64 >> 3;
+    }
+
+    if (cpu->cfg.ext_zvl128b) {
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvl32b), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvl64b), true);
+        cpu->cfg.vlenb = 128 >> 3;
+    }
+
+    if (cpu->cfg.ext_zvl256b) {
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvl32b), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvl64b), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvl128b), true);
+        cpu->cfg.vlenb = 256 >> 3;
+    }
+
+    if (cpu->cfg.ext_zvl512b) {
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvl32b), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvl64b), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvl128b), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvl256b), true);
+        cpu->cfg.vlenb = 512 >> 3;
+    }
+
+    if (cpu->cfg.ext_zvl1024b) {
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvl32b), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvl64b), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvl128b), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvl256b), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvl512b), true);
+        cpu->cfg.vlenb = 1024 >> 3;
+    }
+
     if (riscv_has_ext(env, RVV)) {
+        if (cpu->cfg.vlenb < (128 >> 3)) {
+            cpu->cfg.vlenb = 128 >> 3;
+        }
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvl32b), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvl64b), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvl128b), true);
+
         riscv_cpu_validate_v(env, &cpu->cfg, &local_err);
         if (local_err != NULL) {
             error_propagate(errp, local_err);
