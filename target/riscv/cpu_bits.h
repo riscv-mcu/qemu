@@ -1012,7 +1012,7 @@ typedef enum RISCVException {
 #define MINTSTATUS_UIL                     0x000000ff /* uil[7:0] */
 
 /* mcause */
-#define MCAUSE_INTERRUPT                   0x80000000 /* INTERRUPT  31*/
+#define MCAUSE_INTERRUPT                   (1ULL << (TARGET_LONG_BITS - 1)) /* INTERRUPT xlen-1*/
 #define MCAUSE_MINHV                       0x40000000 /* minhv */
 #define MCAUSE_MPP                         0x30000000 /* mpp[1:0] */
 #define MCAUSE_MPIE                        0x08000000 /* mpie */
