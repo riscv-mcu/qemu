@@ -40,7 +40,7 @@ static bool require_rvf(DisasContext *s)
 
     switch (s->sew) {
     case MO_16:
-        return s->cfg_ptr->ext_zvfh;
+        return s->cfg_ptr->ext_zvfh || s->cfg_ptr->ext_xxlvfbf;
     case MO_32:
         return s->cfg_ptr->ext_zve32f;
     case MO_64:

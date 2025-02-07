@@ -127,6 +127,18 @@ static void do_##NAME(void *vd, void *vs2, int i)      \
     *((TD *)vd + HD(i)) = OP(s2);                      \
 }
 
+#define OPIVV1_F_BF(NAME, TD, T2, TX2, HD, HS2, OP1, OP2)   \
+static void do_##NAME(void *vd, void *vs2, int i,           \
+                      CPURISCVState *env)                   \
+{                                                           \
+    TX2 s2 = *((T2 *)vs2 + HS2(i));                         \
+    if (env->mmisc_ctl1 & 0x1) {                            \
+        *((TD *)vd + HD(i)) = OP2(s2);                      \
+    } else {                                                \
+        *((TD *)vd + HD(i)) = OP1(s2);                      \
+    }                                                       \
+}
+
 #define GEN_VEXT_V(NAME, ESZ)                          \
 void HELPER(NAME)(void *vd, void *v0, void *vs2,       \
                   CPURISCVState *env, uint32_t desc)   \
@@ -149,6 +161,35 @@ void HELPER(NAME)(void *vd, void *v0, void *vs2,       \
             continue;                                  \
         }                                              \
         do_##NAME(vd, vs2, i);                         \
+    }                                                  \
+    env->vstart = 0;                                   \
+    /* set tail elements to 1s */                      \
+    vext_set_elems_1s(vd, vta, vl * ESZ,               \
+                      total_elems * ESZ);              \
+}
+
+#define GEN_VEXT_V_F_BF(NAME, ESZ)                     \
+void HELPER(NAME)(void *vd, void *v0, void *vs2,       \
+                  CPURISCVState *env, uint32_t desc)   \
+{                                                      \
+    uint32_t vm = vext_vm(desc);                       \
+    uint32_t vl = env->vl;                             \
+    uint32_t total_elems =                             \
+        vext_get_total_elems(env, desc, ESZ);          \
+    uint32_t vta = vext_vta(desc);                     \
+    uint32_t vma = vext_vma(desc);                     \
+    uint32_t i;                                        \
+                                                       \
+    VSTART_CHECK_EARLY_EXIT(env);                      \
+                                                       \
+    for (i = env->vstart; i < vl; i++) {               \
+        if (!vm && !vext_elem_mask(v0, i)) {           \
+            /* set masked-off elements to 1s */        \
+            vext_set_elems_1s(vd, vma, i * ESZ,        \
+                              (i + 1) * ESZ);          \
+            continue;                                  \
+        }                                              \
+        do_##NAME(vd, vs2, i, env);                    \
     }                                                  \
     env->vstart = 0;                                   \
     /* set tail elements to 1s */                      \
