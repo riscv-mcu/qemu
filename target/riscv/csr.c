@@ -5065,13 +5065,12 @@ static int rmw_jalmnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
     if (env->irq_pending) {
         uint64_t vec_addr = (env->mcause & 0x3FF) *riscv_addr_size + env->mtvt;
         cpu_physical_memory_rw(vec_addr, &addr,  riscv_addr_size, 0);
-        env->gpr[1] = env->pc + riscv_addr_size;  //ret use
-        env->gpr[5] = env->pc + riscv_addr_size;  //link reg
+        env->gpr[1] = env->pc;  //ret use
         *ret_value = addr;
         env->mstatus = set_field(env->mstatus, MSTATUS_MIE, 1);
         riscv_cpu_eclic_int_handler_start(env->eclic, env->mcause & 0x3ff, env->mhartid);
     } else
-        *ret_value = env->pc + riscv_addr_size;
+        *ret_value = env->pc;
 #endif
     return RISCV_EXCP_NONE;
 }

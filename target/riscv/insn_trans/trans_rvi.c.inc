@@ -871,6 +871,7 @@ static bool do_csrrw(DisasContext *ctx, int rd, int rc, TCGv src, TCGv mask)
     translator_io_start(&ctx->base);
     if(rc == CSR_NUCLEI_JALMNXTI)
     {
+        gen_update_pc(ctx, ctx->cur_insn_len);
         gen_helper_csrrw(cpu_pc, tcg_env, csr, src, mask);
         return do_csr_post2(ctx);
     }
