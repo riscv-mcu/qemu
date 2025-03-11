@@ -2491,7 +2491,9 @@ static RISCVException rmw_mip(CPURISCVState *env, int csrno,
 
      /* The xip CSR appears hardwired to zero in CLIC mode. (Section 4.3) */
     if (riscv_intc_is_clic_mode(env)) {
-        *ret_val = 0;
+        if (ret_val) {
+            *ret_val = 0;
+        }
         return RISCV_EXCP_NONE;
     }
 
@@ -3133,7 +3135,9 @@ static RISCVException rmw_sip(CPURISCVState *env, int csrno,
 
     /* The xip CSR appears hardwired to zero in CLIC mode. (Section 4.3) */
     if (riscv_intc_is_clic_mode(env)) {
-        *ret_val = 0;
+        if (ret_val) {
+            *ret_val = 0;
+        }
         return RISCV_EXCP_NONE;
     }
 
