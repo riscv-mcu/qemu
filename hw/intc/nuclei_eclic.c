@@ -276,8 +276,8 @@ void nuclei_eclic_next_interrupt(void *eclic_ptr, int hartid)
     RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(hartid));
     NucleiECLICState *eclic = (NucleiECLICState *)eclic_ptr;
     ECLICPendingInterrupt *active;
-    int shv;
     int mode = PRV_M;
+    int exccode;
 
     QLIST_FOREACH(active, &eclic->pending_list[hartid], next)
     {
@@ -285,10 +285,10 @@ void nuclei_eclic_next_interrupt(void *eclic_ptr, int hartid)
         {
             if (active->level >= eclic->mth[hartid])
             {
-                eclic->exccode[0] = active->irq | mode << 12 | active->level << 14;
-                shv = eclic->clicintattr[hartid][active->irq] & 0x1;
+                exccode = active->irq | mode << 12 | active->level << 14;
+                eclic->exccode[0] = exccode;
                 eclic->active_count++;
-                riscv_cpu_eclic_interrupt(cpu, (active->irq & 0xFFF) | (shv << 12) | (active->level << 14));
+                riscv_cpu_eclic_interrupt(cpu, exccode);
                 return;
             }
         }

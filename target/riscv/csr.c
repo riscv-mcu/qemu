@@ -2522,7 +2522,6 @@ static bool get_xnxti_status(CPURISCVState *env)
     } else {
         riscv_clic_decode_exccode(env->exccode, &clic_priv, &clic_il,
                                   &clic_irq);
-        clic_priv = env->priv;
         if (env->priv == PRV_M) {
             pil = MAX(get_field(env->mcause, MCAUSE_MPIL), env->mintthresh);
         } else if (env->priv == PRV_S) {

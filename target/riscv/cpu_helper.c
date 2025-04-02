@@ -1942,7 +1942,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
                 riscv_addr_size = 8;
             }
 
-            if (mode) {
+            if (nuclei_eclic_shv_interrupt(env->eclic, mode, cs->cpu_index, cause & 0x3FF)) {
                 uint64_t vec_addr = (cause & 0x3FF) *riscv_addr_size + env->mtvt;
                 cpu_physical_memory_rw(vec_addr, &newpc,  riscv_addr_size, 0);
             } else {
