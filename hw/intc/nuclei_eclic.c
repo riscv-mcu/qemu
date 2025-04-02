@@ -249,6 +249,28 @@ static void update_eclic_int_info(NucleiECLICState *eclic, int irq, int hartid)
     eclic->clicintlist[hartid][irq].trigger = (eclic->clicintattr[hartid][irq] >> 1) & 0x3;
 }
 
+bool nuclei_eclic_shv_interrupt(void *opaque, int mode, int hartid, int irq)
+{
+    NucleiECLICState *eclic = (NucleiECLICState *)opaque;
+    int shv;
+    shv = eclic->clicintattr[hartid][irq] & 0x1;
+    return shv;
+}
+
+bool nuclei_eclic_edge_triggered(void *opaque, int mode, int hartid, int irq)
+{
+    NucleiECLICState *eclic = (NucleiECLICState *)opaque;
+    return (eclic->clicintattr[hartid][irq] >> 1) & 0x1;
+}
+
+void nuclei_eclic_clean_pending(void *opaque, int mode, int hartid, int irq)
+{
+    NucleiECLICState *eclic = (NucleiECLICState *)opaque;
+    eclic->clicintip[hartid][irq] = 0;
+    eclic_remove_pending_list(eclic, irq, hartid);
+}
+
+
 void nuclei_eclic_next_interrupt(void *eclic_ptr, int hartid)
 {
     RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(hartid));
@@ -266,7 +288,7 @@ void nuclei_eclic_next_interrupt(void *eclic_ptr, int hartid)
                 eclic->exccode[0] = active->irq | mode << 12 | active->level << 14;
                 shv = eclic->clicintattr[hartid][active->irq] & 0x1;
                 eclic->active_count++;
-                riscv_cpu_eclic_interrupt(cpu, (active->irq & 0xFFF) | (shv << 12) | (active->level << 13));
+                riscv_cpu_eclic_interrupt(cpu, (active->irq & 0xFFF) | (shv << 12) | (active->level << 14));
                 return;
             }
         }

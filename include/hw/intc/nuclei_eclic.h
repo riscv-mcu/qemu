@@ -130,6 +130,9 @@ void nuclei_eclic_systimer_cb(DeviceState *dev);
 void riscv_cpu_eclic_int_handler_start(void *eclic_ptr, int irq, int hartid);
 bool riscv_intc_is_clic_mode(CPUArchState *env);
 void nuclei_eclic_next_interrupt(void *eclic, int hartid);
+bool nuclei_eclic_shv_interrupt(void *opaque, int mode, int hartid, int irq);
+bool nuclei_eclic_edge_triggered(void *opaque, int mode, int hartid, int irq);
+void nuclei_eclic_clean_pending(void *opaque, int mode, int hartid, int irq);
 
 #endif
 

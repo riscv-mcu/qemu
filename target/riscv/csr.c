@@ -2513,13 +2513,16 @@ static bool get_xnxti_status(CPURISCVState *env)
     if (!env->exccode) { /* No interrupt */
         return false;
     }
+    if (!env->irq_pending) {
+        return false;
+    }
     /* The system is not in a CLIC mode */
     if (!riscv_intc_is_clic_mode(env)) {
         return false;
     } else {
         riscv_clic_decode_exccode(env->exccode, &clic_priv, &clic_il,
                                   &clic_irq);
-
+        clic_priv = env->priv;
         if (env->priv == PRV_M) {
             pil = MAX(get_field(env->mcause, MCAUSE_MPIL), env->mintthresh);
         } else if (env->priv == PRV_S) {
@@ -2532,7 +2535,7 @@ static bool get_xnxti_status(CPURISCVState *env)
 
         if ((clic_priv != env->priv) || /* No horizontal interrupt */
             (clic_il <= pil) || /* No higher level interrupt */
-            (riscv_clic_shv_interrupt(env->clic, clic_priv, cs->cpu_index,
+            (nuclei_eclic_shv_interrupt(env->eclic, clic_priv, cs->cpu_index,
                                       clic_irq))) { /* CLIC vector mode */
             return false;
         } else {
@@ -2566,10 +2569,10 @@ static int rmw_mnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
         riscv_clic_decode_exccode(env->exccode, &clic_priv, &clic_il,
                                   &clic_irq);
         if (write_mask) {
-            bool edge = riscv_clic_edge_triggered(env->clic, clic_priv,
+            bool edge = nuclei_eclic_edge_triggered(env->eclic, clic_priv,
                                                   cs->cpu_index, clic_irq);
             if (edge) {
-                riscv_clic_clean_pending(env->clic, clic_priv,
+                nuclei_eclic_clean_pending(env->eclic, clic_priv,
                                          cs->cpu_index, clic_irq);
             }
             env->mintstatus = set_field(env->mintstatus,

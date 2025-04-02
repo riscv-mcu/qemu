@@ -538,7 +538,7 @@ bool riscv_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         CPURISCVState *env = &cpu->env;
 
         int exccode = env->exccode & 0x3FF;
-        int level = (env->exccode >> 13) & 0xFF;
+        int level = (env->exccode >> 14) & 0xFF;
 
         int enabled = riscv_cpu_local_irq_mode_enabled(cs, exccode, level);
 
@@ -1859,8 +1859,8 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     }
     if(eclic_flag)
     {
-        mode = (cause >> 12) & 0x1;
-        level = (cause >> 13) & 0xFF;
+        mode = (cause >> 12) & 0x3;
+        level = (cause >> 14) & 0xFF;
         cause &= 0x3ff;
         cause |= get_field(env->mstatus, MSTATUS_MPP) << 28;
         cause |= get_field(env->mintstatus, MINTSTATUS_MIL) << 16;
