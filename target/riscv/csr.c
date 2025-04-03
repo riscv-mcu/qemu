@@ -2940,7 +2940,7 @@ static RISCVException write_stvec(CPURISCVState *env, int csrno,
      */
     if ((val & 3) < 2) {
         env->stvec = val;
-    } else if ((val & 1) && env->clic) {
+    } else if ((val & 1) && env->eclic) {
         /*
          * If only CLIC mode is supported, writes to bit 1 are also ignored and
          * it is always set to one. CLIC mode hardwires xtvec bits 2-5 to zero.
@@ -3176,10 +3176,10 @@ static int rmw_snxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
         riscv_clic_decode_exccode(env->exccode, &clic_priv, &clic_il,
                                   &clic_irq);
         if (write_mask) {
-            bool edge = riscv_clic_edge_triggered(env->clic, clic_priv,
+            bool edge = nuclei_eclic_edge_triggered(env->eclic, clic_priv,
                                                   cs->cpu_index, clic_irq);
             if (edge) {
-                riscv_clic_clean_pending(env->clic, clic_priv,
+                nuclei_eclic_clean_pending(env->eclic, clic_priv,
                                          cs->cpu_index, clic_irq);
             }
             env->mintstatus = set_field(env->mintstatus,
