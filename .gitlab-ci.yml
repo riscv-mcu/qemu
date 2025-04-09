@@ -9,7 +9,7 @@ stages:
 
 variables:
   IMAGE: rego.corp.nucleisys.com/software/sdkbuild
-  IMAGE_TAG: "2024.02.18"
+  IMAGE_TAG: "2025.02"
 
 workflow:
   rules:
