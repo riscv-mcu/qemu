@@ -389,7 +389,7 @@ deploy-qemu:
         echo "Copy ${qemu_deploy_zip} to ${shareloc}/deploy/"
         mv ${qemu_deploy_zip} ${shareloc}/deploy/
         ls -lht ${shareloc}/deploy/
-    - echo "Qemu successfully deployed to share environment $shareloc/${QEMU_VER}"
+    - echo "Qemu successfully deployed to share environment $shareloc/linux64/${QEMU_VER}"
   tags:
     - env::shell
     - user::xl_ci
