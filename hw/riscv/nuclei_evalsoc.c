@@ -78,6 +78,7 @@ static const struct MemmapEntry
 }  evalsoc_memmap[] = {
     [EVALSOC_IINFO]   = { IREGION_IINFO_OFS,              IREGION_IINFO_SIZE,   "IINFO"},
     [EVALSOC_MROM]    = { EVALSOC_MROM_BASE,              EVALSOC_MROM_SIZE,    "MROM" },
+    [EVALSOC_XEC0]    = { EVALSOC_XEC0_BASE,              EVALSOC_XEC0_SIZE,    "XEC0"},
     [EVALSOC_TEST]    = { EVALSOC_TEST_BASE,              EVALSOC_TEST_SIZE,    "TEST" },
     [EVALSOC_GPIO]    = { EVALSOC_GPIO_BASE,              EVALSOC_GPIO_SIZE,    "GPIO" },
     [EVALSOC_UART0]   = { EVALSOC_UART0_BASE,             EVALSOC_UART0_SIZE,   "UART0"},
@@ -135,7 +136,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     int cpu;
     uint32_t *cells;
     char *nodename;
-    uint32_t plic_phandle, uart_phandle, gpio_phandle, phandle = 1;
+    uint32_t plic_phandle, uart_phandle, gpio_phandle, phy_phandle, phandle = 1;
     uint32_t aplic_m_phandle, aplic_s_phandle;
     uint32_t msi_m_phandle, msi_s_phandle;
     uint32_t hfclk_phandle,test_phandle;
@@ -415,7 +416,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     qemu_fdt_setprop_cells(fdt, nodename, "interrupts", EVALSOC_PLIC_GPIO_IRQ0,
                            EVALSOC_PLIC_GPIO_IRQ1, EVALSOC_PLIC_GPIO_IRQ2, EVALSOC_PLIC_GPIO_IRQ3,
                            EVALSOC_PLIC_GPIO_IRQ4, EVALSOC_PLIC_GPIO_IRQ5, EVALSOC_PLIC_GPIO_IRQ6,
-                           EVALSOC_PLIC_GPIO_IRQ7, EVALSOC_PLIC_GPIO_IRQ8, EVALSOC_PLIC_GPIO_IRQ9,
+                           EVALSOC_PLIC_GPIO_IRQ8, EVALSOC_PLIC_GPIO_IRQ9,
                            EVALSOC_PLIC_GPIO_IRQ10, EVALSOC_PLIC_GPIO_IRQ11, EVALSOC_PLIC_GPIO_IRQ12,
                            EVALSOC_PLIC_GPIO_IRQ13, EVALSOC_PLIC_GPIO_IRQ14, EVALSOC_PLIC_GPIO_IRQ15,
                            EVALSOC_PLIC_GPIO_IRQ16, EVALSOC_PLIC_GPIO_IRQ17, EVALSOC_PLIC_GPIO_IRQ18,
@@ -428,6 +429,34 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,gpio0");
     qemu_fdt_setprop_cell(fdt, nodename, "phandle", gpio_phandle);
     qemu_fdt_setprop_string(fdt, nodename, "status", "disabled");
+    g_free(nodename);
+
+    phy_phandle = phandle++;
+    nodename = g_strdup_printf("/soc/ethernet@%lx",
+                            (long)s->xec0.base);
+    qemu_fdt_add_subnode(fdt, nodename);
+    qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,xec");
+    qemu_fdt_setprop_cells(fdt, nodename, "reg",
+                           0x0, (hwaddr)s->xec0.base,
+                           0x0, memmap[EVALSOC_XEC0].size);
+    qemu_fdt_setprop_string(fdt, nodename, "reg-names", "control");
+    qemu_fdt_setprop_string(fdt, nodename, "phy-mode", "rgmii");
+    qemu_fdt_setprop_cell(fdt, nodename, "phy-handle", phy_phandle);
+    qemu_fdt_setprop_cell(fdt, nodename, "interrupt-parent", plic_phandle);
+    qemu_fdt_setprop_cell(fdt, nodename, "interrupts", s->xec0.irq);
+    qemu_fdt_setprop_cells(fdt, nodename, "clocks", hfclk_phandle);
+    qemu_fdt_setprop(fdt, nodename, "local-mac-address",
+        s->soc.xec0.conf.macaddr.a, 6);
+    qemu_fdt_setprop_cell(fdt, nodename, "#address-cells", 1);
+    qemu_fdt_setprop_cell(fdt, nodename, "#size-cells", 0);
+    g_free(nodename);
+
+    // phy
+    nodename = g_strdup_printf("/soc/ethernet@%lx/ethernet-phy@2",
+                                (long)s->xec0.base);
+    qemu_fdt_add_subnode(fdt, nodename);
+    qemu_fdt_setprop_cell(fdt, nodename, "phandle", phy_phandle);
+    qemu_fdt_setprop_cell(fdt, nodename, "reg", 0x2);
     g_free(nodename);
 
     nodename = g_strdup_printf("/soc/spi@%lx",
@@ -712,6 +741,12 @@ static void parse_json_config(MachineState *machine)
         {"enable",  &s->qspi2.enable,   "qspi2.enable"},
         {"version", &s->qspi2.version,  "qspi2.version"},
     };
+    const JsonFieldMapping xec0_mappings[] = {
+        {"base",    &s->xec0.base,      "xec0.base"},
+        {"size",    &s->xec0.size,      "xec0.size"},
+        {"irq",     &s->xec0.irq,       "xec0.irq"},
+        {"enable",  &s->xec0.enable,    "xec0.enable"},
+    };
     const JsonFieldMapping aplic_m_mappings[] = {
         {"base",    &s->aplic_m.base,     "aplic_m.base"},
         {"size",    &s->aplic_m.size,     "aplic_m.size"},
@@ -813,6 +848,8 @@ static void parse_json_config(MachineState *machine)
                                 parse_json_keys_and_values(options_page2, qspi1_mappings, ARRAY_SIZE(qspi1_mappings));
                             } else if (!strcmp(page1->key, "qspi2")) {
                                 parse_json_keys_and_values(options_page2, qspi2_mappings, ARRAY_SIZE(qspi2_mappings));
+                            } else if (!strcmp(page1->key, "xec0")) {
+                                parse_json_keys_and_values(options_page2, xec0_mappings, ARRAY_SIZE(xec0_mappings));
                             } else if (!strcmp(page1->key, "aplic_m")) {
                                 parse_json_keys_and_values(options_page2, aplic_m_mappings, ARRAY_SIZE(aplic_m_mappings));
                             } else if (!strcmp(page1->key, "aplic_s")) {
@@ -884,6 +921,8 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
     memoryRegion[EVALSOC_QSPI1].size = s->qspi1.size;
     memoryRegion[EVALSOC_QSPI2].base = s->qspi2.base;
     memoryRegion[EVALSOC_QSPI2].size = s->qspi2.size;
+    memoryRegion[EVALSOC_XEC0].base = s->xec0.base;
+    memoryRegion[EVALSOC_XEC0].size = s->xec0.size;
     //IMSIC actual size depends on smp cpus
     uint32_t imsic_hart_count = (smp_cpus < EVALSOC_IMSIC_DEFAULT_HARTS) ? smp_cpus : EVALSOC_IMSIC_DEFAULT_HARTS;
     uint32_t guest_bits = imsic_num_bits(s->aia_guests + 1);
@@ -1137,9 +1176,6 @@ static void evalsoc_machine_init(MachineState *machine)
     DEBUGF("gpio    : base:0x%lx, size:0x%lx\n", (long)s->gpio.base,(long)s->gpio.size);
     DEBUGF("uart0   : base:0x%lx, size:0x%lx, irq:%d\n", (long)s->uart0.base, (long)s->uart0.size, (int)s->uart0.irq);
     DEBUGF("uart1   : base:0x%lx, size:0x%lx, irq:%d\n", (long)s->uart1.base, (long)s->uart1.size, (int)s->uart1.irq);
-    DEBUGF("qspi0   : base:0x%lx, size:0x%lx, irq:%d\n", (long)s->qspi0.base, (long)s->qspi0.size, (int)s->qspi0.irq);
-    DEBUGF("qspi1   : base:0x%lx, size:0x%lx, irq:%d\n", (long)s->qspi1.base, (long)s->qspi1.size, (int)s->qspi1.irq);
-    DEBUGF("qspi2   : base:0x%lx, size:0x%lx, irq:%d\n", (long)s->qspi2.base, (long)s->qspi2.size, (int)s->qspi2.irq);
     DEBUGF("aplic_m : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->aplic_m.base, (long)s->aplic_m.size, (int)s->aplic_m.enable);
     DEBUGF("aplic_s : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->aplic_s.base, (long)s->aplic_s.size, (int)s->aplic_s.enable);
     DEBUGF("imsic_m : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->imsic_m.base, (long)s->imsic_m.size, (int)s->imsic_m.enable);
@@ -1148,6 +1184,7 @@ static void evalsoc_machine_init(MachineState *machine)
     DEBUGF("qspi0_xip: base:0x%lx, size:0x%lx, enable:%ld\n", (long)s->qspi0_xip.base, (long)s->qspi0_xip.size, (long)s->qspi0_xip.enable);
     DEBUGF("qspi1   : base:0x%lx, size:0x%lx, irq:%d, version:0x%lx\n", (long)s->qspi1.base, (long)s->qspi1.size, (int)s->qspi1.irq, (long)s->qspi1.version);
     DEBUGF("qspi2   : base:0x%lx, size:0x%lx, irq:%d, version:0x%lx\n", (long)s->qspi2.base, (long)s->qspi2.size, (int)s->qspi2.irq, (long)s->qspi2.version);
+    DEBUGF("xec0    : base:0x%lx, size:0x%lx, irq:%d\n", (long)s->xec0.base, (long)s->xec0.size, (int)s->xec0.irq);
     DEBUGF("iregion : base:0x%lx, size:0x%lx\n", (long)s->iregion.base, (long)s->iregion.size);
     DEBUGF("irqmax  : %d\n", (int)s->irqmax);
     DEBUGF("timer_freq : %d\n", (int)s->timer_freq);
@@ -1336,6 +1373,10 @@ static void evalsoc_machine_instance_init(Object *obj)
     s->qspi2.irq = EVALSOC_PLIC_SPI2_IRQ;
     s->qspi2.enable = 1;
     s->qspi2.version = NUCLEI_SPI_DEFAULT_VERSION;
+    s->xec0.base = memmap[EVALSOC_XEC0].base;
+    s->xec0.size = memmap[EVALSOC_XEC0].size;
+    s->xec0.irq = EVALSOC_PLIC_ETHERNET_IRQ;
+    s->xec0.enable = 1;
     s->aplic_m.base = memmap[EVALSOC_APLIC_M].base;
     s->aplic_m.size = memmap[EVALSOC_APLIC_M].size;
     s->aplic_m.enable = 0;
@@ -1510,6 +1551,7 @@ static void riscv_evalsoc_soc_init(Object *obj)
                             TYPE_RISCV_HART_ARRAY);
 
     object_initialize_child(obj, "gpio", &s->gpio, TYPE_NUCLEI_GPIO);
+    object_initialize_child(obj, "xec0", &s->xec0, TYPE_NUCLEI_XEC);
     object_initialize_child(obj, "spi0", &s->spi0, TYPE_NUCLEI_SPI);
     object_initialize_child(obj, "spi2", &s->spi2, TYPE_NUCLEI_SPI);
     object_initialize_child(obj, "timer", &s->timer, TYPE_NUCLEI_SYSTIMER);
@@ -1766,6 +1808,19 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         if (s->irqchip)
             sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi2), 0,
                             qdev_get_gpio_in(DEVICE(s->irqchip), mst->qspi2.irq));
+    }
+
+    object_property_set_int(OBJECT(&s->xec0), "revision", XEC_REVISION,
+                            &error_abort);
+    if (!sysbus_realize(SYS_BUS_DEVICE(&s->xec0), errp)) {
+        return;
+    }
+    if (mst->xec0.enable) {
+        sysbus_mmio_map(SYS_BUS_DEVICE(&s->xec0), 0,
+                        mst->xec0.base);
+        if (s->irqchip)
+            sysbus_connect_irq(SYS_BUS_DEVICE(&s->xec0), 0,
+                            qdev_get_gpio_in(DEVICE(s->irqchip), mst->xec0.irq));
     }
 
     /* Nuclei Test MMIO device */

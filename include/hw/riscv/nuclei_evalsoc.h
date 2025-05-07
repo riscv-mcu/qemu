@@ -36,6 +36,7 @@
 #include "hw/intc/nuclei_eclic.h"
 #include "hw/intc/nuclei_cidu.h"
 #include "hw/smpcc/nuclei_smpcc.h"
+#include "hw/net/nuclei_xec.h"
 #include "hw/sysbus.h"
 #include "hw/sd/sd.h"
 
@@ -49,6 +50,8 @@
 
 #define EVALSOC_CLIC_INTCTLBITS 3
 //#define NUCLEI_U_ECLIC_INTCTLBITS 3
+
+#define XEC_REVISION        0x00010000
 
 #define TYPE_EVALSOC_SOC "riscv.evalsoc.soc"
 
@@ -88,6 +91,7 @@ typedef struct EvalSoCSoCState {
     NucleiGPIOState gpio;
     NucleiSPIState spi0;
     NucleiSPIState spi2;
+    NucleiXECState xec0;
 
     uint32_t serial;
     char *cpu_type;
@@ -145,6 +149,7 @@ typedef struct
     evalsoc_device_info qspi0_xip;
     evalsoc_device_info qspi1;
     evalsoc_device_info qspi2;
+    evalsoc_device_info xec0;
     evalsoc_device_info aplic_m;
     evalsoc_device_info aplic_s;
     evalsoc_device_info imsic_m;
@@ -184,6 +189,7 @@ enum {
     EVALSOC_UART1,
     EVALSOC_QSPI1,
     EVALSOC_QSPI2,
+    EVALSOC_XEC0,
     EVALSOC_SMP,
     EVALSOC_DDR,
     EVALSOC_XIP,
@@ -202,7 +208,7 @@ enum
     EVALSOC_PLIC_GPIO_IRQ4 = 5,
     EVALSOC_PLIC_GPIO_IRQ5 = 6,
     EVALSOC_PLIC_GPIO_IRQ6 = 7,
-    EVALSOC_PLIC_GPIO_IRQ7 = 8,
+    EVALSOC_PLIC_ETHERNET_IRQ = 8,
     EVALSOC_PLIC_GPIO_IRQ8 = 9,
     EVALSOC_PLIC_GPIO_IRQ9 = 10,
     EVALSOC_PLIC_GPIO_IRQ10 = 11,
@@ -271,6 +277,8 @@ enum
 #define EVALSOC_MROM_SIZE           (0xf000)
 #define EVALSOC_TEST_BASE           (0x100000)
 #define EVALSOC_TEST_SIZE           (0x10000)
+#define EVALSOC_XEC0_BASE           (0x10002000)
+#define EVALSOC_XEC0_SIZE           (0x1000)
 #define EVALSOC_GPIO_BASE           (0x10012000)
 #define EVALSOC_GPIO_SIZE           (0x1000)
 #define EVALSOC_UART0_BASE          (0x10013000)
