@@ -30,6 +30,7 @@
 #include "hw/registerfields.h"
 #include "hw/qdev-properties.h"
 #include "migration/vmstate.h"
+#include "sysemu/runstate.h"
 #include "trace.h"
 
 int hart_numbers = 0;
@@ -363,7 +364,7 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
         break;
     case NUCLEI_SYSTIMER_REG_MSFTRST:
         if (value == 0x80000a5f)
-            nuclei_timer_reset((DeviceState *)s);
+            qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
         break;
     case NUCLEI_SYSTIMER_REG_MTIMECTL:
         s->mtimectl = value;
