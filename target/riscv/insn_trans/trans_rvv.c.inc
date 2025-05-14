@@ -58,7 +58,7 @@ static bool require_rvfmin(DisasContext *s)
 
     switch (s->sew) {
     case MO_16:
-        return s->cfg_ptr->ext_zvfhmin;
+        return s->cfg_ptr->ext_zvfhmin || s->cfg_ptr->ext_xxlvfbf;
     case MO_32:
         return s->cfg_ptr->ext_zve32f;
     default:
@@ -74,7 +74,7 @@ static bool require_scale_rvf(DisasContext *s)
 
     switch (s->sew) {
     case MO_8:
-        return s->cfg_ptr->ext_zvfh;
+        return s->cfg_ptr->ext_zvfh || s->cfg_ptr->ext_xxlvfbf;
     case MO_16:
         return s->cfg_ptr->ext_zve32f;
     case MO_32:
