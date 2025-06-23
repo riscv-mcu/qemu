@@ -106,6 +106,7 @@ static void nuclei_clint_write_timecmp(RISCVCPU *cpu, uint64_t value,
     /* back to ns (note args switched in muldiv64) */
     next = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) +
         muldiv64(diff, NANOSECONDS_PER_SECOND, timebase_freq);
+    next = MIN(next, INT64_MAX);
     timer_mod(cpu->env.mtimer, next);
 }
 
