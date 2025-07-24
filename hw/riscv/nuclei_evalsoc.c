@@ -996,7 +996,7 @@ static void evalsoc_machine_init(MachineState *machine)
                                  sizeof(reset_vec), kernel_entry);
 
      /* Connect an SPI flash to SPI0 */
-    flash_dev = qdev_new("is25wp256");
+    flash_dev = qdev_new("w25q512jv");
     dinfo = drive_get(IF_MTD, 0, 0);
     if (dinfo)
     {

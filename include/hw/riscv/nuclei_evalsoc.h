@@ -246,7 +246,7 @@ enum
 #define EVALSOC_QSPI2_SIZE          (0x1000)
 
 #define EVALSOC_XIP_BASE            (0x20000000)
-#define EVALSOC_XIP_SIZE            (0x02000000)//32MB
+#define EVALSOC_XIP_SIZE            (0x04000000)//64MB
 #define EVALSOC_DDR_BASE            (0x80000000)
 #define EVALSOC_DDR_SIZE            (0x04000000)//64MB
 #define EVALSOC_ILM_BASE            (0x80000000)
