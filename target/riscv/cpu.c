@@ -2776,9 +2776,17 @@ static void cpu_set_ext_state(Object *obj, const char *value, Error **errp)
 
     for (subext = strtok(isa_ext, "_"); subext; subext = strtok(NULL, "_")) {
         ext_match = 0;
-        if (strcmp(subext, "v") == 0) {
-            cpu->env.misa_ext |= RVV;
-            ext_match = 1;
+
+        char first_char = subext[0];
+        if ((first_char != 'z')
+            && (first_char != 's')
+            && (first_char != 'x')) {
+            // single letter parse
+            for (int i = 0; subext[i] != '\0'; i++) {
+                int misa_idx = 1 << (subext[i] - 'a');
+                cpu->env.misa_ext |= misa_idx;
+                ext_match = 1;
+            }
         }
 
         for (prop = riscv_cpu_extensions; prop && prop->name; prop++) {
