@@ -594,11 +594,15 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
     /* Set the ISA extensions, checks should have happened above */
     if (cpu->cfg.ext_zhinx) {
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zca), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zhinxmin), true);
     }
 
-    if ((cpu->cfg.ext_zdinx || cpu->cfg.ext_zhinxmin) && !cpu->cfg.ext_zfinx) {
-        error_setg(errp, "Zdinx/Zhinx/Zhinxmin extensions require Zfinx");
-        return;
+    if (cpu->cfg.ext_zhinxmin) {
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zfinx), true);
+    }
+
+    if (cpu->cfg.ext_zdinx) {
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zfinx), true);
     }
 
     if (cpu->cfg.ext_zfinx) {
