@@ -1002,7 +1002,8 @@ DeviceState *riscv_aplic_create(hwaddr addr, hwaddr size,
     uint32_t i;
 
     assert(num_harts < APLIC_MAX_IDC);
-    assert((APLIC_IDC_BASE + (num_harts * APLIC_IDC_SIZE)) <= size);
+    // Block this assertion because the current evalsoc does not have an IDC module configured.
+    // assert((APLIC_IDC_BASE + (num_harts * APLIC_IDC_SIZE)) <= size);
     assert(num_sources < APLIC_MAX_SOURCE);
     assert(APLIC_MIN_IPRIO_BITS <= iprio_bits);
     assert(iprio_bits <= APLIC_MAX_IPRIO_BITS);

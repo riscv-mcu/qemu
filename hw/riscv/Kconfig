@@ -93,6 +93,7 @@ config NUCLEI_EVALSOC
     select CADENCE
     select MSI_NONBROKEN
     select RISCV_ACLINT
+    select RISCV_APLIC
     select SIFIVE_PDMA
     select SIFIVE_PLIC
     select SIFIVE_UART

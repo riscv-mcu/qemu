@@ -34,6 +34,7 @@
 #include "hw/riscv/boot.h"
 #include "hw/riscv/numa.h"
 #include "hw/intc/riscv_aclint.h"
+#include "hw/intc/riscv_aplic.h"
 #include "hw/intc/sifive_plic.h"
 #include "hw/misc/nuclei_test.h"
 #include "chardev/char.h"
@@ -71,27 +72,29 @@ static const struct MemmapEntry
     hwaddr base;
     hwaddr size;
 }  evalsoc_memmap[] = {
-    [EVALSOC_IINFO] = { EVALSOC_IINFO_BASE,             EVALSOC_IINFO_SIZE },
-    [EVALSOC_MROM]  = { EVALSOC_MROM_BASE,              EVALSOC_MROM_SIZE  },
-    [EVALSOC_TEST]  = { EVALSOC_TEST_BASE,              EVALSOC_TEST_SIZE  },
-    [EVALSOC_GPIO]  = { EVALSOC_GPIO_BASE,              EVALSOC_GPIO_SIZE  },
-    [EVALSOC_UART0] = { EVALSOC_UART0_BASE,             EVALSOC_UART0_SIZE },
-    [EVALSOC_UART1] = { EVALSOC_UART1_BASE,             EVALSOC_UART1_SIZE },
-    [EVALSOC_QSPI0] = { EVALSOC_QSPI0_BASE,             EVALSOC_QSPI0_SIZE },
-    [EVALSOC_QSPI1] = { EVALSOC_QSPI1_BASE,             EVALSOC_QSPI1_SIZE },
-    [EVALSOC_QSPI2] = { EVALSOC_QSPI2_BASE,             EVALSOC_QSPI2_SIZE },
-    [EVALSOC_XIP]   = { EVALSOC_XIP_BASE,               EVALSOC_XIP_SIZE   },
-    [EVALSOC_DEBUG] = { IREGION_DEBUG_OFS,              IREGION_DEBUG_SIZE },
-    [EVALSOC_TIMER] = { IREGION_TIMER_OFS,              IREGION_TIMER_SIZE },
-    [EVALSOC_PLIC]  = { IREGION_PLIC_OFS,               IREGION_PLIC_SIZE  },
-    [EVALSOC_ECLIC] = { IREGION_ECLIC_OFS,              IREGION_ECLIC_SIZE },
-    [EVALSOC_CIDU]  = { IREGION_IDU_OFS,                IREGION_IDU_SIZE   },
-    [EVALSOC_SMP]   = { IREGION_SMP_OFS,                IREGION_SMP_SIZE   },
-    [EVALSOC_DDR]   = { EVALSOC_DDR_BASE,               EVALSOC_DDR_SIZE   },
-    [EVALSOC_ILM]   = { EVALSOC_ILM_BASE,               EVALSOC_ILM_SIZE   },
-    [EVALSOC_DLM]   = { EVALSOC_DLM_BASE,               EVALSOC_DLM_SIZE   },
-    [EVALSOC_SRAM]  = { EVALSOC_SRAM_BASE,              EVALSOC_SRAM_SIZE  },
-    [EVALSOC_CLINT] = { IREGION_TIMER_OFS + 0x1000,     0xF000 },//MTIME in CLINT mode
+    [EVALSOC_IINFO]   = { EVALSOC_IINFO_BASE,             EVALSOC_IINFO_SIZE },
+    [EVALSOC_MROM]    = { EVALSOC_MROM_BASE,              EVALSOC_MROM_SIZE  },
+    [EVALSOC_TEST]    = { EVALSOC_TEST_BASE,              EVALSOC_TEST_SIZE  },
+    [EVALSOC_GPIO]    = { EVALSOC_GPIO_BASE,              EVALSOC_GPIO_SIZE  },
+    [EVALSOC_UART0]   = { EVALSOC_UART0_BASE,             EVALSOC_UART0_SIZE },
+    [EVALSOC_UART1]   = { EVALSOC_UART1_BASE,             EVALSOC_UART1_SIZE },
+    [EVALSOC_QSPI0]   = { EVALSOC_QSPI0_BASE,             EVALSOC_QSPI0_SIZE },
+    [EVALSOC_QSPI1]   = { EVALSOC_QSPI1_BASE,             EVALSOC_QSPI1_SIZE },
+    [EVALSOC_QSPI2]   = { EVALSOC_QSPI2_BASE,             EVALSOC_QSPI2_SIZE },
+    [EVALSOC_XIP]     = { EVALSOC_XIP_BASE,               EVALSOC_XIP_SIZE   },
+    [EVALSOC_DEBUG]   = { IREGION_DEBUG_OFS,              IREGION_DEBUG_SIZE },
+    [EVALSOC_TIMER]   = { IREGION_TIMER_OFS,              IREGION_TIMER_SIZE },
+    [EVALSOC_PLIC]    = { IREGION_PLIC_OFS,               IREGION_PLIC_SIZE  },
+    [EVALSOC_APLIC_M] = { EVALSOC_APLIC_M_BASE,           EVALSOC_APLIC_M_SIZE },
+    [EVALSOC_APLIC_S] = { EVALSOC_APLIC_S_BASE,           EVALSOC_APLIC_S_SIZE },
+    [EVALSOC_ECLIC]   = { IREGION_ECLIC_OFS,              IREGION_ECLIC_SIZE },
+    [EVALSOC_CIDU]    = { IREGION_IDU_OFS,                IREGION_IDU_SIZE   },
+    [EVALSOC_SMP]     = { IREGION_SMP_OFS,                IREGION_SMP_SIZE   },
+    [EVALSOC_DDR]     = { EVALSOC_DDR_BASE,               EVALSOC_DDR_SIZE   },
+    [EVALSOC_ILM]     = { EVALSOC_ILM_BASE,               EVALSOC_ILM_SIZE   },
+    [EVALSOC_DLM]     = { EVALSOC_DLM_BASE,               EVALSOC_DLM_SIZE   },
+    [EVALSOC_SRAM]    = { EVALSOC_SRAM_BASE,              EVALSOC_SRAM_SIZE  },
+    [EVALSOC_CLINT]   = { IREGION_TIMER_OFS + 0x1000,     0xF000 },//MTIME in CLINT mode
 };
 
 static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
@@ -103,6 +106,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     uint32_t *cells;
     char *nodename;
     uint32_t plic_phandle, uart_phandle, gpio_phandle, phandle = 1;
+    uint32_t aplic_m_phandle, aplic_s_phandle;
     uint32_t hfclk_phandle,test_phandle;
 
     if (ms->dtb)
@@ -248,6 +252,48 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     qemu_fdt_setprop_cell(fdt, nodename, "phandle", plic_phandle);
     g_free(cells);
     g_free(nodename);
+
+    aplic_m_phandle = phandle++;
+    aplic_s_phandle = phandle++;
+    nodename = g_strdup_printf("/soc/interrupt-controller@%lx",
+                            (long)memmap[EVALSOC_APLIC_M].base);
+    qemu_fdt_add_subnode(fdt, nodename);
+    qemu_fdt_setprop_string(fdt, nodename, "compatible", "riscv,aplic");
+    qemu_fdt_setprop_cell(fdt, nodename, "#interrupt-cells", 2);
+    qemu_fdt_setprop(fdt, nodename, "interrupt-controller", NULL, 0);
+    qemu_fdt_setprop(fdt, nodename, "interrupts-extended",
+                     cells, (ms->smp.cpus * 4 ) * sizeof(uint32_t) * 2);
+    qemu_fdt_setprop_cells(fdt, nodename, "reg",
+                            0x0, memmap[EVALSOC_APLIC_M].base,
+                            0x0, memmap[EVALSOC_APLIC_M].size);
+    // qemu_fdt_setprop_cell(fdt, nodename, "riscv,num-sources",
+    //     VIRT_IRQCHIP_NUM_SOURCES);
+    qemu_fdt_setprop_cell(fdt, nodename, "riscv,children",
+        aplic_s_phandle);
+    // qemu_fdt_setprop_cells(fdt, nodename, "riscv,delegate",
+    //     aplic_s_phandle, 0x1, VIRT_IRQCHIP_NUM_SOURCES);
+    // riscv_socket_fdt_write_id(ms, fdt, nodename, socket);
+    qemu_fdt_setprop_cell(fdt, nodename, "phandle", aplic_m_phandle);
+    g_free(nodename);
+
+    // aplic_s_phandle = phandle++;
+    nodename = g_strdup_printf("/soc/interrupt-controller@%lx",
+                                (long)memmap[EVALSOC_APLIC_S].base);
+    qemu_fdt_add_subnode(fdt, nodename);
+    qemu_fdt_setprop_string(fdt, nodename, "compatible", "riscv,aplic");
+    qemu_fdt_setprop_cell(fdt, nodename, "#interrupt-cells", 2);
+    qemu_fdt_setprop(fdt, nodename, "interrupt-controller", NULL, 0);
+    qemu_fdt_setprop(fdt, nodename, "interrupts-extended",
+                     cells, (ms->smp.cpus * 4 ) * sizeof(uint32_t) * 2);
+    qemu_fdt_setprop_cells(fdt, nodename, "reg",
+                            0x0, memmap[EVALSOC_APLIC_S].base,
+                            0x0, memmap[EVALSOC_APLIC_S].size);
+    // qemu_fdt_setprop_cell(fdt, nodename, "riscv,num-sources",
+    //     VIRT_IRQCHIP_NUM_SOURCES);
+    // riscv_socket_fdt_write_id(ms, mc->fdt, nodename, socket);
+    qemu_fdt_setprop_cell(fdt, nodename, "phandle", aplic_s_phandle);
+    g_free(nodename);
+
 
     test_phandle = phandle++;
     nodename = g_strdup_printf("/soc/test@%lx",
@@ -1105,6 +1151,37 @@ static void evalsoc_machine_set_soccfg(Object *obj, const char *value, Error **e
     s->soccfg = g_strdup(value);
 }
 
+static char *evalsoc_machine_get_aia(Object *obj, Error **errp)
+{
+    EvalSoCState *s = RISCV_EVALSOC_MACHINE(obj);
+    const char *val;
+
+    switch (s->aia_type) {
+    case EVALSOC_AIA_TYPE_APLIC:
+        val = "aplic";
+        break;
+    default:
+        val = "none";
+        break;
+    };
+
+    return g_strdup(val);
+}
+
+static void evalsoc_machine_set_aia(Object *obj, const char *val, Error **errp)
+{
+    EvalSoCState *s = RISCV_EVALSOC_MACHINE(obj);
+
+    if (!strcmp(val, "none")) {
+        s->aia_type = EVALSOC_AIA_TYPE_NONE;
+    } else if (!strcmp(val, "aplic")) {
+        s->aia_type = EVALSOC_AIA_TYPE_APLIC;
+    } else {
+        error_setg(errp, "Invalid AIA interrupt controller type");
+        error_append_hint(errp, "Valid values are none, and aplic.\n");
+    }
+}
+
 static void evalsoc_machine_class_init(ObjectClass *oc, void *data)
 {
     MachineClass *mc = MACHINE_CLASS(oc);
@@ -1129,6 +1206,13 @@ static void evalsoc_machine_class_init(ObjectClass *oc, void *data)
                                           "Set on to tell QEMU's ROM to jump to "
                                           "download mode. Otherwise QEMU will jump to flash base address, aka download=flashxip"
                                           "nuclei support these download modes(flashxip,flash,ilm,ddr,sram)");
+    object_class_property_add_str(oc, "aia",
+                                  evalsoc_machine_get_aia,
+                                  evalsoc_machine_set_aia);
+    object_class_property_set_description(oc, "aia",
+                                          "Set type of AIA interrupt "
+                                          "controller. Valid values are "
+                                          "none, and aplic.");
 }
 
 static const TypeInfo evalsoc_machine_typeinfo = {
@@ -1219,18 +1303,43 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         plic_hart_config_len -= (strlen(EVALSOC_PLIC_HART_CONFIG) + 1);
     }
     /* MMIO */
-    s->plic = sifive_plic_create(memmap[EVALSOC_PLIC].base + mst->iregion,
-                                 plic_hart_config, ms->smp.cpus, 0,
-                                 mst->irqmax > EVALSOC_PLIC_NUM_SOURCES ? EVALSOC_PLIC_NUM_SOURCES : mst->irqmax,
-                                 EVALSOC_PLIC_NUM_PRIORITIES,
-                                 EVALSOC_PLIC_PRIORITY_BASE,
-                                 EVALSOC_PLIC_PENDING_BASE,
-                                 EVALSOC_PLIC_ENABLE_BASE,
-                                 EVALSOC_PLIC_ENABLE_STRIDE,
-                                 EVALSOC_PLIC_CONTEXT_BASE,
-                                 EVALSOC_PLIC_CONTEXT_STRIDE,
-                                 memmap[EVALSOC_PLIC].size);
-    g_free(plic_hart_config);
+
+    if (mst->aia_type == EVALSOC_AIA_TYPE_NONE) {
+        s->irqchip = sifive_plic_create(memmap[EVALSOC_PLIC].base + mst->iregion,
+                                    plic_hart_config, ms->smp.cpus, 0,
+                                    mst->irqmax > EVALSOC_PLIC_NUM_SOURCES ? EVALSOC_PLIC_NUM_SOURCES : mst->irqmax,
+                                    EVALSOC_PLIC_NUM_PRIORITIES,
+                                    EVALSOC_PLIC_PRIORITY_BASE,
+                                    EVALSOC_PLIC_PENDING_BASE,
+                                    EVALSOC_PLIC_ENABLE_BASE,
+                                    EVALSOC_PLIC_ENABLE_STRIDE,
+                                    EVALSOC_PLIC_CONTEXT_BASE,
+                                    EVALSOC_PLIC_CONTEXT_STRIDE,
+                                    memmap[EVALSOC_PLIC].size);
+        g_free(plic_hart_config);
+    } else {
+        /* M-level APLIC */
+        s->irqchip = riscv_aplic_create(
+            memmap[EVALSOC_APLIC_M].base,
+            memmap[EVALSOC_APLIC_M].size,
+            0, ms->smp.cpus,
+            mst->irqmax > EVALSOC_PLIC_NUM_SOURCES ? EVALSOC_PLIC_NUM_SOURCES : mst->irqmax,
+            VIRT_IRQCHIP_NUM_PRIO_BITS,
+            false, true, NULL);
+
+        if (s->irqchip) {
+            /* S-level APLIC */
+            riscv_aplic_create(
+                memmap[EVALSOC_APLIC_S].base,
+                memmap[EVALSOC_APLIC_S].size,
+                0, ms->smp.cpus,
+                mst->irqmax > EVALSOC_PLIC_NUM_SOURCES ? EVALSOC_PLIC_NUM_SOURCES : mst->irqmax,
+                VIRT_IRQCHIP_NUM_PRIO_BITS,
+                false, false, s->irqchip);
+        }
+    }
+    
+
 
     s->eclic = nuclei_eclic_create(memmap[EVALSOC_ECLIC].base + mst->iregion,
                                    memmap[EVALSOC_ECLIC].size,
@@ -1273,7 +1382,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                         0,
                         NULL,
                         NULL,
-                        qdev_get_gpio_in(DEVICE(s->plic), mst->uart0.irq));
+                        qdev_get_gpio_in(DEVICE(s->irqchip), mst->uart0.irq));
 
         nuclei_uart_create(sys_mem,
                         mst->uart1.addr_base,
@@ -1282,7 +1391,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                         0,
                         NULL,
                         NULL,
-                        qdev_get_gpio_in(DEVICE(s->plic), mst->uart1.irq));
+                        qdev_get_gpio_in(DEVICE(s->irqchip), mst->uart1.irq));
 
         nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion,
                 memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, NULL, mst->timer_freq);
@@ -1307,7 +1416,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     for (i = 0; i < 32; i++)
     {
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->gpio), i,
-                           qdev_get_gpio_in(DEVICE(s->plic),
+                           qdev_get_gpio_in(DEVICE(s->irqchip),
                                             EVALSOC_PLIC_GPIO_IRQ0 + i));
     }
 
@@ -1316,13 +1425,13 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi0), 0,
                     mst->qspi0.addr_base);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi0), 0,
-                       qdev_get_gpio_in(DEVICE(s->plic), mst->qspi0.irq));
+                       qdev_get_gpio_in(DEVICE(s->irqchip), mst->qspi0.irq));
 
     sysbus_realize(SYS_BUS_DEVICE(&s->spi2), errp);
     sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi2), 0,
                     mst->qspi2.addr_base);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi2), 0,
-                       qdev_get_gpio_in(DEVICE(s->plic), mst->qspi2.irq));
+                       qdev_get_gpio_in(DEVICE(s->irqchip), mst->qspi2.irq));
 
     /* Nuclei Test MMIO device */
     nuclei_test_create(memmap[EVALSOC_TEST].base);
