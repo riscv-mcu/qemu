@@ -58,8 +58,12 @@
 typedef enum EvalsocAIAType {
     EVALSOC_AIA_TYPE_NONE = 0,
     EVALSOC_AIA_TYPE_APLIC,
+    EVALSOC_AIA_TYPE_APLIC_IMSIC,
 } EvalsocAIAType;
 
+#define EVALSOC_IRQCHIP_NUM_MSIS            (255)
+#define EVALSOC_IRQCHIP_GUEST_INDEX_BITS    (2)
+#define EVALSOC_IRQCHIP_MAX_GUESTS          (1U << EVALSOC_IRQCHIP_GUEST_INDEX_BITS)
 typedef struct EvalSoCSoCState {
     /*< private >*/
     SysBusDevice parent_obj;
@@ -127,6 +131,7 @@ typedef struct
     uint32_t msel;
     uint32_t serial;
     EvalsocAIAType aia_type;
+    int aia_guests;
 } EvalSoCState;
 
 #define TYPE_RISCV_EVALSOC_MACHINE MACHINE_TYPE_NAME("nuclei_evalsoc")
@@ -143,6 +148,8 @@ enum {
     EVALSOC_PLIC,
     EVALSOC_APLIC_M,
     EVALSOC_APLIC_S,
+    EVALSOC_IMSIC_M,
+    EVALSOC_IMSIC_S,
     EVALSOC_ECLIC,
     EVALSOC_CIDU,
     EVALSOC_GPIO,
@@ -256,6 +263,10 @@ enum
 #define EVALSOC_APLIC_M_SIZE        (0x4000)
 #define EVALSOC_APLIC_S_BASE        (0x10044000)
 #define EVALSOC_APLIC_S_SIZE        (0x4000)
+#define EVALSOC_IMSIC_M_BASE        (0x4f000000)
+#define EVALSOC_IMSIC_MINTF_SIZE    (0x1000)
+#define EVALSOC_IMSIC_S_BASE        (0x4f200000)
+#define EVALSOC_IMSIC_SINTF_SIZE    (0x1000)
 
 #define EVALSOC_XIP_BASE            (0x20000000)
 #define EVALSOC_XIP_SIZE            (0x04000000)//64MB

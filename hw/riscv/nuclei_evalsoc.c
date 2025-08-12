@@ -35,6 +35,7 @@
 #include "hw/riscv/numa.h"
 #include "hw/intc/riscv_aclint.h"
 #include "hw/intc/riscv_aplic.h"
+#include "hw/intc/riscv_imsic.h"
 #include "hw/intc/sifive_plic.h"
 #include "hw/misc/nuclei_test.h"
 #include "chardev/char.h"
@@ -87,6 +88,8 @@ static const struct MemmapEntry
     [EVALSOC_PLIC]    = { IREGION_PLIC_OFS,               IREGION_PLIC_SIZE  },
     [EVALSOC_APLIC_M] = { EVALSOC_APLIC_M_BASE,           EVALSOC_APLIC_M_SIZE },
     [EVALSOC_APLIC_S] = { EVALSOC_APLIC_S_BASE,           EVALSOC_APLIC_S_SIZE },
+    [EVALSOC_IMSIC_M] = { EVALSOC_IMSIC_M_BASE,           EVALSOC_IMSIC_MINTF_SIZE },
+    [EVALSOC_IMSIC_S] = { EVALSOC_IMSIC_S_BASE,           EVALSOC_IMSIC_SINTF_SIZE },
     [EVALSOC_ECLIC]   = { IREGION_ECLIC_OFS,              IREGION_ECLIC_SIZE },
     [EVALSOC_CIDU]    = { IREGION_IDU_OFS,                IREGION_IDU_SIZE   },
     [EVALSOC_SMP]     = { IREGION_SMP_OFS,                IREGION_SMP_SIZE   },
@@ -107,6 +110,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     char *nodename;
     uint32_t plic_phandle, uart_phandle, gpio_phandle, phandle = 1;
     uint32_t aplic_m_phandle, aplic_s_phandle;
+    uint32_t msi_m_phandle, msi_s_phandle;
     uint32_t hfclk_phandle,test_phandle;
 
     if (ms->dtb)
@@ -235,6 +239,46 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
         cells[cpu * 4 + 3] = cpu_to_be32(IRQ_S_EXT);
         g_free(nodename);
     }
+
+    // M-level IMSIC node
+    msi_m_phandle = phandle++;
+    nodename = g_strdup_printf("/soc/imsics@%lx",
+                                (long)memmap[EVALSOC_IMSIC_M].base);
+    qemu_fdt_add_subnode(fdt, nodename);
+    qemu_fdt_setprop_string(fdt, nodename, "compatible", "riscv,imsics");
+    qemu_fdt_setprop_cell(fdt, nodename, "#interrupt-cells", 0);
+    qemu_fdt_setprop(fdt, nodename, "interrupt-controller", NULL, 0);
+    qemu_fdt_setprop(fdt, nodename, "msi-controller", NULL, 0);
+    qemu_fdt_setprop(fdt, nodename, "interrupts-extended",
+                    cells, ms->smp.cpus * sizeof(uint32_t) * 2);
+    qemu_fdt_setprop_cells(fdt, nodename, "reg",
+                        0x0, memmap[EVALSOC_IMSIC_M].base,
+                        0x0, memmap[EVALSOC_IMSIC_M].size * ms->smp.cpus);
+    qemu_fdt_setprop_cell(fdt, nodename, "riscv,num-ids",
+                            EVALSOC_IRQCHIP_NUM_MSIS);
+    qemu_fdt_setprop_cell(fdt, nodename, "phandle", msi_m_phandle);
+    g_free(nodename);
+
+    // S-level IMSIC node
+    msi_s_phandle = phandle++;
+    nodename = g_strdup_printf("/soc/imsics@%lx",
+                                (long)memmap[EVALSOC_IMSIC_S].base);
+    qemu_fdt_add_subnode(fdt, nodename);
+    qemu_fdt_setprop_string(fdt, nodename, "compatible", "riscv,imsics");
+    qemu_fdt_setprop_cell(fdt, nodename, "#interrupt-cells", 0);
+    qemu_fdt_setprop(fdt, nodename, "interrupt-controller", NULL, 0);
+    qemu_fdt_setprop(fdt, nodename, "msi-controller", NULL, 0);
+    qemu_fdt_setprop(fdt, nodename, "interrupts-extended",
+                    cells, ms->smp.cpus * sizeof(uint32_t) * 2);
+    qemu_fdt_setprop_cells(fdt, nodename, "reg",
+                        0x0, memmap[EVALSOC_IMSIC_S].base,
+                        0x0, memmap[EVALSOC_IMSIC_S].size * ms->smp.cpus * (1 + s->aia_guests));
+    qemu_fdt_setprop_cell(fdt, nodename, "riscv,num-ids",
+                            EVALSOC_IRQCHIP_NUM_MSIS);
+    qemu_fdt_setprop_cell(fdt, nodename, "riscv,guest-index-bits",
+                            EVALSOC_IRQCHIP_GUEST_INDEX_BITS);
+    qemu_fdt_setprop_cell(fdt, nodename, "phandle", msi_s_phandle);
+    g_free(nodename);
 
     plic_phandle = phandle++;
     nodename = g_strdup_printf("/soc/interrupt-controller@%lx",
@@ -869,6 +913,11 @@ static void evalsoc_machine_init(MachineState *machine)
     memory_region_add_subregion(system_memory, s->sram.addr_base,
                                 &s->soc.sram);
 
+    // memory_region_init_ram(&s->soc.ims, NULL, "riscv.evalsoc.ram.sram",
+    //                        s->sram.addr_size, &error_fatal);
+    // memory_region_add_subregion(system_memory, s->sram.addr_base,
+    //                             &s->soc.sram);
+
     // ddr
     //if -m 128M or no -m,s->ddr.addr_size is first json,then EVALSOC_DDR_SIZE
     if(machine->ram_size != 128 * MiB)
@@ -1160,6 +1209,9 @@ static char *evalsoc_machine_get_aia(Object *obj, Error **errp)
     case EVALSOC_AIA_TYPE_APLIC:
         val = "aplic";
         break;
+    case EVALSOC_AIA_TYPE_APLIC_IMSIC:
+        val = "aplic-imsic";
+        break;
     default:
         val = "none";
         break;
@@ -1176,14 +1228,39 @@ static void evalsoc_machine_set_aia(Object *obj, const char *val, Error **errp)
         s->aia_type = EVALSOC_AIA_TYPE_NONE;
     } else if (!strcmp(val, "aplic")) {
         s->aia_type = EVALSOC_AIA_TYPE_APLIC;
+    } else if (!strcmp(val, "aplic-imsic")) {
+        s->aia_type = EVALSOC_AIA_TYPE_APLIC_IMSIC;
     } else {
         error_setg(errp, "Invalid AIA interrupt controller type");
-        error_append_hint(errp, "Valid values are none, and aplic.\n");
+        error_append_hint(errp, "Valid values are none, aplic, and "
+                          "aplic-imsic.\n");
+    }
+}
+
+static char *evalsoc_machine_get_aia_guests(Object *obj, Error **errp)
+{
+    EvalSoCState *s = RISCV_EVALSOC_MACHINE(obj);
+    char val[32];
+
+    sprintf(val, "%d", s->aia_guests);
+    return g_strdup(val);
+}
+
+static void evalsoc_machine_set_aia_guests(Object *obj, const char *val, Error **errp)
+{
+    EvalSoCState *s = RISCV_EVALSOC_MACHINE(obj);
+
+    s->aia_guests = atoi(val);
+    if (s->aia_guests < 0 || s->aia_guests > EVALSOC_IRQCHIP_MAX_GUESTS) {
+        error_setg(errp, "Invalid number of AIA IMSIC guests");
+        error_append_hint(errp, "Valid values be between 0 and %d.\n",
+                          EVALSOC_IRQCHIP_MAX_GUESTS);
     }
 }
 
 static void evalsoc_machine_class_init(ObjectClass *oc, void *data)
 {
+    char str[128];
     MachineClass *mc = MACHINE_CLASS(oc);
 
     mc->desc = "Nuclei RISC-V EvalSoC, support Nuclei RISC-V 200/300/600/900 series processors";
@@ -1212,7 +1289,13 @@ static void evalsoc_machine_class_init(ObjectClass *oc, void *data)
     object_class_property_set_description(oc, "aia",
                                           "Set type of AIA interrupt "
                                           "controller. Valid values are "
-                                          "none, and aplic.");
+                                          "none, aplic and aplic-imsic.");
+    object_class_property_add_str(oc, "aia-guests",
+                                  evalsoc_machine_get_aia_guests,
+                                  evalsoc_machine_set_aia_guests);
+    sprintf(str, "Set number of guest MMIO pages for AIA IMSIC. Valid value "
+                 "should be between 0 and %d.", EVALSOC_IRQCHIP_MAX_GUESTS);
+    object_class_property_set_description(oc, "aia-guests", str);
 }
 
 static const TypeInfo evalsoc_machine_typeinfo = {
@@ -1266,6 +1349,8 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     int i = 0;
     char *plic_hart_config;
     size_t plic_hart_config_len;
+    bool msimode;
+    hwaddr msi_addr;
 
     qdev_prop_set_uint32(DEVICE(&s->cpus), "num-harts", ms->smp.cpus);
     qdev_prop_set_uint32(DEVICE(&s->cpus), "hartid-base", 0);
@@ -1318,24 +1403,43 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                                     memmap[EVALSOC_PLIC].size);
         g_free(plic_hart_config);
     } else {
+        msimode = (mst->aia_type == EVALSOC_AIA_TYPE_APLIC_IMSIC) ? true : false;
+        if (msimode) {
+            /* M-level IMSICs */
+            msi_addr = memmap[EVALSOC_IMSIC_M].base;
+            for (i = 0; i < ms->smp.cpus; i++) {
+                riscv_imsic_create(msi_addr + i * memmap[EVALSOC_IMSIC_M].size,
+                                i, true, 1, EVALSOC_IRQCHIP_NUM_MSIS);
+            }
+            /* S-level IMSICs */
+            msi_addr = memmap[EVALSOC_IMSIC_S].base;
+            for (i = 0; i < ms->smp.cpus; i++) {
+                riscv_imsic_create(msi_addr + i * (1 + mst->aia_guests) * memmap[EVALSOC_IMSIC_S].size,
+                                i, false, 1 + mst->aia_guests,
+                                EVALSOC_IRQCHIP_NUM_MSIS);
+            }
+        }
+        
         /* M-level APLIC */
         s->irqchip = riscv_aplic_create(
             memmap[EVALSOC_APLIC_M].base,
             memmap[EVALSOC_APLIC_M].size,
-            0, ms->smp.cpus,
+            0, 
+            (msimode) ? 0 : ms->smp.cpus,
             mst->irqmax > EVALSOC_PLIC_NUM_SOURCES ? EVALSOC_PLIC_NUM_SOURCES : mst->irqmax,
             VIRT_IRQCHIP_NUM_PRIO_BITS,
-            false, true, NULL);
+            msimode, true, NULL);
 
         if (s->irqchip) {
             /* S-level APLIC */
             riscv_aplic_create(
                 memmap[EVALSOC_APLIC_S].base,
                 memmap[EVALSOC_APLIC_S].size,
-                0, ms->smp.cpus,
+                0, 
+                (msimode) ? 0 : ms->smp.cpus,
                 mst->irqmax > EVALSOC_PLIC_NUM_SOURCES ? EVALSOC_PLIC_NUM_SOURCES : mst->irqmax,
                 VIRT_IRQCHIP_NUM_PRIO_BITS,
-                false, false, s->irqchip);
+                msimode, false, s->irqchip);
         }
     }
     
