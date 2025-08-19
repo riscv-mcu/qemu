@@ -45,9 +45,16 @@ void riscv_timer_write_timecmp(CPURISCVState *env, QEMUTimer *timer,
                                uint32_t timer_irq)
 {
     uint64_t diff, ns_diff, next;
-    RISCVAclintMTimerState *mtimer = env->rdtime_fn_arg;
-    uint32_t timebase_freq = mtimer->timebase_freq;
+    RISCVAclintMTimerState *mtimer;
+    uint32_t timebase_freq;
     uint64_t rtc_r = env->rdtime_fn(env->rdtime_fn_arg) + delta;
+
+    if (env->mcfg_info){
+        timebase_freq = *(uint64_t *)(env->rdtime_fn_arg);
+    } else {
+        mtimer = env->rdtime_fn_arg;
+        timebase_freq = mtimer->timebase_freq;
+    }
 
     if (timecmp <= rtc_r) {
         /*
