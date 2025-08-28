@@ -5129,6 +5129,54 @@ static int rmw_pushmepc(CPURISCVState *env, int csrno, target_ulong *ret_value,
     return RISCV_EXCP_NONE;
 }
 
+static int rmw_pushscause(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                target_ulong new_value, target_ulong write_mask)
+{
+    uint64_t notify_addr = 0;
+    uint32_t riscv_addr_size = 4;
+
+    // If in debug mode, directly return
+    if (env->debugger) {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+        return RISCV_EXCP_NONE;
+    }
+
+    if (riscv_cpu_mxl(env) == MXL_RV32) {
+    } else {
+        riscv_addr_size = 8;
+    }
+    notify_addr = new_value * riscv_addr_size + env->gpr[2];
+    cpu_physical_memory_rw(notify_addr, &env->scause,  riscv_addr_size, 1);
+    return RISCV_EXCP_NONE;
+}
+
+static int rmw_pushsepc(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                target_ulong new_value, target_ulong write_mask)
+{
+    uint64_t notify_addr = 0;
+    uint32_t riscv_addr_size = 4;
+
+    // If in debug mode, directly return
+    if (env->debugger) {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+        return RISCV_EXCP_NONE;
+    }
+
+    if (riscv_cpu_mxl(env) == MXL_RV32) {
+    } else {
+        riscv_addr_size = 8;
+    }
+
+    notify_addr = new_value * riscv_addr_size + env->gpr[2];
+    cpu_physical_memory_rw(notify_addr, &env->sepc, riscv_addr_size, 1);
+
+    return RISCV_EXCP_NONE;
+}
+
 static int read_wfe(CPURISCVState *env, int csrno, target_ulong *val)
 {
     *val = env->wfe;
@@ -6116,8 +6164,8 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
 
     [CSR_NUCLEI_JALSNXTI]       = { "jalsnxti",     any, read_zero, write_ignore },
     [CSR_NUCLEI_STVT2]          = { "stvt2",        any, read_zero, write_ignore },
-    [CSR_NUCLEI_PUSHSCAUSE]     = { "pushscause",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_PUSHSEPC]       = { "pushsepc",     any, read_zero, write_ignore },
+    [CSR_NUCLEI_PUSHSCAUSE]     = { "pushscause",   any, NULL, NULL, rmw_pushscause },
+    [CSR_NUCLEI_PUSHSEPC]       = { "pushsepc",     any, NULL, NULL, rmw_pushsepc },
 
     /* === Nuclei custom CSR Registers === */
     [CSR_NUCLEI_MILM_CTL]       = { "milm_ctl",     any, read_zero, write_ignore },
