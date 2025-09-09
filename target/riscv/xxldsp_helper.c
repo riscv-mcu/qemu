@@ -255,13 +255,13 @@ static inline void do_dkhmx8(CPURISCVState *env, void *vd, void *va,
      *              (3,2),(2,3),(1,0),(0,1))
      */
     if (a[H1(i)] == INT8_MIN && b[H1(i + 1)] == INT8_MIN) {
-        env->vxsat = 1;
+        env->ucode = 1;
         d[H1(i)] = INT8_MAX;
     } else {
         d[H1(i)] = (int16_t)a[H1(i)] * b[H1(i + 1)] >> 7;
     }
     if (a[H1(i + 1)] == INT8_MIN && b[H1(i)] == INT8_MIN) {
-        env->vxsat = 1;
+        env->ucode = 1;
         d[H1(i + 1)] = INT8_MAX;
     } else {
         d[H1(i + 1)] = (int16_t)a[H1(i + 1)] * b[H1(i)] >> 7;
@@ -284,13 +284,13 @@ static inline void do_dkhmx16(CPURISCVState *env, void *vd, void *va,
      *              (1,0),(0,1)
      */
     if (a[H2(i)] == INT16_MIN && b[H2(i + 1)] == INT16_MIN) {
-        env->vxsat = 1;
+        env->ucode = 1;
         d[H2(i)] = INT16_MAX;
     } else {
         d[H2(i)] = (int32_t)a[H2(i)] * b[H2(i + 1)] >> 15;
     }
     if (a[H2(i + 1)] == INT16_MIN && b[H2(i)] == INT16_MIN) {
-        env->vxsat = 1;
+        env->ucode = 1;
         d[H2(i + 1)] = INT16_MAX;
     } else {
         d[H2(i + 1)] = (int32_t)a[H2(i + 1)] * b[H2(i)] >> 15;
@@ -324,14 +324,14 @@ static inline void do_dkwmmul(CPURISCVState *env, void *vd, void *va,
 {
     int32_t *d = vd, *a = va, *b = vb;
     if (a[i] == INT32_MIN && b[i] == INT32_MIN) {
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
         d[i] = INT32_MAX;
     } else {
         d[i] = (int64_t)a[i] * b[i] >> 31;
     }
 
     if (a[i+1] == INT32_MIN && b[i+1] == INT32_MIN) {
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
         d[i+1] = INT32_MAX;
     } else {
         d[i+1] = (int64_t)a[i+1] * b[i+1] >> 31;
@@ -345,14 +345,14 @@ static inline void do_dkwmmul_u(CPURISCVState *env, void *vd, void *va,
 {
     int32_t *d = vd, *a = va, *b = vb;
     if (a[i] == INT32_MIN && b[i] == INT32_MIN) {
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
         d[i] = INT32_MAX;
     } else {
         d[i] = ((int64_t)a[i] * b[i] + (1ull << 30)) >> 31;
     }
 
     if (a[i+1] == INT32_MIN && b[i+1] == INT32_MIN) {
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
         d[i+1] = INT32_MAX;
     } else {
         d[i+1] = ((int64_t)a[i+1] * b[i+1] + (1ull << 30)) >> 31;
@@ -421,7 +421,7 @@ static inline void do_dkmda(CPURISCVState *env, void *vd, void *va,
     int32_t *d = vd;
     int16_t *a = va, *b = vb;
     if(((a[i * 2] == INT16_MIN) && (b[i * 2] == INT16_MIN)) || ((a[i * 2 + 1] == INT16_MIN) && (b[i * 2 + 1] == INT16_MIN))){
-        env->vxsat = 1;
+        env->ucode = 1;
         d[i] = INT32_MAX;
     }else{
         d[i] = (int32_t)a[i * 2] * b[i * 2] + (int32_t)a[i * 2 + 1] * b[i * 2 + 1];
@@ -436,7 +436,7 @@ static inline void do_dkmxda(CPURISCVState *env, void *vd, void *va,
     int32_t *d = vd;
     int16_t *a = va, *b = vb;
     if(((a[i * 2] == INT16_MIN) && (b[i * 2] == INT16_MIN)) || ((a[i * 2 + 1] == INT16_MIN) && (b[i * 2 + 1] == INT16_MIN))){
-        env->vxsat = 1;
+        env->ucode = 1;
         d[i] = INT32_MAX;
     }else{
         d[i] = (int32_t)a[i * 2] * b[i * 2 + 1] + (int32_t)a[i * 2 + 1] * b[i * 2];
@@ -737,17 +737,17 @@ static inline void do_dkcrsa16(CPURISCVState *env, void *vd, void *va,
     op2 = a[i * 2] + b[i * 2 + 1];
     if (op1 > INT16_MAX){
         op1 = INT16_MAX;
-        env->vxsat = 1;
+        env->ucode = 1;
     }else if (op1 < INT16_MIN){
         op1 = INT16_MIN;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     if (op2 > INT16_MAX){
         op2 = INT16_MAX;
-        env->vxsat = 1;
+        env->ucode = 1;
     }else if (op2 < INT16_MIN){
         op2 = INT16_MIN;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     d[i * 2] = op2;
     d[i * 2 + 1] = op1;
@@ -764,17 +764,17 @@ static inline void do_dkcras16(CPURISCVState *env, void *vd, void *va,
     op2 = a[i * 2] - b[i * 2 + 1];
     if (op1 > INT16_MAX){
         op1 = INT16_MAX;
-        env->vxsat = 1;
+        env->ucode = 1;
     }else if (op1 < INT16_MIN){
         op1 = INT16_MIN;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     if (op2 > INT16_MAX){
         op2 = INT16_MAX;
-        env->vxsat = 1;
+        env->ucode = 1;
     }else if (op2 < INT16_MIN){
         op2 = INT16_MIN;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     d[i * 2] = op2;
     d[i * 2 + 1] = op1;
@@ -829,17 +829,17 @@ static inline void do_dkcras32(CPURISCVState *env, void *vd, void *va,
     op2 = a[i + 1] + b[i];
     if (op1 > INT32_MAX){
         op1 = INT32_MAX;
-        env->vxsat = 1;
+        env->ucode = 1;
     }else if (op1 < INT32_MIN){
         op1 = INT32_MIN;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     if (op2 > INT32_MAX){
         op2 = INT32_MAX;
-        env->vxsat = 1;
+        env->ucode = 1;
     }else if (op2 < INT32_MIN){
         op2 = INT32_MIN;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     d[i] = op1;
     d[i + 1] = op2;
@@ -856,17 +856,17 @@ static inline void do_dkcrsa32(CPURISCVState *env, void *vd, void *va,
     op2 = a[i + 1] - b[i];
     if (op1 > INT32_MAX){
         op1 = INT32_MAX;
-        env->vxsat = 1;
+        env->ucode = 1;
     }else if (op1 < INT32_MIN){
         op1 = INT32_MIN;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     if (op2 > INT32_MAX){
         op2 = INT32_MAX;
-        env->vxsat = 1;
+        env->ucode = 1;
     }else if (op2 < INT32_MIN){
         op2 = INT32_MIN;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     d[i] = op1;
     d[i + 1] = op2;
@@ -903,19 +903,19 @@ static inline void do_dkstsa16(CPURISCVState *env, void *vd, void *va,
     p2 = a[i * 2] + b[i * 2];
     if(p1 > INT16_MAX){
         p1 = INT16_MAX;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     else if(p1 < INT16_MIN){
         p1 = INT16_MIN;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     if(p2 > INT16_MAX){
         p2 = INT16_MAX;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     else if(p2 < INT16_MIN){
         p2 = INT16_MIN;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     d[i * 2 + 1] = p1;
     d[i * 2] = p2;
@@ -932,19 +932,19 @@ static inline void do_dkstas16(CPURISCVState *env, void *vd, void *va,
     p2 = a[i * 2] - b[i * 2];
     if(p1 > INT16_MAX){
         p1 = INT16_MAX;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     else if(p1 < INT16_MIN){
         p1 = INT16_MIN;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     if(p2 > INT16_MAX){
         p2 = INT16_MAX;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     else if(p2 < INT16_MIN){
         p2 = INT16_MIN;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     d[i * 2 + 1] = p1;
     d[i * 2] = p2;
@@ -985,11 +985,11 @@ static inline void do_dsclip8(CPURISCVState *env, void *vd, void *va,
     if(a[i] > max)
     {
         d[i] = max;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     }else if(a[i] < min)
     {
         d[i] = min;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     }else
         d[i] = a[i];
 }
@@ -1007,11 +1007,11 @@ static inline void do_dsclip16(CPURISCVState *env, void *vd, void *va,
     if(a[i] > max)
     {
         d[i] = max;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     }else if(a[i] < min)
     {
         d[i] = min;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     }else
         d[i] = a[i];
 }
@@ -1029,11 +1029,11 @@ static inline void do_dsclip32(CPURISCVState *env, void *vd, void *va,
     if(a[i] > max)
     {
         d[i] = max;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     }else if(a[i] < min)
     {
         d[i] = min;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     }else
         d[i] = a[i];
 }
@@ -1402,7 +1402,7 @@ static inline void do_ksll16(CPURISCVState *env, void *vd, void *va,
 
     result = a[i] << shift;
     if (shift > (clrsb32(a[i]) - 16)) {
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
         d[i] = (a[i] & INT16_MIN) ? INT16_MIN : INT16_MAX;
     } else {
         d[i] = result;
@@ -1521,7 +1521,7 @@ static inline void do_ksll8(CPURISCVState *env, void *vd, void *va,
 
     result = a[i] << shift;
     if (shift > (clrsb32(a[i]) - 24)) {
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
         d[i] = (a[i] & INT8_MIN) ? INT8_MIN : INT8_MAX;
     } else {
         d[i] = result;
@@ -1739,7 +1739,7 @@ static inline void do_khm16(CPURISCVState *env, void *vd, void *va,
     int16_t *d = vd, *a = va, *b = vb;
 
     if (a[i] == INT16_MIN && b[i] == INT16_MIN) {
-        env->vxsat = 1;
+        env->ucode = 1;
         d[i] = INT16_MAX;
     } else {
         d[i] = (int32_t)a[i] * b[i] >> 15;
@@ -1754,7 +1754,7 @@ static inline void do_dkhm16(CPURISCVState *env, void *vd, void *va,
     int16_t *d = vd, *a = va, *b = vb;
 
     if (a[i] == INT16_MIN && b[i] == INT16_MIN) {
-        env->vxsat = 1;
+        env->ucode = 1;
         d[i] = INT16_MAX;
     } else {
         d[i] = (int32_t)a[i] * b[i] >> 15;
@@ -1777,13 +1777,13 @@ static inline void do_khmx16(CPURISCVState *env, void *vd, void *va,
      *              (1,0),(0,1)
      */
     if (a[H2(i)] == INT16_MIN && b[H2(i + 1)] == INT16_MIN) {
-        env->vxsat = 1;
+        env->ucode = 1;
         d[H2(i)] = INT16_MAX;
     } else {
         d[H2(i)] = (int32_t)a[H2(i)] * b[H2(i + 1)] >> 15;
     }
     if (a[H2(i + 1)] == INT16_MIN && b[H2(i)] == INT16_MIN) {
-        env->vxsat = 1;
+        env->ucode = 1;
         d[H2(i + 1)] = INT16_MAX;
     } else {
         d[H2(i + 1)] = (int32_t)a[H2(i + 1)] * b[H2(i)] >> 15;
@@ -1847,7 +1847,7 @@ static inline void do_khm8(CPURISCVState *env, void *vd, void *va,
     int8_t *d = vd, *a = va, *b = vb;
 
     if (a[i] == INT8_MIN && b[i] == INT8_MIN) {
-        env->vxsat = 1;
+        env->ucode = 1;
         d[i] = INT8_MAX;
     } else {
         d[i] = (int16_t)a[i] * b[i] >> 7;
@@ -1862,7 +1862,7 @@ static inline void do_dkhm8(CPURISCVState *env, void *vd, void *va,
     int8_t *d = vd, *a = va, *b = vb;
 
     if (a[i] == INT8_MIN && b[i] == INT8_MIN) {
-        env->vxsat = 1;
+        env->ucode = 1;
         d[i] = INT8_MAX;
     } else {
         d[i] = (int16_t)a[i] * b[i] >> 7;
@@ -1885,13 +1885,13 @@ static inline void do_khmx8(CPURISCVState *env, void *vd, void *va,
      *              (3,2),(2,3),(1,0),(0,1))
      */
     if (a[H1(i)] == INT8_MIN && b[H1(i + 1)] == INT8_MIN) {
-        env->vxsat = 1;
+        env->ucode = 1;
         d[H1(i)] = INT8_MAX;
     } else {
         d[H1(i)] = (int16_t)a[H1(i)] * b[H1(i + 1)] >> 7;
     }
     if (a[H1(i + 1)] == INT8_MIN && b[H1(i)] == INT8_MIN) {
-        env->vxsat = 1;
+        env->ucode = 1;
         d[H1(i + 1)] = INT8_MAX;
     } else {
         d[H1(i + 1)] = (int16_t)a[H1(i + 1)] * b[H1(i)] >> 7;
@@ -1949,10 +1949,10 @@ static int64_t sat64(CPURISCVState *env, int64_t a, uint8_t shift)
 
     if (a > max) {
         result = max;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else if (a < min) {
         result = min;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         result = a;
     }
@@ -1977,7 +1977,7 @@ static uint64_t satu64(CPURISCVState *env, uint64_t a, uint8_t shift)
 
     if (a > max) {
         result = max;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         result = a;
     }
@@ -1992,7 +1992,7 @@ static inline void do_uclip16(CPURISCVState *env, void *vd, void *va,
 
     if (a[i] < 0) {
         d[i] = 0;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         d[i] = satu64(env, a[i], shift);
     }
@@ -2080,7 +2080,7 @@ static inline void do_kabs16(CPURISCVState *env, void *vd, void *va, uint8_t i)
 
     if (a[i] == INT16_MIN) {
         d[i] = INT16_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         d[i] = abs(a[i]);
     }
@@ -2094,7 +2094,7 @@ static inline void do_dkabs16(CPURISCVState *env, void *vd, void *va, uint8_t i)
 
     if (a[i] == INT16_MIN) {
         d[i] = INT16_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         d[i] = abs(a[i]);
     }
@@ -2186,7 +2186,7 @@ static inline void do_uclip8(CPURISCVState *env, void *vd, void *va,
 
     if (a[i] < 0) {
         d[i] = 0;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         d[i] = satu64(env, a[i], shift);
     }
@@ -2200,7 +2200,7 @@ static inline void do_kabs8(CPURISCVState *env, void *vd, void *va, uint8_t i)
 
     if (a[i] == INT8_MIN) {
         d[i] = INT8_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         d[i] = abs(a[i]);
     }
@@ -2213,7 +2213,7 @@ static inline void do_dkabs8(CPURISCVState *env, void *vd, void *va, uint8_t i)
     int8_t *d = vd, *a = va;
     if (a[i] == INT8_MIN) {
         d[i] = INT8_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         d[i] = abs(a[i]);
     }
@@ -2654,7 +2654,7 @@ static inline void do_kwmmul(CPURISCVState *env, void *vd, void *va,
 {
     int32_t *d = vd, *a = va, *b = vb;
     if (a[i] == INT32_MIN && b[i] == INT32_MIN) {
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
         d[i] = INT32_MAX;
     } else {
         d[i] = (int64_t)a[i] * b[i] >> 31;
@@ -2668,7 +2668,7 @@ static inline void do_kwmmul_u(CPURISCVState *env, void *vd, void *va,
 {
     int32_t *d = vd, *a = va, *b = vb;
     if (a[i] == INT32_MIN && b[i] == INT32_MIN) {
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
         d[i] = INT32_MAX;
     } else {
         d[i] = ((int64_t)a[i] * b[i] + (1ull << 30)) >> 31;
@@ -2767,7 +2767,7 @@ static inline void do_kmmwb2(CPURISCVState *env, void *vd, void *va,
     int32_t *d = vd, *a = va;
     int16_t *b = vb;
     if (a[H4(i)] == INT32_MIN && b[H2(2 * i)] == INT16_MIN) {
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
         d[H4(i)] = INT32_MAX;
     } else {
         d[H4(i)] = (int64_t)a[H4(i)] * b[H2(2 * i)] >> 15;
@@ -2782,7 +2782,7 @@ static inline void do_kmmwb2_u(CPURISCVState *env, void *vd, void *va,
     int32_t *d = vd, *a = va;
     int16_t *b = vb;
     if (a[H4(i)] == INT32_MIN && b[H2(2 * i)] == INT16_MIN) {
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
         d[H4(i)] = INT32_MAX;
     } else {
         d[H4(i)] = ((int64_t)a[H4(i)] * b[H2(2 * i)] + (1ull << 14)) >> 15;
@@ -2797,7 +2797,7 @@ static inline void do_kmmwt2(CPURISCVState *env, void *vd, void *va,
     int32_t *d = vd, *a = va;
     int16_t *b = vb;
     if (a[H4(i)] == INT32_MIN && b[H2(2 * i + 1)] == INT16_MIN) {
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
         d[H4(i)] = INT32_MAX;
     } else {
         d[H4(i)] = (int64_t)a[H4(i)] * b[H2(2 * i + 1)] >> 15;
@@ -2812,7 +2812,7 @@ static inline void do_kmmwt2_u(CPURISCVState *env, void *vd, void *va,
     int32_t *d = vd, *a = va;
     int16_t *b = vb;
     if (a[H4(i)] == INT32_MIN && b[H2(2 * i + 1)] == INT16_MIN) {
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
         d[H4(i)] = INT32_MAX;
     } else {
         d[H4(i)] = ((int64_t)a[H4(i)] * b[H2(2 * i + 1)] + (1ull << 14)) >> 15;
@@ -2827,7 +2827,7 @@ static inline void do_kmmawb2(CPURISCVState *env, void *vd, void *va,
     int32_t *d = vd, *a = va, *c = vc, result;
     int16_t *b = vb;
     if (a[H4(i)] == INT32_MIN && b[H2(2 * i)] == INT16_MIN) {
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
         result = INT32_MAX;
     } else {
         result = (int64_t)a[H4(i)] * b[H2(2 * i)] >> 15;
@@ -2843,7 +2843,7 @@ static inline void do_kmmawb2_u(CPURISCVState *env, void *vd, void *va,
     int32_t *d = vd, *a = va, *c = vc, result;
     int16_t *b = vb;
     if (a[H4(i)] == INT32_MIN && b[H2(2 * i)] == INT16_MIN) {
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
         result = INT32_MAX;
     } else {
         result = ((int64_t)a[H4(i)] * b[H2(2 * i)] + (1ull << 14)) >> 15;
@@ -2859,7 +2859,7 @@ static inline void do_kmmawt2(CPURISCVState *env, void *vd, void *va,
     int32_t *d = vd, *a = va, *c = vc, result;
     int16_t *b = vb;
     if (a[H4(i)] == INT32_MIN && b[H2(2 * i + 1)] == INT16_MIN) {
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
         result = INT32_MAX;
     } else {
         result = (int64_t)a[H4(i)] * b[H2(2 * i + 1)] >> 15;
@@ -2875,7 +2875,7 @@ static inline void do_kmmawt2_u(CPURISCVState *env, void *vd, void *va,
     int32_t *d = vd, *a = va, *c = vc, result;
     int16_t *b = vb;
     if (a[H4(i)] == INT32_MIN && b[H2(2 * i + 1)] == INT16_MIN) {
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
         result = INT32_MAX;
     } else {
         result = ((int64_t)a[H4(i)] * b[H2(2 * i + 1)] + (1ull << 14)) >> 15;
@@ -2924,7 +2924,7 @@ static inline void do_kmda(CPURISCVState *env, void *vd, void *va,
     if (a[H2(2 * i)] == INT16_MIN && a[H2(2 * i + 1)] == INT16_MIN &&
         b[H2(2 * i)] == INT16_MIN && a[H2(2 * i + 1)] == INT16_MIN) {
         d[H4(i)] = INT32_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         d[H4(i)] = (int32_t)a[H2(2 * i)] * b[H2(2 * i)] +
                    (int32_t)a[H2(2 * i + 1)] * b[H2(2 * i + 1)];
@@ -2941,7 +2941,7 @@ static inline void do_kmxda(CPURISCVState *env, void *vd, void *va,
     if (a[H2(2 * i)] == INT16_MIN && a[H2(2 * i + 1)] == INT16_MIN &&
         b[H2(2 * i)] == INT16_MIN && a[H2(2 * i + 1)] == INT16_MIN) {
         d[H4(i)] = INT32_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         d[H4(i)] = (int32_t)a[H2(2 * i + 1)] * b[H2(2 * i)] +
                    (int32_t)a[H2(2 * i)] * b[H2(2 * i + 1)];
@@ -3029,7 +3029,7 @@ static inline void do_kmada(CPURISCVState *env, void *vd, void *va,
         if (c[H4(i)] < 0) {
             d[H4(i)] = INT32_MAX + c[H4(i)] + 1ll;
         } else {
-            env->vxsat = 0x1;
+            env->ucode = 0x1;
             d[H4(i)] = INT32_MAX;
         }
     } else {
@@ -3053,7 +3053,7 @@ static inline void do_kmaxda(CPURISCVState *env, void *vd, void *va,
         if (c[H4(i)] < 0) {
             d[H4(i)] = INT32_MAX + c[H4(i)] + 1ll;
         } else {
-            env->vxsat = 0x1;
+            env->ucode = 0x1;
             d[H4(i)] = INT32_MAX;
         }
     } else {
@@ -3117,7 +3117,7 @@ static inline void do_kmsda(CPURISCVState *env, void *vd, void *va,
     if (a[H2(i)] == INT16_MIN && a[H2(i + 1)] == INT16_MIN &&
         b[H2(i)] == INT16_MIN && b[H2(i + 1)] == INT16_MIN) {
         if (c[H4(i)] < 0) {
-            env->vxsat = 0x1;
+            env->ucode = 0x1;
             d[H4(i)] = INT32_MIN;
         } else {
             d[H4(i)] = c[H4(i)] - 1ll - INT32_MAX;
@@ -3141,7 +3141,7 @@ static inline void do_kmsxda(CPURISCVState *env, void *vd, void *va,
     if (a[H2(i)] == INT16_MIN && a[H2(i + 1)] == INT16_MIN &&
         b[H2(i)] == INT16_MIN && b[H2(i + 1)] == INT16_MIN) {
         if (d[H4(i)] < 0) {
-            env->vxsat = 0x1;
+            env->ucode = 0x1;
             d[H4(i)] = INT32_MIN;
         } else {
             d[H4(i)] = c[H4(i)] - 1ll - INT32_MAX;
@@ -3198,7 +3198,7 @@ static inline void do_uclip32(CPURISCVState *env, void *vd, void *va,
 
     if (a[i] < 0) {
         d[i] = 0;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         d[i] = satu64(env, a[i], shift);
     }
@@ -3515,7 +3515,7 @@ static inline void do_kmar64(CPURISCVState *env, void *vd, void *va,
         a[H4(i + 1)] == INT32_MIN && b[H4(i + 1)] == INT32_MIN) {
         if (*c >= 0) {
             *d = INT64_MAX;
-            env->vxsat = 1;
+            env->ucode = 1;
         } else {
             *d = sadd64(env, 0, *c + m0, m1);
         }
@@ -3542,7 +3542,7 @@ static inline void do_kmsr64(CPURISCVState *env, void *vd, void *va,
             a[H4(i + 1)] == INT32_MIN && b[H4(i + 1)] == INT32_MIN) {
             if (*c <= 0) {
                 *d = INT64_MIN;
-                env->vxsat = 1;
+                env->ucode = 1;
             } else {
                 *d = ssub64(env, 0, *c - m0, m1);
             }
@@ -3866,7 +3866,7 @@ static inline void do_kdmbb(CPURISCVState *env, void *vd, void *va,
 
     if (a[H2(i)] == INT16_MIN && b[H2(i)] == INT16_MIN) {
         *d = INT32_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         *d = (int64_t)a[H2(i)] * b[H2(i)] << 1;
     }
@@ -3882,7 +3882,7 @@ static inline void do_kdmbt(CPURISCVState *env, void *vd, void *va,
 
     if (a[H2(i)] == INT16_MIN && b[H2(i + 1)] == INT16_MIN) {
         *d = INT32_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         *d = (int64_t)a[H2(i)] * b[H2(i + 1)] << 1;
     }
@@ -3898,7 +3898,7 @@ static inline void do_kdmtt(CPURISCVState *env, void *vd, void *va,
 
     if (a[H2(i + 1)] == INT16_MIN && b[H2(i + 1)] == INT16_MIN) {
         *d = INT32_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         *d = (int64_t)a[H2(i + 1)] * b[H2(i + 1)] << 1;
     }
@@ -3964,7 +3964,7 @@ static inline void do_kdmabb(CPURISCVState *env, void *vd, void *va,
 
     if (a[H2(i)] == INT16_MIN && b[H2(i)] == INT16_MIN) {
         m0 = INT32_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         m0 = (int32_t)a[H2(i)] * b[H2(i)] << 1;
     }
@@ -3983,7 +3983,7 @@ static inline void do_kdmabt(CPURISCVState *env, void *vd, void *va,
 
     if (a[H2(i)] == INT16_MIN && b[H2(i + 1)] == INT16_MIN) {
         m0 = INT32_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         m0 = (int32_t)a[H2(i)] * b[H2(i + 1)] << 1;
     }
@@ -4002,7 +4002,7 @@ static inline void do_kdmatt(CPURISCVState *env, void *vd, void *va,
 
     if (a[H2(i + 1)] == INT16_MIN && b[H2(i + 1)] == INT16_MIN) {
         m0 = INT32_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         m0 = (int32_t)a[H2(i + 1)] * b[H2(i + 1)] << 1;
     }
@@ -4019,7 +4019,7 @@ static inline void do_kabsw(CPURISCVState *env, void *vd, void *va, uint8_t i)
 
     if (a[H4(i)] == INT32_MIN) {
         *d = INT32_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         *d = (int32_t)abs(a[H4(i)]);
     }
@@ -4533,7 +4533,7 @@ static inline void do_ksll32(CPURISCVState *env, void *vd, void *va,
 
     result = a[i] << shift;
     if (shift > clrsb32(a[i])) {
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
         d[i] = (a[i] & INT32_MIN) ? INT32_MIN : INT32_MAX;
     } else {
         d[i] = result;
@@ -4640,7 +4640,7 @@ static inline void do_kabs32(CPURISCVState *env, void *vd, void *va, uint8_t i)
 
     if (a[i] == INT32_MIN) {
         d[i] = INT32_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         d[i] = abs(a[i]);
     }
@@ -4690,7 +4690,7 @@ static inline void do_kdmbb16(CPURISCVState *env, void *vd, void *va,
 
     if (a[H2(i)] == INT16_MIN && b[H2(i)] == INT16_MIN) {
         d[H4(i / 2)] = INT32_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         d[H4(i / 2)] = (int64_t)a[H2(i)] * b[H2(i)] << 1;
     }
@@ -4706,7 +4706,7 @@ static inline void do_kdmbt16(CPURISCVState *env, void *vd, void *va,
 
     if (a[H2(i)] == INT16_MIN && b[H2(i + 1)] == INT16_MIN) {
         d[H4(i / 2)] = INT32_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         d[H4(i / 2)] = (int64_t)a[H2(i)] * b[H2(i + 1)] << 1;
     }
@@ -4722,7 +4722,7 @@ static inline void do_kdmtt16(CPURISCVState *env, void *vd, void *va,
 
     if (a[H2(i + 1)] == INT16_MIN && b[H2(i + 1)] == INT16_MIN) {
         d[H4(i / 2)] = INT32_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         d[H4(i / 2)] = (int64_t)a[H2(i + 1)] * b[H2(i + 1)] << 1;
     }
@@ -4740,7 +4740,7 @@ static inline void do_kdmabb16(CPURISCVState *env, void *vd, void *va,
 
     if (a[H2(i)] == INT16_MIN && b[H2(i)] == INT16_MIN) {
         m0 = INT32_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         m0 = (int32_t)a[H2(i)] * b[H2(i)] << 1;
     }
@@ -4759,7 +4759,7 @@ static inline void do_kdmabt16(CPURISCVState *env, void *vd, void *va,
 
     if (a[H2(i)] == INT16_MIN && b[H2(i + 1)] == INT16_MIN) {
         m0 = INT32_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         m0 = (int32_t)a[H2(i)] * b[H2(i + 1)] << 1;
     }
@@ -4778,7 +4778,7 @@ static inline void do_kdmatt16(CPURISCVState *env, void *vd, void *va,
 
     if (a[H2(i + 1)] == INT16_MIN && b[H2(i + 1)] == INT16_MIN) {
         m0 = INT32_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         m0 = (int32_t)a[H2(i + 1)] * b[H2(i + 1)] << 1;
     }
@@ -4848,7 +4848,7 @@ static inline void do_kmda32(CPURISCVState *env, void *vd, void *va,
     if (a[H4(i)] == INT32_MIN && b[H4(i)] == INT32_MIN &&
         a[H4(i + 1)] == INT32_MIN && b[H4(i + 1)] == INT32_MIN) {
         *d = INT64_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         *d = (int64_t)a[H4(i)] * b[H4(i)] +
              (int64_t)a[H4(i + 1)] * b[H4(i + 1)];
@@ -4865,7 +4865,7 @@ static inline void do_kmxda32(CPURISCVState *env, void *vd, void *va,
     if (a[H4(i)] == INT32_MIN && b[H4(i)] == INT32_MIN &&
         a[H4(i + 1)] == INT32_MIN && b[H4(i + 1)] == INT32_MIN) {
         *d = INT64_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         *d = (int64_t)a[H4(i)] * b[H4(i + 1)] +
              (int64_t)a[H4(i + 1)] * b[H4(i)];
@@ -4888,7 +4888,7 @@ static inline void do_kmaxda32(CPURISCVState *env, void *vd, void *va,
         if (*d < 0) {
             *d = (INT64_MAX + *c) + 1ll;
         } else {
-            env->vxsat = 0x1;
+            env->ucode = 0x1;
             *d = INT64_MAX;
         }
     } else {
@@ -4952,7 +4952,7 @@ static inline void do_kmsda32(CPURISCVState *env, void *vd, void *va,
     if (a[H4(i)] == INT32_MIN && a[H4(i + 1)] == INT32_MIN &&
         b[H4(i)] == INT32_MIN && b[H4(i + 1)] == INT32_MIN) {
         if (*c < 0) {
-            env->vxsat = 0x1;
+            env->ucode = 0x1;
             *d = INT64_MIN;
         } else {
             *d = *c - 1ll - INT64_MAX;
@@ -4976,7 +4976,7 @@ static inline void do_kmsxda32(CPURISCVState *env, void *vd, void *va,
     if (a[H4(i)] == INT32_MIN && a[H4(i + 1)] == INT32_MIN &&
         b[H4(i)] == INT32_MIN && b[H4(i + 1)] == INT32_MIN) {
         if (*c < 0) {
-            env->vxsat = 0x1;
+            env->ucode = 0x1;
             *d = INT64_MIN;
         } else {
             *d = *c - 1ll - INT64_MAX;
@@ -5160,7 +5160,7 @@ static inline void do_dkabs32(CPURISCVState *env, void *vd, void *va, uint8_t i)
     int32_t *d = vd, *a = va;
     if (a[i] == INT32_MIN) {
         d[i] = INT32_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         d[i] = abs(a[i]);
     }
@@ -5265,7 +5265,7 @@ static inline void do_dkmada(CPURISCVState *env, void *vd, void *va,
         if (c[H4(i)] < 0) {
             d[H4(i)] = INT32_MAX + c[H4(i)] + 1ll;
         } else {
-            env->vxsat = 0x1;
+            env->ucode = 0x1;
             d[H4(i)] = INT32_MAX;
         }
     } else {
@@ -5289,7 +5289,7 @@ static inline void do_dkmaxda(CPURISCVState *env, void *vd, void *va,
         if (c[H4(i)] < 0) {
             d[H4(i)] = INT32_MAX + c[H4(i)] + 1ll;
         } else {
-            env->vxsat = 0x1;
+            env->ucode = 0x1;
             d[H4(i)] = INT32_MAX;
         }
     } else {
@@ -5339,7 +5339,7 @@ static inline void do_dkmsda(CPURISCVState *env, void *vd, void *va,
     if (a[H2(i)] == INT16_MIN && a[H2(i + 1)] == INT16_MIN &&
         b[H2(i)] == INT16_MIN && b[H2(i + 1)] == INT16_MIN) {
         if (c[H4(i)] < 0) {
-            env->vxsat = 0x1;
+            env->ucode = 0x1;
             d[H4(i)] = INT32_MIN;
         } else {
             d[H4(i)] = c[H4(i)] - 1ll - INT32_MAX;
@@ -5363,7 +5363,7 @@ static inline void do_dkmsxda(CPURISCVState *env, void *vd, void *va,
     if (a[H2(i)] == INT16_MIN && a[H2(i + 1)] == INT16_MIN &&
         b[H2(i)] == INT16_MIN && b[H2(i + 1)] == INT16_MIN) {
         if (d[H4(i)] < 0) {
-            env->vxsat = 0x1;
+            env->ucode = 0x1;
             d[H4(i)] = INT32_MIN;
         } else {
             d[H4(i)] = c[H4(i)] - 1ll - INT32_MAX;
@@ -5426,7 +5426,7 @@ static inline void do_dkmda32(CPURISCVState *env, void *vd, void *va,
     if (a[H4(i)] == INT32_MIN && b[H4(i)] == INT32_MIN &&
         a[H4(i + 1)] == INT32_MIN && b[H4(i + 1)] == INT32_MIN) {
         *d = INT64_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         *d = (int64_t)a[H4(i)] * b[H4(i)] +
              (int64_t)a[H4(i + 1)] * b[H4(i + 1)];
@@ -5443,7 +5443,7 @@ static inline void do_dkmxda32(CPURISCVState *env, void *vd, void *va,
     if (a[H4(i)] == INT32_MIN && b[H4(i)] == INT32_MIN &&
         a[H4(i + 1)] == INT32_MIN && b[H4(i + 1)] == INT32_MIN) {
         *d = INT64_MAX;
-        env->vxsat = 0x1;
+        env->ucode = 0x1;
     } else {
         *d = (int64_t)a[H4(i)] * b[H4(i + 1)] +
              (int64_t)a[H4(i + 1)] * b[H4(i)];
@@ -5565,7 +5565,7 @@ static inline void do_dkmsxda32(CPURISCVState *env, void *vd, void *va,
     if (a[H4(i)] == INT32_MIN && a[H4(i + 1)] == INT32_MIN &&
         b[H4(i)] == INT32_MIN && b[H4(i + 1)] == INT32_MIN) {
         if (*c < 0) {
-            env->vxsat = 0x1;
+            env->ucode = 0x1;
             *d = INT64_MIN;
         } else {
             *d = *c - 1ll - INT64_MAX;
@@ -5855,10 +5855,10 @@ static inline void do_dksms32_u(CPURISCVState *env, void *vd, void *va,
     op = (int64_t)c[i] + extract64(round, 1, 32);
     if(op > INT32_MAX){
         op = INT32_MAX;
-        env->vxsat = 1;
+        env->ucode = 1;
     }else if(op < INT32_MIN){
         op = INT32_MIN;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     d[i] = op;
 }
@@ -5950,12 +5950,12 @@ static inline void do_dkmabb32(CPURISCVState *env, void *vd, void *va,
     if (res > INT64_MAX)
     {
         res = INT64_MAX;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     else if (res < INT64_MIN)
     {
         res = INT64_MIN;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     d[i] = res;
 }
@@ -5972,12 +5972,12 @@ static inline void do_dkmabt32(CPURISCVState *env, void *vd, void *va,
     if (res > INT64_MAX)
     {
         res = INT64_MAX;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     else if (res < INT64_MIN)
     {
         res = INT64_MIN;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     d[i] = res;
 }
@@ -5994,12 +5994,12 @@ static inline void do_dkmatt32(CPURISCVState *env, void *vd, void *va,
     if (res > INT64_MAX)
     {
         res = INT64_MAX;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     else if (res < INT64_MIN)
     {
         res = INT64_MIN;
-        env->vxsat = 1;
+        env->ucode = 1;
     }
     d[i] = res;
 }
