@@ -3048,6 +3048,7 @@ static const TypeInfo riscv_cpu_type_infos[] = {
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N205,       MXL_RV32, rv32imacu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N205E,      MXL_RV32, rv32emacu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N300,       MXL_RV32, rv32imacu_nuclei_cpu_init),
+    DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N300E,      MXL_RV32, rv32emacu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N300F,      MXL_RV32, rv32imafcu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N300FD,     MXL_RV32, rv32imafdcu_nuclei_cpu_init),
     DEFINE_CPU(TYPE_RISCV_CPU_NUCLEI_N305,       MXL_RV32, rv32imacu_nuclei_cpu_init),
