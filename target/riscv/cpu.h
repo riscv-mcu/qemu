@@ -469,6 +469,7 @@ struct CPUArchState {
     target_ulong jalmnxti;
     target_ulong pushmcause;
     target_ulong pushmepc;
+    target_ulong stvt2;
 
     target_ulong wfe;
     target_ulong sleepvalue;

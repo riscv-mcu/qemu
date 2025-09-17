@@ -54,6 +54,12 @@ typedef struct ECLICPendingInterrupt
 #define NUCLEI_ECLIC_REG_CLICINTIE_BASE 0x1001
 #define NUCLEI_ECLIC_REG_CLICINTATTR_BASE 0x1002
 #define NUCLEI_ECLIC_REG_CLICINTCTL_BASE 0x1003
+#define NUCLEI_ECLIC_REG_SINTTHRESH     0x2008
+#define NUCLEI_ECLIC_REG_STH            0x2009
+#define NUCLEI_ECLIC_REG_CLICINTIP_BASE_S 0x3000
+#define NUCLEI_ECLIC_REG_CLICINTIE_BASE_S 0x3001
+#define NUCLEI_ECLIC_REG_CLICINTATTR_BASE_S 0x3002
+#define NUCLEI_ECLIC_REG_CLICINTCTL_BASE_S 0x3003
 
 #define CLICINTCTLBITS 0x6
 
@@ -86,12 +92,24 @@ typedef struct NucleiECLICState
     uint8_t clicintctl[ECLIC_MAX_HARTS][4096];  /*  level (cliccfg.nlbits) priority( (CLICINTCTLBITS - cliccfg.nlbits)*/
     ECLICPendingInterrupt clicintlist[ECLIC_MAX_HARTS][4096];
 
+    uint8_t sth[ECLIC_MAX_HARTS];
+    uint8_t clicintip_s[ECLIC_MAX_HARTS][4096];
+    uint8_t clicintie_s[ECLIC_MAX_HARTS][4096];
+    uint8_t clicintattr_s[ECLIC_MAX_HARTS][4096]; /* shv(0) trig(1~2)*/
+    uint8_t clicintctl_s[ECLIC_MAX_HARTS][4096];  /*  level (cliccfg.nlbits) priority( (CLICINTCTLBITS - cliccfg.nlbits)*/
+    ECLICPendingInterrupt clicintlist_s[ECLIC_MAX_HARTS][4096];
+
+
     uint32_t *exccode;
     uint32_t aperture_size;
 
     QLIST_HEAD(, ECLICPendingInterrupt)
     pending_list[ECLIC_MAX_HARTS];
     size_t active_count;
+
+    QLIST_HEAD(, ECLICPendingInterrupt)
+    pending_list_s[ECLIC_MAX_HARTS];
+    size_t active_count_s;
 
     /* ECLIC IRQ handlers */
     qemu_irq irqs[ECLIC_MAX_HARTS][4096];
@@ -127,9 +145,10 @@ DeviceState *nuclei_eclic_create(hwaddr addr, uint32_t aperture_size, bool prv_s
                                uint8_t clicintctlbits);
 qemu_irq nuclei_eclic_get_irq(DeviceState *dev, int irq, int hartid);
 void nuclei_eclic_systimer_cb(DeviceState *dev);
-void riscv_cpu_eclic_int_handler_start(void *eclic_ptr, int irq, int hartid);
+void riscv_cpu_eclic_int_handler_start(void *eclic_ptr, int mode, int irq, int hartid);
+void riscv_cpu_eclic_int_handler_start_s(void *eclic_ptr, int mode, int irq, int hartid);
 bool riscv_intc_is_clic_mode(CPUArchState *env);
-void nuclei_eclic_next_interrupt(void *eclic, int hartid);
+void nuclei_eclic_next_interrupt(void *eclic, int mode, int hartid);
 bool nuclei_eclic_shv_interrupt(void *opaque, int mode, int hartid, int irq);
 bool nuclei_eclic_edge_triggered(void *opaque, int mode, int hartid, int irq);
 void nuclei_eclic_clean_pending(void *opaque, int mode, int hartid, int irq);

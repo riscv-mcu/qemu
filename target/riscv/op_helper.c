@@ -272,17 +272,6 @@ target_ulong helper_sret(CPURISCVState *env)
     uint64_t mstatus;
     target_ulong prev_priv, prev_virt;
 
-    if (riscv_intc_is_clic_mode(env)) {
-        CPUState *cs = env_cpu(env);
-        target_ulong spil = get_field(env->scause, SCAUSE_SPIL);
-        env->mintstatus = set_field(env->mintstatus, MINTSTATUS_SIL, spil);
-        env->scause = set_field(env->scause, SCAUSE_SPIE, 0);
-        env->scause = set_field(env->scause, SCAUSE_SPP, PRV_U);
-        bql_lock();
-        nuclei_eclic_next_interrupt(env->eclic, cs->cpu_index);
-        bql_unlock();
-    }
-
     if (!(env->priv >= PRV_S)) {
         riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, GETPC());
     }
@@ -300,12 +289,23 @@ target_ulong helper_sret(CPURISCVState *env)
         riscv_raise_exception(env, RISCV_EXCP_VIRT_INSTRUCTION_FAULT, GETPC());
     }
 
+    if (riscv_intc_is_clic_mode(env)) {
+        target_ulong spil = get_field(env->scause, SCAUSE_SPIL);
+        env->mintstatus = set_field(env->mintstatus, MINTSTATUS_SIL, spil);
+        env->scause = set_field(env->scause, SCAUSE_SPIE, 0);
+        env->scause = set_field(env->scause, SCAUSE_SPP, PRV_S);
+    }
+
     mstatus = env->mstatus;
     prev_priv = get_field(mstatus, MSTATUS_SPP);
     mstatus = set_field(mstatus, MSTATUS_SIE,
                         get_field(mstatus, MSTATUS_SPIE));
     mstatus = set_field(mstatus, MSTATUS_SPIE, 1);
-    mstatus = set_field(mstatus, MSTATUS_SPP, PRV_U);
+    if (riscv_intc_is_clic_mode(env)) {
+        mstatus = set_field(mstatus, MSTATUS_SPP, PRV_S);
+    } else {
+        mstatus = set_field(mstatus, MSTATUS_SPP, PRV_U);
+    }
     if (env->priv_ver >= PRIV_VERSION_1_12_0) {
         mstatus = set_field(mstatus, MSTATUS_MPRV, 0);
     }
@@ -329,6 +329,13 @@ target_ulong helper_sret(CPURISCVState *env)
     }
 
     riscv_cpu_set_mode(env, prev_priv);
+
+    if (riscv_intc_is_clic_mode(env)) {
+        CPUState *cs = env_cpu(env);
+        bql_lock();
+        nuclei_eclic_next_interrupt(env->eclic, PRV_S, cs->cpu_index);
+        bql_unlock();
+    }
 
     return retpc;
 }
@@ -387,7 +394,7 @@ target_ulong helper_mret(CPURISCVState *env)
     if (riscv_intc_is_clic_mode(env)) {
         CPUState *cs = env_cpu(env);
         bql_lock();
-        nuclei_eclic_next_interrupt(env->eclic, cs->cpu_index);
+        nuclei_eclic_next_interrupt(env->eclic, PRV_M, cs->cpu_index);
         bql_unlock();
     }
 

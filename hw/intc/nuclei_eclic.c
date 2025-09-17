@@ -37,12 +37,16 @@
 
 static void nuclei_eclic_update_intmth(NucleiECLICState *eclic, int irq, int hartid, int mth);
 static void nuclei_eclic_update_intip(NucleiECLICState *eclic, int irq, int hartid, int new_intip);
-static void nuclei_eclic_update_intie(NucleiECLICState *eclic, int irq, int hartid, int new_intie);
-static void nuclei_eclic_update_intattr(NucleiECLICState *eclic, int irq, int hartid, int new_intattr);
-static void nuclei_eclic_update_intctl(NucleiECLICState *eclic, int irq, int hartid, int new_intctl);
+static void nuclei_eclic_update_intie(NucleiECLICState *eclic, int mode, int irq, int hartid, int new_intie);
+static void nuclei_eclic_update_intattr(NucleiECLICState *eclic, int mode, int irq, int hartid, int new_intattr);
+static void nuclei_eclic_update_intctl(NucleiECLICState *eclic, int mode, int irq, int hartid, int new_intctl);
 static void eclic_insert_pending_list(NucleiECLICState *eclic, int irq, int hartid);
-static void eclic_remove_pending_list(NucleiECLICState *eclic, int irq, int hartid);
+static void eclic_insert_pending_list_s(NucleiECLICState *eclic, int irq, int hartid);
+static void eclic_remove_pending_list(NucleiECLICState *eclic, int mode, int irq, int hartid);
 static void update_eclic_int_info(NucleiECLICState *eclic, int irq, int hartid);
+static void update_eclic_int_info_s(NucleiECLICState *eclic, int irq, int hartid);
+static void nuclei_eclic_update_intsth(NucleiECLICState *eclic, int irq, int hartid, int sth);
+static void nuclei_eclic_update_intip_s(NucleiECLICState *eclic, int irq, int hartid, int new_intip);
 
 /*
 6'b000011:clic
@@ -50,8 +54,8 @@ else:     clint
  */
 bool riscv_intc_is_clic_mode(CPUArchState *env)
 {
-    target_ulong xtvec = (env->priv == PRV_M) ? env->mtvec : env->stvec;
-    return env->eclic && ((xtvec & 0x3F) == 3);
+    // Currently, eclic is only marked in mtvec.
+    return env->eclic && ((env->mtvec & 0x3F) == 3);
 }
 
 qemu_irq nuclei_eclic_get_irq(DeviceState *dev, int irq, int hartid)
@@ -77,8 +81,12 @@ static uint64_t nuclei_eclic_read(void *opaque, hwaddr offset, unsigned size)
     uint32_t shift = 0;
     uint32_t hartid = nuclei_eclic_get_current_cpu(eclic);
 
-    if (offset >= NUCLEI_ECLIC_REG_CLICINTIP_BASE)
-    {
+    if (offset >= NUCLEI_ECLIC_REG_CLICINTIP_BASE_S) {
+        shift = offset & 0x3;
+        irq = (offset - shift - 0x3000) / 4;
+        //返回寄存器列表
+        offset = offset - 4 * irq;
+    } else if (offset >= NUCLEI_ECLIC_REG_CLICINTIP_BASE) {
         shift = offset & 0x3;
         irq = (offset - shift - 0x1000) / 4;
         //返回寄存器列表
@@ -122,6 +130,31 @@ static uint64_t nuclei_eclic_read(void *opaque, hwaddr offset, unsigned size)
     case NUCLEI_ECLIC_REG_CLICINTCTL_BASE:
         value = eclic->clicintctl[hartid][irq] & 0xFF;
         break;
+    case NUCLEI_ECLIC_REG_SINTTHRESH:
+        value = ((uint32_t)eclic->sth[hartid] << 8);
+        break;
+    case NUCLEI_ECLIC_REG_STH:
+        value = eclic->sth[hartid] & 0xFF;
+        break;
+    case NUCLEI_ECLIC_REG_CLICINTIP_BASE_S:
+        if (size == 4) {
+            value = (uint32_t)eclic->clicintip_s[hartid][irq] | ((uint32_t)eclic->clicintie_s[hartid][irq] << 8) | \
+                    ((uint32_t)eclic->clicintattr_s[hartid][irq] << 16) | ((uint32_t)eclic->clicintctl_s[hartid][irq] << 24);
+        } else if (size == 2) {
+            value = (uint32_t)eclic->clicintip_s[hartid][irq] | ((uint32_t)eclic->clicintie_s[hartid][irq] << 8);
+        } else {
+            value = eclic->clicintip_s[hartid][irq] & 0xFF;
+        }
+        break;
+    case NUCLEI_ECLIC_REG_CLICINTIE_BASE_S:
+        value = eclic->clicintie_s[hartid][irq] & 0xFF;
+        break;
+    case NUCLEI_ECLIC_REG_CLICINTATTR_BASE_S:
+        value = eclic->clicintattr_s[hartid][irq] & 0xFF;
+        break;
+    case NUCLEI_ECLIC_REG_CLICINTCTL_BASE_S:
+        value = eclic->clicintctl_s[hartid][irq] & 0xFF;
+        break;
     default:
         break;
     }
@@ -146,8 +179,12 @@ static void nuclei_eclic_write(void *opaque, hwaddr offset, uint64_t value,
     uint32_t hartid = nuclei_eclic_get_current_cpu(eclic);
     uint32_t shift = 0;
 
-    if (offset >= NUCLEI_ECLIC_REG_CLICINTIP_BASE)
-    {
+    if (offset >= NUCLEI_ECLIC_REG_CLICINTIP_BASE_S) {
+        shift = offset & 0x3;
+        irq = (offset - shift - 0x3000) / 4;
+        //返回寄存器列表
+        offset = offset - 4 * irq;
+    } else if (offset >= NUCLEI_ECLIC_REG_CLICINTIP_BASE) {
         shift = offset & 0x3;
         irq = (offset - shift - 0x1000) / 4;
         //返回寄存器列表
@@ -159,6 +196,7 @@ static void nuclei_eclic_write(void *opaque, hwaddr offset, uint64_t value,
         eclic->cliccfg[hartid] = value & 0xFF;
         for (irq = 0; irq < eclic->num_sources; irq++)
         {
+            update_eclic_int_info_s(eclic, irq, hartid);
             update_eclic_int_info(eclic, irq, hartid);
         }
         break;
@@ -181,19 +219,52 @@ static void nuclei_eclic_write(void *opaque, hwaddr offset, uint64_t value,
             else if ((eclic->clicintip[hartid][irq] == 1) && (value & 0x1) == 0)
             {
                 eclic->clicintip[hartid][irq] = 0;
-                eclic_remove_pending_list(eclic, irq, hartid);
+                eclic_remove_pending_list(eclic, PRV_M, irq, hartid);
             }
         }
-        nuclei_eclic_next_interrupt(eclic, hartid);
+        nuclei_eclic_next_interrupt(eclic, PRV_M, hartid);
         break;
     case NUCLEI_ECLIC_REG_CLICINTIE_BASE:
-        nuclei_eclic_update_intie(eclic, irq, hartid, value & 0xFF);
+        nuclei_eclic_update_intie(eclic, PRV_M, irq, hartid, value & 0xFF);
         break;
     case NUCLEI_ECLIC_REG_CLICINTATTR_BASE:
-        nuclei_eclic_update_intattr(eclic, irq, hartid, value & 0xFF);
+        nuclei_eclic_update_intattr(eclic, PRV_M, irq, hartid, value & 0xFF);
         break;
     case NUCLEI_ECLIC_REG_CLICINTCTL_BASE:
-        nuclei_eclic_update_intctl(eclic, irq, hartid, value & 0xFF);
+        nuclei_eclic_update_intctl(eclic, PRV_M, irq, hartid, value & 0xFF);
+        break;
+    case NUCLEI_ECLIC_REG_SINTTHRESH:
+        if (size == 4) {
+            nuclei_eclic_update_intsth(eclic, irq, hartid, (value >> 24) & 0xFF);
+        }
+        break;
+    case NUCLEI_ECLIC_REG_STH:
+        nuclei_eclic_update_intsth(eclic, irq, hartid, value & 0xFF);
+        break;
+    case NUCLEI_ECLIC_REG_CLICINTIP_BASE_S:
+        if ((eclic->clicintlist_s[hartid][irq].trigger & 0x1) != 0)
+        {
+            if ((eclic->clicintip_s[hartid][irq] == 0) && (value & 0x1) == 1)
+            {
+                eclic->clicintip_s[hartid][irq] = 1;
+                eclic_insert_pending_list_s(eclic, irq, hartid);
+            }
+            else if ((eclic->clicintip_s[hartid][irq] == 1) && (value & 0x1) == 0)
+            {
+                eclic->clicintip_s[hartid][irq] = 0;
+                eclic_remove_pending_list(eclic, PRV_S, irq, hartid);
+            }
+        }
+        nuclei_eclic_next_interrupt(eclic, PRV_S, hartid);
+        break;
+    case NUCLEI_ECLIC_REG_CLICINTIE_BASE_S:
+        nuclei_eclic_update_intie(eclic, PRV_S, irq, hartid, value & 0xFF);
+        break;
+    case NUCLEI_ECLIC_REG_CLICINTATTR_BASE_S:
+        nuclei_eclic_update_intattr(eclic, PRV_S, irq, hartid, value & 0xFF);
+        break;
+    case NUCLEI_ECLIC_REG_CLICINTCTL_BASE_S:
+        nuclei_eclic_update_intctl(eclic, PRV_S, irq, hartid, value & 0xFF);
         break;
     default:
         break;
@@ -243,7 +314,6 @@ static void update_eclic_int_info(NucleiECLICState *eclic, int irq, int hartid)
     else
         eclic->clicintlist[hartid][irq].prio = (eclic->clicintctl[hartid][irq] >> (8 - level_width)) &
                                        ~(0x80 >> (8 - prio_width));
-
     eclic->clicintlist[hartid][irq].enable = eclic->clicintie[hartid][irq] & 0x1;
     // 0, level triggered; 2, rising edge; 3, falling edge
     eclic->clicintlist[hartid][irq].trigger = (eclic->clicintattr[hartid][irq] >> 1) & 0x3;
@@ -253,58 +323,115 @@ bool nuclei_eclic_shv_interrupt(void *opaque, int mode, int hartid, int irq)
 {
     NucleiECLICState *eclic = (NucleiECLICState *)opaque;
     int shv;
-    shv = eclic->clicintattr[hartid][irq] & 0x1;
+    shv = ((mode <= PRV_S) ? eclic->clicintattr_s[hartid][irq] : eclic->clicintattr[hartid][irq]) & 0x1;
     return shv;
 }
 
 bool nuclei_eclic_edge_triggered(void *opaque, int mode, int hartid, int irq)
 {
     NucleiECLICState *eclic = (NucleiECLICState *)opaque;
-    return (eclic->clicintattr[hartid][irq] >> 1) & 0x1;
+        return (((mode <= PRV_S) ? eclic->clicintattr_s[hartid][irq]
+                : eclic->clicintattr[hartid][irq]) >> 1) & 0x1;
 }
 
 void nuclei_eclic_clean_pending(void *opaque, int mode, int hartid, int irq)
 {
     NucleiECLICState *eclic = (NucleiECLICState *)opaque;
-    eclic->clicintip[hartid][irq] = 0;
-    eclic_remove_pending_list(eclic, irq, hartid);
+    if (mode <= PRV_S) {
+        eclic->clicintip_s[hartid][irq] = 0;
+    } else {
+        eclic->clicintip[hartid][irq] = 0;
+    }
+    eclic_remove_pending_list(eclic, mode, irq, hartid);
 }
 
+static void update_eclic_int_info_s(NucleiECLICState *eclic, int irq, int hartid)
+{
+    int level_width = (eclic->cliccfg[hartid] >> 1) & 0xF; // cliccfg.nlbits
+    if (level_width > CLICINTCTLBITS)
+        level_width = CLICINTCTLBITS;
+    int prio_width = CLICINTCTLBITS - level_width;
 
-void nuclei_eclic_next_interrupt(void *eclic_ptr, int hartid)
+    if (level_width == 0)
+        eclic->clicintlist_s[hartid][irq].level = 255;
+    else
+        eclic->clicintlist_s[hartid][irq].level = (((eclic->clicintctl_s[hartid][irq] >> (8 - level_width)) &
+                                          ~((char)0x80 >> (8 - level_width)))
+                                         << (8 - level_width)) |
+                                        (0xff >> level_width);
+
+    // TODO: implement priority decode logic when width > CLICINTCTLBITS or zeros
+    if (prio_width == 0)
+        eclic->clicintlist_s[hartid][irq].prio = 0;
+    else
+        eclic->clicintlist_s[hartid][irq].prio = (eclic->clicintctl_s[hartid][irq] >> (8 - level_width)) &
+                                       ~(0x80 >> (8 - prio_width));
+    eclic->clicintlist_s[hartid][irq].enable = eclic->clicintie_s[hartid][irq] & 0x1;
+    // 0, level triggered; 2, rising edge; 3, falling edge
+    eclic->clicintlist_s[hartid][irq].trigger = (eclic->clicintattr_s[hartid][irq] >> 1) & 0x3;
+}
+
+void nuclei_eclic_next_interrupt(void *eclic_ptr, int mode, int hartid)
 {
     RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(hartid));
     NucleiECLICState *eclic = (NucleiECLICState *)eclic_ptr;
     ECLICPendingInterrupt *active;
-    int mode = PRV_M;
     int exccode;
 
-    QLIST_FOREACH(active, &eclic->pending_list[hartid], next)
-    {
-        if (active->enable)
+    if (mode <= PRV_S) {
+        QLIST_FOREACH(active, &eclic->pending_list_s[hartid], next)
         {
-            if (active->level >= eclic->mth[hartid])
+            if (active->enable)
             {
-                exccode = active->irq | mode << 12 | active->level << 14;
-                eclic->exccode[0] = exccode;
-                eclic->active_count++;
-                riscv_cpu_eclic_interrupt(cpu, exccode);
-                return;
+                if (active->level >= eclic->sth[hartid])
+                {
+                    exccode = active->irq | mode << 12 | active->level << 14;
+                    eclic->exccode[0] = exccode;
+                    eclic->active_count_s++;
+                    riscv_cpu_eclic_interrupt(cpu, exccode);
+                    return;
+                }
+            }
+        }
+    } else {
+        QLIST_FOREACH(active, &eclic->pending_list[hartid], next)
+        {
+            if (active->enable)
+            {
+                if (active->level >= eclic->mth[hartid])
+                {
+                    exccode = active->irq | mode << 12 | active->level << 14;
+                    eclic->exccode[0] = exccode;
+                    eclic->active_count++;
+                    riscv_cpu_eclic_interrupt(cpu, exccode);
+                    return;
+                }
             }
         }
     }
     riscv_cpu_eclic_interrupt(cpu, -1);
 }
 
-void riscv_cpu_eclic_int_handler_start(void *eclic_ptr, int irq, int hartid)
+void riscv_cpu_eclic_int_handler_start(void *eclic_ptr, int mode, int irq, int hartid)
 {
     NucleiECLICState *eclic = (NucleiECLICState *)eclic_ptr;
     if ((eclic->clicintlist[hartid][irq].trigger & 0x1) != 0)
     {
         eclic->clicintip[hartid][irq] = 0;
-        eclic_remove_pending_list(eclic, irq, hartid);
+        eclic_remove_pending_list(eclic, mode, irq, hartid);
     }
-    nuclei_eclic_next_interrupt(eclic, hartid);
+    nuclei_eclic_next_interrupt(eclic, mode, hartid);
+}
+
+void riscv_cpu_eclic_int_handler_start_s(void *eclic_ptr, int mode, int irq, int hartid)
+{
+    NucleiECLICState *eclic = (NucleiECLICState *)eclic_ptr;
+    if ((eclic->clicintlist_s[hartid][irq].trigger & 0x1) != 0)
+    {
+        eclic->clicintip_s[hartid][irq] = 0;
+        eclic_remove_pending_list(eclic, mode, irq, hartid);
+    }
+    nuclei_eclic_next_interrupt(eclic, mode, hartid);
 }
 
 static int level_compare(NucleiECLICState *eclic, ECLICPendingInterrupt *irq1, ECLICPendingInterrupt *irq2)
@@ -350,6 +477,8 @@ extern uint32_t cidu_int_indicator;
 static void nuclei_eclic_irq_request(void *opaque, int id, int new_intip)
 {
     NucleiECLICState *eclic = NUCLEI_ECLIC(opaque);
+    RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(nuclei_eclic_get_current_cpu(opaque)));
+    CPURISCVState *env = &cpu->env;
 
     if (id < Internal_Reserved_Max_IRQn)
     {
@@ -361,7 +490,11 @@ static void nuclei_eclic_irq_request(void *opaque, int id, int new_intip)
         {
             for (int i = 0; i < eclic->num_harts; i++)
             {
-                nuclei_eclic_update_intip(eclic, id, i, new_intip);
+                if (env->priv <= PRV_S) {
+                    nuclei_eclic_update_intip_s(eclic, id, i, new_intip);
+                } else {
+                    nuclei_eclic_update_intip(eclic, id, i, new_intip);
+                }
             }
         }
     }
@@ -372,8 +505,13 @@ static void nuclei_eclic_irq_request(void *opaque, int id, int new_intip)
             if (cidu_int_indicator != 0) {
                 if(cidu_int_indicator & (1U << i))
                     nuclei_eclic_update_intip(eclic, id, i, new_intip);
-            } else
-                nuclei_eclic_update_intip(eclic, id, i, new_intip);
+            } else {
+                if (env->priv <= PRV_S) {
+                    nuclei_eclic_update_intip_s(eclic, id, i, new_intip);
+                } else {
+                    nuclei_eclic_update_intip(eclic, id, i, new_intip);
+                }
+            }
         }
     }
 }
@@ -381,7 +519,13 @@ static void nuclei_eclic_irq_request(void *opaque, int id, int new_intip)
 static void nuclei_eclic_update_intmth(NucleiECLICState *eclic, int irq, int hartid, int mth)
 {
     eclic->mth[hartid] = mth;
-    nuclei_eclic_next_interrupt(eclic, hartid);
+    nuclei_eclic_next_interrupt(eclic, PRV_M, hartid);
+}
+
+static void nuclei_eclic_update_intsth(NucleiECLICState *eclic, int irq, int hartid, int sth)
+{
+    eclic->sth[hartid] = sth;
+    nuclei_eclic_next_interrupt(eclic, PRV_S, hartid);
 }
 
 static void eclic_insert_pending_list(NucleiECLICState *eclic, int irq, int hartid)
@@ -409,9 +553,38 @@ static void eclic_insert_pending_list(NucleiECLICState *eclic, int irq, int hart
     }
 }
 
-static void eclic_remove_pending_list(NucleiECLICState *eclic, int irq, int hartid)
+static void eclic_insert_pending_list_s(NucleiECLICState *eclic, int irq, int hartid)
 {
-    QLIST_REMOVE(&eclic->clicintlist[hartid][irq], next);
+    ECLICPendingInterrupt *node;
+    if (QLIST_EMPTY(&eclic->pending_list_s[hartid]))
+    {
+        QLIST_INSERT_HEAD(&eclic->pending_list_s[hartid], &eclic->clicintlist_s[hartid][irq], next);
+    }
+    else
+    {
+        QLIST_FOREACH(node, &eclic->pending_list_s[hartid], next)
+        {
+            if (level_compare(eclic, node, &eclic->clicintlist_s[hartid][irq]))
+            {
+                QLIST_INSERT_BEFORE(node, &eclic->clicintlist_s[hartid][irq], next);
+                break;
+            }
+            else if (node->next.le_next == NULL)
+            {
+                QLIST_INSERT_AFTER(node, &eclic->clicintlist_s[hartid][irq], next);
+                break;
+            }
+        }
+    }
+}
+
+static void eclic_remove_pending_list(NucleiECLICState *eclic, int mode, int irq, int hartid)
+{
+    if (mode <= PRV_S) {
+        QLIST_REMOVE(&eclic->clicintlist_s[hartid][irq], next);
+    } else {
+        QLIST_REMOVE(&eclic->clicintlist[hartid][irq], next);
+    }
 }
 
 static void nuclei_eclic_update_intip(NucleiECLICState *eclic, int irq, int hartid, int new_intip)
@@ -438,37 +611,83 @@ static void nuclei_eclic_update_intip(NucleiECLICState *eclic, int irq, int hart
         else
         {
             if (eclic->clicintip[current_hart_id][irq])
-                eclic_remove_pending_list(eclic, irq, current_hart_id);
+                eclic_remove_pending_list(eclic, PRV_M, irq, current_hart_id);
             eclic->clicintip[current_hart_id][irq] = 0;
             eclic->clicintlist[current_hart_id][irq].sig = new_intip;
         }
-
     }
-
-    nuclei_eclic_next_interrupt(eclic, hartid);
+    nuclei_eclic_next_interrupt(eclic, PRV_M, hartid);
 }
 
-static void nuclei_eclic_update_intie(NucleiECLICState *eclic, int irq, int hartid, int new_intie)
+static void nuclei_eclic_update_intip_s(NucleiECLICState *eclic, int irq, int hartid, int new_intip)
 {
-    eclic->clicintie[hartid][irq] = new_intie;
-    update_eclic_int_info(eclic, irq, hartid);
-    nuclei_eclic_next_interrupt(eclic, hartid);
+    uint32_t current_hart_id;
+    current_hart_id = nuclei_eclic_get_current_cpu(eclic);
+
+    int old_intip = eclic->clicintlist_s[hartid][irq].sig;
+    int trigger = (eclic->clicintattr_s[hartid][irq] >> 1) & 0x3;
+    if((old_intip == new_intip) &&  (new_intip != 0))
+    {
+
+    }
+    else
+    {
+        if (((trigger == 0) && new_intip) ||
+            ((trigger == 1) && !old_intip && new_intip) ||
+            ((trigger == 3) && old_intip && !new_intip))
+        {
+            eclic->clicintip_s[hartid][irq] = 1;
+            eclic->clicintlist_s[hartid][irq].sig = new_intip;
+            eclic_insert_pending_list_s(eclic, irq, hartid);
+        }
+        else
+        {
+            if (eclic->clicintip_s[current_hart_id][irq])
+                eclic_remove_pending_list(eclic, PRV_S, irq, current_hart_id);
+            eclic->clicintip_s[current_hart_id][irq] = 0;
+            eclic->clicintlist_s[current_hart_id][irq].sig = new_intip;
+        }
+    }
+
+    nuclei_eclic_next_interrupt(eclic, PRV_S, hartid);
+}
+
+static void nuclei_eclic_update_intie(NucleiECLICState *eclic, int mode, int irq, int hartid, int new_intie)
+{
+    if (mode <= PRV_S) {
+        eclic->clicintie_s[hartid][irq] = new_intie;
+        update_eclic_int_info_s(eclic, irq, hartid);
+    } else {
+        eclic->clicintie[hartid][irq] = new_intie;
+        update_eclic_int_info(eclic, irq, hartid);
+    }
+    nuclei_eclic_next_interrupt(eclic, mode, hartid);
 }
 
 // TODO: intattr not supposed to be changed during runtime?
-static void nuclei_eclic_update_intattr(NucleiECLICState *eclic, int irq, int hartid, int new_intattr)
+static void nuclei_eclic_update_intattr(NucleiECLICState *eclic, int mode, int irq, int hartid, int new_intattr)
 {
-    eclic->clicintattr[hartid][irq] = new_intattr;
-    update_eclic_int_info(eclic, irq, hartid);
-    nuclei_eclic_next_interrupt(eclic, hartid);
+    if (mode <= PRV_S) {
+        eclic->clicintattr_s[hartid][irq] = new_intattr;
+        update_eclic_int_info_s(eclic, irq, hartid);
+    } else {
+        eclic->clicintattr[hartid][irq] = new_intattr;
+        update_eclic_int_info(eclic, irq, hartid);
+    }
+    nuclei_eclic_next_interrupt(eclic, mode, hartid);
 }
 
 // TODO: intctl not supposed to be changed during runtime?
-static void nuclei_eclic_update_intctl(NucleiECLICState *eclic, int irq, int hartid, int new_intctl)
+static void nuclei_eclic_update_intctl(NucleiECLICState *eclic, int mode, int irq, int hartid, int new_intctl)
 {
-    eclic->clicintctl[hartid][irq] = new_intctl;
-    update_eclic_int_info(eclic, irq, hartid);
-    nuclei_eclic_next_interrupt(eclic, hartid);
+    if (mode <= PRV_S) {
+        eclic->clicintctl_s[hartid][irq] = new_intctl;
+        update_eclic_int_info_s(eclic, irq, hartid);
+    } else {
+        eclic->clicintctl[hartid][irq] = new_intctl;
+        update_eclic_int_info(eclic, irq, hartid);
+    }
+    nuclei_eclic_next_interrupt(eclic, mode, hartid);
 }
 
 static void nuclei_eclic_realize(DeviceState *dev, Error **errp)
@@ -484,16 +703,18 @@ static void nuclei_eclic_realize(DeviceState *dev, Error **errp)
 
     for (int i = 0; i < eclic->num_harts; i++)
     {
+        RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(i));
 
         QLIST_INIT(&eclic->pending_list[i]);
         for (id = 0; id < eclic->num_sources; id++)
         {
+            eclic->clicintlist_s[i][id].irq = id;
+            update_eclic_int_info_s(eclic, id, i);
             eclic->clicintlist[i][id].irq = id;
             update_eclic_int_info(eclic, id, i);
         }
         eclic->active_count = 0;
-
-        RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(i));
+        eclic->active_count_s = 0;
 
         /* Init ECLIC IRQ */
         eclic->irqs[i][Internal_SysTimerSW_IRQn] = qemu_allocate_irq(nuclei_eclic_irq_request,

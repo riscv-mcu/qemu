@@ -301,7 +301,7 @@ enum
 #define EVALSOC_MSTACK_BOUND        0xffffffff
 #define EVALSOC_MSTACK_BASE         0xffffffff
 #define EVALSOC_MCACHE_CTL          0x20004
-#define EVALSOC_MCFG_INFO           0x810fcc
+#define EVALSOC_MCFG_INFO           0x810fcd
 #define EVALSOC_MICFG_INFO          0xd0137
 #define EVALSOC_MDCFG_INFO          0xd0137
 #define EVALSOC_MTLBCFG_INFO        0x2d02b4

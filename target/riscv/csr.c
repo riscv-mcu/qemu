@@ -4899,6 +4899,23 @@ static int write_stvt(CPURISCVState *env, int csrno, target_ulong val)
     return RISCV_EXCP_NONE;
 }
 
+static int read_stvt2(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    int low_bit = 0;
+    if(env->stvt2 & 0x01)
+    {
+        low_bit = 1;
+    }
+    *val = ((env->stvt2 & (target_ulong)(~0x3)) | low_bit);
+    return RISCV_EXCP_NONE;
+}
+
+static int write_stvt2(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->stvt2 = val;
+    return RISCV_EXCP_NONE;
+}
+
 static int read_mirgb_info(CPURISCVState *env, int csrno, target_ulong *val)
 {
     if (env->mcfg_info & (1 << 16)) {
@@ -5197,7 +5214,7 @@ static int rmw_jalmnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
         env->gpr[1] = env->pc;  //ret use
         *ret_value = addr;
         env->mstatus = set_field(env->mstatus, MSTATUS_MIE, 1);
-        riscv_cpu_eclic_int_handler_start(env->eclic, env->mcause & 0x3ff, env->mhartid);
+        riscv_cpu_eclic_int_handler_start(env->eclic, env->priv, env->mcause & 0x3ff, env->mhartid);
     } else
         *ret_value = env->pc;
 #endif
@@ -5249,6 +5266,39 @@ static int rmw_pushmepc(CPURISCVState *env, int csrno, target_ulong *ret_value,
     notify_addr = new_value * riscv_addr_size + env->gpr[2];
     cpu_physical_memory_rw(notify_addr, &env->mepc, riscv_addr_size, 1);
 
+    return RISCV_EXCP_NONE;
+}
+
+static int rmw_jalsnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                target_ulong new_value, target_ulong write_mask)
+{
+#ifndef CONFIG_USER_ONLY
+    target_ulong addr;
+
+    // If in debug mode, directly return
+    if (env->debugger) {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+        return RISCV_EXCP_NONE;
+    }
+
+    uint32_t riscv_addr_size = 4;
+    if (riscv_cpu_mxl(env) == MXL_RV32) {
+    } else {
+        riscv_addr_size = 8;
+    }
+
+    if (env->irq_pending) {
+        uint64_t vec_addr = (env->scause & 0x3FF) *riscv_addr_size + env->stvt;
+        cpu_physical_memory_rw(vec_addr, &addr,  riscv_addr_size, 0);
+        env->gpr[1] = env->pc;
+        *ret_value = addr;
+        env->mstatus = set_field(env->mstatus, MSTATUS_SIE, 1);
+        riscv_cpu_eclic_int_handler_start_s(env->eclic, env->priv, env->scause & 0x3ff, env->mhartid);
+    } else
+        *ret_value = env->pc + riscv_addr_size;
+#endif
     return RISCV_EXCP_NONE;
 }
 
@@ -5322,7 +5372,7 @@ static int write_sleepvalue(CPURISCVState *env, int csrno, target_ulong val)
 {
     env->sleepvalue = val;
 #if !defined(CONFIG_USER_ONLY)
-    riscv_cpu_eclic_int_handler_start(env->eclic, env->mcause & val, env->mhartid);
+    riscv_cpu_eclic_int_handler_start(env->eclic, env->priv, env->mcause & val, env->mhartid);
 #endif
     return RISCV_EXCP_NONE;
 }
@@ -6299,10 +6349,10 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_SMPUADDR62]     = { "smpuaddr62",   any, read_zero, write_ignore },
     [CSR_NUCLEI_SMPUADDR63]     = { "smpuaddr63",   any, read_zero, write_ignore },
 
-    [CSR_NUCLEI_JALSNXTI]       = { "jalsnxti",     any, read_zero, write_ignore },
-    [CSR_NUCLEI_STVT2]          = { "stvt2",        any, read_zero, write_ignore },
-    [CSR_NUCLEI_PUSHSCAUSE]     = { "pushscause",   any, NULL, NULL, rmw_pushscause },
-    [CSR_NUCLEI_PUSHSEPC]       = { "pushsepc",     any, NULL, NULL, rmw_pushsepc },
+    [CSR_NUCLEI_JALSNXTI]       = { "jalsnxti",     smode, NULL, NULL, rmw_jalsnxti },
+    [CSR_NUCLEI_STVT2]          = { "stvt2",        smode, read_stvt2,write_stvt2 },
+    [CSR_NUCLEI_PUSHSCAUSE]     = { "pushscause",   smode, NULL, NULL, rmw_pushscause },
+    [CSR_NUCLEI_PUSHSEPC]       = { "pushsepc",     smode, NULL, NULL, rmw_pushsepc },
 
     /* === Nuclei custom CSR Registers === */
     [CSR_NUCLEI_MILM_CTL]       = { "milm_ctl",     any, read_zero, write_ignore },
@@ -6425,10 +6475,10 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     /* Machine Mode Core Level Interrupt Controller */
     [CSR_MINTSTATUS]            = {"mintstatus",      any, read_mintstatus, write_mintthresh },
     /* Supervisor Mode Core Level Interrupt Controller */
-    [CSR_SINTSTATUS]            = {"sintstatus",      any, read_sintstatus, write_sintthresh },
+    [CSR_SINTSTATUS]            = {"sintstatus",      smode, read_sintstatus, write_sintthresh },
     [CSR_SSCRATCHCSW]           = {"sscratchcsw",     any, read_zero, write_ignore },
     /* Supervisor Mode Core Level Interrupt Controller */
-    [CSR_STVT]                  = { "stvt",           any, read_stvt, write_stvt },
-    [CSR_SNXTI]                 = { "snxti",          any, NULL, NULL, rmw_snxti },
+    [CSR_STVT]                  = { "stvt",           smode, read_stvt, write_stvt },
+    [CSR_SNXTI]                 = { "snxti",          smode, NULL, NULL, rmw_snxti },
 #endif /* !CONFIG_USER_ONLY */
 };

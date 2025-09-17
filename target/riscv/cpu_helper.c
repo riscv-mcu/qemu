@@ -79,12 +79,14 @@ static int riscv_cpu_local_irq_mode_enabled(CPUState *cs, int excode, int level)
     CPURISCVState *env = &cpu->env;
 
     target_ulong mintstatus_mil = get_field(env->mintstatus, MINTSTATUS_MIL);
+    target_ulong mintstatus_sil = get_field(env->mintstatus, MINTSTATUS_SIL);
 
-    if(mintstatus_mil >= level)
-    {
+    if(((env->priv == PRV_M) && (mintstatus_mil >= level))
+        || ((env->priv == PRV_S) && (mintstatus_sil >= level))) {
         return false;
     }
-    return env->priv < PRV_M ||  (env->priv == PRV_M && get_field(env->mstatus, MSTATUS_MIE));
+    return (env->priv == PRV_M && get_field(env->mstatus, MSTATUS_MIE))
+            || (env->priv == PRV_S && get_field(env->mstatus, MSTATUS_SIE));
 }
 #endif
 
@@ -1862,13 +1864,20 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         mode = (cause >> 12) & 0x3;
         level = (cause >> 14) & 0xFF;
         cause &= 0x3ff;
-        cause |= get_field(env->mstatus, MSTATUS_MPP) << 28;
-        cause |= get_field(env->mintstatus, MINTSTATUS_MIL) << 16;
-        cause |= get_field(env->mstatus, MSTATUS_MPIE) << 27;
-        cause = set_field(cause, MCAUSE_MPP, PRV_M);
-        cause = set_field(cause, MCAUSE_INTERRUPT, 1);
+        if (env->priv <= PRV_S)
+        {
+            cause |= get_field(env->mstatus, MSTATUS_SPP) << 28;
+            cause |= get_field(env->mintstatus, MINTSTATUS_SIL) << 16;
+            env->mintstatus = set_field(env->mintstatus, MINTSTATUS_SIL, level);
+        } else {
+            cause |= get_field(env->mstatus, MSTATUS_MPP) << 28;
+            cause |= get_field(env->mintstatus, MINTSTATUS_MIL) << 16;
+            cause |= get_field(env->mstatus, MSTATUS_MPIE) << 27;
+            cause = set_field(cause, MCAUSE_MPP, PRV_M);
+            cause = set_field(cause, MCAUSE_INTERRUPT, 1);
 
-        env->mintstatus = set_field(env->mintstatus, MINTSTATUS_MIL, level);
+            env->mintstatus = set_field(env->mintstatus, MINTSTATUS_MIL, level);
+        }
     }else{
         cause = set_field(cause, MCAUSE_INTERRUPT, 0);
     }
@@ -1882,9 +1891,29 @@ void riscv_cpu_do_interrupt(CPUState *cs)
                   __func__, env->mhartid, async, cause, env->pc, tval,
                   riscv_cpu_get_trap_name(cause, async));
 
-    if (env->priv <= PRV_S && cause < 64 &&
-        (((deleg >> cause) & 1) || s_injected || vs_injected)) {
+    if (env->priv <= PRV_S && ((cause < 64 &&
+        (((deleg >> cause) & 1) || s_injected || vs_injected)) || eclic_flag)) {
         /* handle the trap in S-mode */
+        if (eclic_flag) {
+            uint32_t riscv_addr_size = 4; 
+            if (riscv_cpu_mxl(env) == MXL_RV64) {
+                riscv_addr_size = 8;
+            }
+            if (nuclei_eclic_shv_interrupt(env->eclic, mode, cs->cpu_index, cause & 0x3FF)) {
+                uint64_t vec_addr = (cause & 0x3FF) *riscv_addr_size + env->stvt;
+                cpu_physical_memory_rw(vec_addr, &newpc,  riscv_addr_size, 0);
+            } else {
+                if ((env->stvt2 & 0x1) == 0) {
+                    newpc = env->stvec & 0xfffffffc;
+                } else if ((env->stvt2 & 0x1) == 1) {
+                    newpc = env->stvt2 & 0xfffffffc;
+                }
+            }
+        } else {
+            newpc = (env->stvec >> 2 << 2) +
+                ((async && (env->stvec & 3) == 1) ? cause * 4 : 0);
+        }
+
         if (riscv_has_ext(env, RVH)) {
             uint64_t hdeleg = async ? env->hideleg : env->hedeleg;
 
@@ -1932,6 +1961,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
 
         env->pc = riscv_intr_pc(env, env->stvec, env->stvt, async,
                                 eclic_flag & 0xfff, cause, PRV_S);
+        env->pc = newpc;
 
         riscv_cpu_set_mode(env, PRV_S);
     } else {
@@ -1997,8 +2027,12 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     env->two_stage_lookup = false;
     env->two_stage_indirect_lookup = false;
 
-    if (eclic_flag && nuclei_eclic_shv_interrupt(env->eclic, mode, cs->cpu_index, cause & 0x3FF)) {
-        riscv_cpu_eclic_int_handler_start(env->eclic, cause & 0x3ff, env->mhartid);
+    if (eclic_flag) {
+        if (env->priv <= PRV_S && nuclei_eclic_shv_interrupt(env->eclic, mode, cs->cpu_index, cause & 0x3FF)) {
+            riscv_cpu_eclic_int_handler_start_s(env->eclic, env->priv, cause & 0x3ff, env->mhartid);
+        } else if (env->priv == PRV_M && nuclei_eclic_shv_interrupt(env->eclic, mode, cs->cpu_index, cause & 0x3FF)) {
+            riscv_cpu_eclic_int_handler_start(env->eclic, env->priv, cause & 0x3ff, env->mhartid);
+        }
     }
 
 #endif
