@@ -1809,3 +1809,8 @@ DEF_HELPER_6(xl_vqmaccu_vv, void, ptr, ptr, ptr, ptr, env, i32)
 DEF_HELPER_6(xl_vqmacc_vv, void, ptr, ptr, ptr, ptr, env, i32)
 DEF_HELPER_6(xl_vqmaccus_vv, void, ptr, ptr, ptr, ptr, env, i32)
 DEF_HELPER_6(xl_vqmaccsu_vv, void, ptr, ptr, ptr, ptr, env, i32)
+
+/* CFI (zicfiss) helpers */
+#ifndef CONFIG_USER_ONLY
+DEF_HELPER_1(ssamoswap_disabled, void, env)
+#endif
