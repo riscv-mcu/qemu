@@ -360,6 +360,7 @@ make_qemu_zip:
 deploy-qemu:
   stage: deploy
   resource_group: deploy
+  allow_failure: true
   interruptible: true
   rules:
     # manual trigger this deploy job on not merge request pipeline
@@ -403,6 +404,7 @@ deploy-qemu:
 link-qemu:
   stage: deploy
   resource_group: deploy
+  allow_failure: true
   interruptible: true
   needs:
     - job: deploy-qemu
