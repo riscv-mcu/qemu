@@ -78,6 +78,8 @@ static int riscv_cpu_local_irq_mode_enabled(CPUState *cs, int excode, int level)
     RISCVCPU *cpu = RISCV_CPU(cs);
     CPURISCVState *env = &cpu->env;
 
+    int mode = (excode >> 12) & 0x3;
+
     target_ulong mintstatus_mil = get_field(env->mintstatus, MINTSTATUS_MIL);
     target_ulong mintstatus_sil = get_field(env->mintstatus, MINTSTATUS_SIL);
 
@@ -85,8 +87,18 @@ static int riscv_cpu_local_irq_mode_enabled(CPUState *cs, int excode, int level)
         || ((env->priv == PRV_S) && (mintstatus_sil >= level))) {
         return false;
     }
-    return (env->priv == PRV_M && get_field(env->mstatus, MSTATUS_MIE))
-            || (env->priv == PRV_S && get_field(env->mstatus, MSTATUS_SIE));
+
+    switch (mode) {
+    case PRV_M:
+        return env->priv < PRV_M ||
+               (env->priv == PRV_M && get_field(env->mstatus, MSTATUS_MIE));
+    case PRV_S:
+        return env->priv < PRV_S ||
+               (env->priv == PRV_S && get_field(env->mstatus, MSTATUS_SIE));
+    default:
+        return false;
+    }
+
 }
 #endif
 
@@ -539,10 +551,9 @@ bool riscv_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         RISCVCPU *cpu = RISCV_CPU(cs);
         CPURISCVState *env = &cpu->env;
 
-        int exccode = env->exccode & 0x3FF;
         int level = (env->exccode >> 14) & 0xFF;
 
-        int enabled = riscv_cpu_local_irq_mode_enabled(cs, exccode, level);
+        int enabled = riscv_cpu_local_irq_mode_enabled(cs, env->exccode, level);
 
         if(enabled && env->exccode ){
             cs->exception_index = RISCV_EXCP_INT_ECLIC |  env->exccode;
@@ -1864,13 +1875,13 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         mode = (cause >> 12) & 0x3;
         level = (cause >> 14) & 0xFF;
         cause &= 0x3ff;
+        cause |= get_field(env->mstatus, MSTATUS_MPP) << 28;
         if (env->priv <= PRV_S)
         {
             cause |= get_field(env->mstatus, MSTATUS_SPP) << 28;
             cause |= get_field(env->mintstatus, MINTSTATUS_SIL) << 16;
             env->mintstatus = set_field(env->mintstatus, MINTSTATUS_SIL, level);
         } else {
-            cause |= get_field(env->mstatus, MSTATUS_MPP) << 28;
             cause |= get_field(env->mintstatus, MINTSTATUS_MIL) << 16;
             cause |= get_field(env->mstatus, MSTATUS_MPIE) << 27;
             cause = set_field(cause, MCAUSE_MPP, PRV_M);
@@ -1892,7 +1903,8 @@ void riscv_cpu_do_interrupt(CPUState *cs)
                   riscv_cpu_get_trap_name(cause, async));
 
     if (env->priv <= PRV_S && ((cause < 64 &&
-        (((deleg >> cause) & 1) || s_injected || vs_injected)) || eclic_flag)) {
+        (((deleg >> cause) & 1) || s_injected || vs_injected))
+        || (eclic_flag && mode == (PRV_S)))) {
         /* handle the trap in S-mode */
         if (eclic_flag) {
             uint32_t riscv_addr_size = 4; 
@@ -1982,6 +1994,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
                     newpc = env->mtvt2 & 0xfffffffc;
                 }
             }
+            nuclei_eclic_clean_pending(env->eclic, mode, cs->cpu_index, cause & 0x3FF);
 
         } else {
             newpc = (env->mtvec >> 2 << 2) +
