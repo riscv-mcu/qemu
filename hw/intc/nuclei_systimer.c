@@ -369,6 +369,8 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
         break;
     case NUCLEI_SYSTIMER_REG_MTIMECTL:
         s->mtimectl = value;
+        if (s->mtimectl & 0x1)
+            timer_del(env->mtimer);
         break;
     case NUCLEI_SYSTIMER_REG_MSIP:
         if (riscv_intc_is_clic_mode(env)) {
