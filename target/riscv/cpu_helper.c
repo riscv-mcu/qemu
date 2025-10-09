@@ -1921,9 +1921,6 @@ void riscv_cpu_do_interrupt(CPUState *cs)
                     newpc = env->stvt2 & 0xfffffffc;
                 }
             }
-        } else {
-            newpc = (env->stvec >> 2 << 2) +
-                ((async && (env->stvec & 3) == 1) ? cause * 4 : 0);
         }
 
         if (riscv_has_ext(env, RVH)) {
@@ -1971,9 +1968,8 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         env->htval = htval;
         env->htinst = tinst;
 
-        env->pc = riscv_intr_pc(env, env->stvec, env->stvt, async,
-                                eclic_flag & 0xfff, cause, PRV_S);
-        env->pc = newpc;
+        env->pc = eclic_flag ? newpc : riscv_intr_pc(env, env->stvec, env->stvt, async,
+                                        eclic_flag & 0xfff, cause, PRV_S);
 
         riscv_cpu_set_mode(env, PRV_S);
     } else {
