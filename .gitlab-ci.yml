@@ -29,7 +29,7 @@ default:
 prepare_tools:
   stage: build
   interruptible: true
-  when: manual
+  #  when: manual
   timeout: 3h
   script:
     # prepare for docker ssh environment
@@ -51,44 +51,22 @@ prepare_tools:
     - mkdir -p $CI_PROJECT_DIR/prebuilt/
     - cd $CI_PROJECT_DIR/prebuilt/
     # test sdk
-    - mkdir -p $CI_PROJECT_DIR/prebuilt/sdk
-    - cd $CI_PROJECT_DIR/prebuilt/sdk
-    - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
+    - mkdir -p $CI_PROJECT_DIR/prebuilt/
+    - cd $CI_PROJECT_DIR/prebuilt/
+    # use nuclei sdk develop branch for testing
+    - git clone -b develop --depth 1 git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
     - cd nuclei-sdk
-    - git checkout master
     - git describe --tags --always --abbrev=10 > build.txt
     # rm unused .git
     - rm -rf .git
     # nmsis
     - cd $CI_PROJECT_DIR/prebuilt/
-    - git clone git@gito.corp.nucleisys.com:software/library/NMSIS.git
-    # checkout to develop branch for NMSIS
+    # use NMSIS master branch for testing
+    - git clone --depth 3 -b master git@gito.corp.nucleisys.com:software/library/NMSIS.git
     - cd NMSIS
-    - git checkout develop
     - git describe --tags --always --abbrev=10 > build.txt
     # rm unused .git
     - rm -rf .git
-    - cd $CI_PROJECT_DIR/prebuilt/NMSIS/NMSIS
-    - git clone git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
-    - cd nuclei-sdk
-    - git checkout master
-    - sed -i "s/64K/1M/g" SoC/demosoc/Board/nuclei_fpga_eval/Source/GCC/gcc_demosoc_ilm.ld
-    - git describe --tags --always --abbrev=10 > build.txt
-    # rm unused .git
-    - rm -rf .git
-    - cd $CI_PROJECT_DIR/prebuilt/NMSIS/NMSIS/nuclei-sdk
-    - pip3 install -r tools/scripts/requirements.txt
-    - cd $CI_PROJECT_DIR/prebuilt/NMSIS/
-    - git describe --tags --always --abbrev=10 > build.txt
-    - export NUCLEI_SDK_ROOT=$(readlink -f NMSIS/nuclei_sdk)
-    - export NUCLEI_SDK_NMSIS=$(readlink -f NMSIS)
-    - source NMSIS/env.sh
-    - export SILENT=1
-    - cd NMSIS
-    - make gen
-    - make gen_nnref_lib
-    # clean unused nmsis library folder
-    - make distclean
     - du -sh $CI_PROJECT_DIR/prebuilt
   tags:
     - env::docker
@@ -198,27 +176,20 @@ build_windows_qemu:
 test_sdk:
   stage: test
   timeout: 4h
-  when: manual
+  #when: manual
   interruptible: true
   script:
-    - apt-get -y update --fix-missing
-    - apt-get install -y --fix-missing git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libpixman-1-dev autoconf automake libtool flex bison make
-    - apt-get install -y python3 python3-pip
-    - apt-get install -y software-properties-common
-    - apt-get install wget openssl libssl-dev -y
-    - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
-    - python3 -m pip install --upgrade pip
     # find qemu and gcc
     - cd $CI_PROJECT_DIR
     - export QEMU_PATH_LINUX=$(readlink -f linux_qemu/bin)
     - export PATH=$QEMU_PATH_LINUX:$PATH
     #- export PATH=$CI_PROJECT_DIR/prebuilt/gcc/gcc/bin:$PATH
-    - qemu-system-riscv32 -M ?
+    - qemu-system-riscv32 --version
     - riscv64-unknown-elf-gcc -v
     ################################################
-    - cd $CI_PROJECT_DIR/prebuilt/sdk/nuclei-sdk
+    - cd $CI_PROJECT_DIR/prebuilt/nuclei-sdk
     - pip3 install -r tools/scripts/requirements.txt
-    - python3 tools/scripts/nsdk_cli/nsdk_bench.py --appcfg tools/scripts/nsdk_cli/configs/application.json --hwcfg tools/scripts/nsdk_cli/configs/nuclei_fpga_eval_ci_qemu.json --parallel=-j --logdir logs/nuclei_fpga_eval_qemu_ci --run --run_target "qemu"
+    - python3 tools/scripts/nsdk_cli/nsdk_bench.py --appcfg tools/scripts/nsdk_cli/configs/application.json --hwcfg tools/scripts/nsdk_cli/configs/nuclei_fpga_eval_ci_bpv.json --parallel=-j --logdir logs/nuclei_fpga_eval_qemu_ci --run --run_target "qemu"
   tags:
     - os::linux
     - env::docker
@@ -227,8 +198,8 @@ test_sdk:
   artifacts:
     name: "qemu_test_sdk_job${CI_JOB_ID}_${CI_COMMIT_SHA::8}"
     when: always
-    # paths:
-    # - $CI_PROJECT_DIR/prebuilt/sdk/nuclei-sdk/logs/
+    paths:
+      - $CI_PROJECT_DIR/prebuilt/nuclei-sdk/logs/
 
 test_nmsis:
   stage: test
@@ -236,32 +207,31 @@ test_nmsis:
   when: manual
   interruptible: true
   script:
-    - apt-get -y update --fix-missing
-    - apt-get install -y --fix-missing git build-essential pkg-config zlib1g-dev libglib2.0-0 libglib2.0-dev libpixman-1-dev autoconf automake libtool flex bison make
-    - apt-get install -y python3 python3-pip
-    - apt-get install -y software-properties-common
-    - apt-get install wget openssl libssl-dev -y
-    - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
-    - python3 -m pip install --upgrade pip
     # find qemu and gcc
     - cd $CI_PROJECT_DIR
     - export QEMU_PATH_LINUX=$(readlink -f linux_qemu/bin)
     - export PATH=$QEMU_PATH_LINUX:$PATH
     #- export PATH=$CI_PROJECT_DIR/prebuilt/gcc/gcc/bin:$PATH
-    - qemu-system-riscv32 -M ?
+    - qemu-system-riscv32 --version
     - riscv64-unknown-elf-gcc -v
     ############################################################
-    - cd $CI_PROJECT_DIR/prebuilt/NMSIS/NMSIS/nuclei-sdk
-    - pip3 install -r tools/scripts/requirements.txt
     - cd $CI_PROJECT_DIR/prebuilt/NMSIS/
-    - export NUCLEI_SDK_ROOT=$(readlink -f NMSIS/nuclei-sdk)
-    - export NUCLEI_SDK_NMSIS=$(readlink -f NMSIS)
-    - export NMSIS_LOGS=$NUCLEI_SDK_NMSIS/Logs
+    - export NUCLEI_SDK_ROOT=$(readlink -f $CI_PROJECT_DIR/prebuilt/nuclei-sdk)
+    - export NMSIS_LOGS=$(pwd)/NMSIS/Logs
     - mkdir $NMSIS_LOGS
-    - source NMSIS/env.sh
+    # change ilm/dlm size from 64K to 1M for evalsoc
+    - sed -i "s/64K/1M/g" $NUCLEI_SDK_ROOT/SoC/evalsoc/Board/nuclei_fpga_eval/Source/GCC/gcc_evalsoc_ilm.ld
+    # change ilm/dlm size from 64K to 1M for evalsoc from Nuclei SDK 0.6.0
+    - |
+      EVALSOC_MEMORY=$NUCLEI_SDK_ROOT/SoC/evalsoc/Board/nuclei_fpga_eval/Source/GCC/evalsoc.memory
+      if [ -f $EVALSOC_MEMORY ] ; then
+        echo "Maybe you are using >= Nuclei SDK 0.6.0, will sed and replace ilm/dlm memory size in $EVALSOC_MEMORY"
+        sed -i 's/\([ID]LM_MEMORY_SIZE\).*/\1 = 0x100000;/' $EVALSOC_MEMORY
+      fi
     - cd $CI_PROJECT_DIR/prebuilt/NMSIS/NMSIS
-    - python3 $NUCLEI_SDK_ROOT/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg Scripts/Runner/nmsis_dsp.json --logdir $NMSIS_LOGS/nmsis_dsp --parallel=-j --run_target qemu --run
-    - python3 $NUCLEI_SDK_ROOT/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg Scripts/Runner/nmsis_nn.json  --logdir $NMSIS_LOGS/nmsis_nn  --parallel=-j --run_target qemu --run
+    - pip3 install -r $NUCLEI_SDK_ROOT/tools/scripts/requirements.txt
+    - python3 $NUCLEI_SDK_ROOT/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg Scripts/Runner/nmsis_dsp_mini.json --logdir $NMSIS_LOGS/nmsis_dsp --parallel=-j --run_target qemu --run
+    - python3 $NUCLEI_SDK_ROOT/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg Scripts/Runner/nmsis_nn_mini.json  --logdir $NMSIS_LOGS/nmsis_nn  --parallel=-j --run_target qemu --run
   tags:
     - os::linux
     - env::docker
@@ -270,8 +240,8 @@ test_nmsis:
   artifacts:
     when: always
     name: "qemu_test_nmsis_job${CI_JOB_ID}_${CI_COMMIT_SHA::8}"
-    # paths:
-    # - $CI_PROJECT_DIR/prebuilt/NMSIS/NMSIS/Logs
+    paths:
+      - $CI_PROJECT_DIR/prebuilt/NMSIS/NMSIS/Logs
 
 make_qemu_zip:
   stage: deploy
