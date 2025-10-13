@@ -1989,9 +1989,9 @@ void riscv_cpu_do_interrupt(CPUState *cs)
                 } else if ((env->mtvt2 & 0x1) == 1) {
                     newpc = env->mtvt2 & 0xfffffffc;
                 }
+                if(!nuclei_eclic_edge_triggered(env->eclic, mode, cs->cpu_index, cause & 0x3FF))
+                    nuclei_eclic_clean_pending(env->eclic, mode, cs->cpu_index, cause & 0x3FF);
             }
-            nuclei_eclic_clean_pending(env->eclic, mode, cs->cpu_index, cause & 0x3FF);
-
         } else {
             newpc = (env->mtvec >> 2 << 2) +
                 ((async && (env->mtvec & 3) == 1) ? cause * 4 : 0);
