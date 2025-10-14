@@ -5,7 +5,7 @@
             "timeout": 240
         },
         "qemu" : {
-            "timeout": 240
+            "timeout": 30
         }
     },
     "parallel": "-j",
@@ -70,7 +70,7 @@
             "build_config" : { "SMP": "4"}
         },
         "application/baremetal/demo_cidu": {
-            "build_config" : { "SMP": "4"}
+            "build_config" : { "SMP": "4", "XLCFG_CIDU" : "1"}
         },
         "application/freertos/demo_profiling": {
             "build_config" : { "DOWNLOAD": "sram"}
@@ -89,12 +89,17 @@
         }
     },
     "expecteds": {
-        "application/baremetal/benchmark/whetstone" : {
+        "application/baremetal/smphello" : {
             "n200": { "build": false, "run": false },
             "n200e" : {"build": false, "run": false}
         },
-        "test" : {
-            "n200e" : {"build": true, "run": true}
+        "application/baremetal/demo_dsp" : {
+            "n200": { "build": false, "run": false },
+            "n200e" : {"build": false, "run": false}
+        },
+        "application/freertos/smpdemo": {
+            "n200": { "build": false, "run": false },
+            "n200e" : {"build": false, "run": false}
         }
     },
     "expected": {
