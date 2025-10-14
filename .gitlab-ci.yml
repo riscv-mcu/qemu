@@ -252,6 +252,8 @@ test_nmsis:
         ln -s $NUCLEI_SDK_ROOT/NMSIS/Library Library
         echo "Generate NN Reference Library"
         make gen_nnref_lib
+        echo "Copy NN Reference Header Files to NMSIS NN Include"
+        cp -f NN/Tests/Ref/Source/*.h $NUCLEI_SDK_ROOT/NMSIS/NN/Include/
       fi
     - python3 $NUCLEI_SDK_ROOT/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg ${APPCFG} --logdir $NMSIS_LOGS/nmsis_${NMSIS_LIB} --parallel=-j --run_target qemu --run
   tags:
