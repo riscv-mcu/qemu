@@ -348,9 +348,11 @@ deploy-qemu:
   allow_failure: true
   interruptible: true
   rules:
-    # manual trigger this deploy job on not merge request pipeline
-    - if: '$CI_PIPELINE_SOURCE != "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: manual
+    - if: '$CI_COMMIT_BRANCH == "nuclei/9.0" && $CI_PIPELINE_SOURCE != "merge_request_event"'
+      when: on_success
+    - when: manual
   needs:
     - job: make_qemu_zip
       artifacts: true
@@ -396,8 +398,9 @@ link-qemu:
       artifacts: true
   rules:
     # manual trigger this deploy job on not merge request pipeline
-    - if: '$CI_PIPELINE_SOURCE != "merge_request_event"'
-      when: manual
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - when: manual
   script:
     - export QEMU_VER=$(cat VERSION)
     - shareloc="/home/share/devtools/qemu/linux64"
