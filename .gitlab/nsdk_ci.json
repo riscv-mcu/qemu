@@ -15,39 +15,34 @@
         "BOARD": "nuclei_fpga_eval"
     },
     "build_configs": {
-        "n300-ilm": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": ""},
-        "n300b-ilm": {"DOWNLOAD": "sram", "CORE": "n300", "ARCH_EXT": "_zba_zbb_zbc_zbs"},
-        "n300bp-ilm": {"DOWNLOAD": "flash", "CORE": "n300", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldspn1x"},
-        "n300fd-ilm": {"DOWNLOAD": "flashxip", "CORE": "n300fd", "ARCH_EXT": ""},
-        "n300fdb-ilm": {"DOWNLOAD": "ddr", "CORE": "n300fd", "ARCH_EXT": "_zba_zbb_zbc_zbs"},
-        "n300fdbp-ilm": {"DOWNLOAD": "ilm", "CORE": "n300fd", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldspn1x"},
-        "ux600-ilm": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": ""},
-        "ux600b-ilm": {"DOWNLOAD": "ilm", "CORE": "ux600", "ARCH_EXT": "_zba_zbb_zbc_zbs"},
-        "ux600bp-ilm": {"DOWNLOAD": "flash", "CORE": "ux600", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldsp"},
-        "ux600fbp-ilm": {"DOWNLOAD": "flashxip", "CORE": "ux600f", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldsp"},
-        "ux600fd-ilm": {"DOWNLOAD": "sram", "CORE": "ux600fd", "ARCH_EXT": ""},
-        "ux600fdb-ilm": {"DOWNLOAD": "ddr", "CORE": "ux600fd", "ARCH_EXT": "_zba_zbb_zbc_zbs"},
-        "ux600fdbp-ilm": {"DOWNLOAD": "sram", "CORE": "ux600fd", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldsp"}
+        "n200": {"DOWNLOAD": "sram", "CORE": "n200", "ARCH_EXT": ""},
+        "n200e": {"DOWNLOAD": "flashxip", "CORE": "n200e", "ARCH_EXT": ""},
+        "n300": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": ""},
+        "n300bp": {"DOWNLOAD": "flash", "CORE": "n300", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldspn1x"},
+        "n300fdbp": {"DOWNLOAD": "ilm", "CORE": "n300fd", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldspn1x"},
+        "ux600": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": ""},
+        "ux600fbp": {"DOWNLOAD": "flashxip", "CORE": "ux600f", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldsp"},
+        "ux600fdbp": {"DOWNLOAD": "sram", "CORE": "ux600fd", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldsp"}
     },
     "appconfig": {
         "application/baremetal/demo_dsp": {
             "build_configs" : {
-                "n600fdv-ilm": {"DOWNLOAD": "sram", "CORE": "n600fd", "ARCH_EXT": "_zve32f"},
-                "n600fdbv-ilm": {"DOWNLOAD": "flashxip", "CORE": "n600fd", "ARCH_EXT": "_zve32f_zba_zbb_zbc_zbs"},
-                "n600fdpv-ilm": {"DOWNLOAD": "ilm", "CORE": "n600fd", "ARCH_EXT": "_zve32f_xxldspn1x"},
-                "n600fdbpv-ilm": {"DOWNLOAD": "ddr", "CORE": "n600fd", "ARCH_EXT": "_zve32f_zba_zbb_zbc_zbs_xxldspn1x"},
-                "n600fv-ilm": {"DOWNLOAD": "flash", "CORE": "n600f", "ARCH_EXT": "_zve32f"},
-                "n600fbv-ilm": {"DOWNLOAD": "sram", "CORE": "n600f", "ARCH_EXT": "_zve32f_zba_zbb_zbc_zbs"},
-                "n600fpv-ilm": {"DOWNLOAD": "ilm", "CORE": "n600f", "ARCH_EXT": "_zve32f_xxldspn1x"},
-                "n600fbpv-ilm": {"DOWNLOAD": "flashxip", "CORE": "n600f", "ARCH_EXT": "_zve32f_zba_zbb_zbc_zbs_xxldspn1x"},
-                "nx600fdv-ilm": {"DOWNLOAD": "ddr", "CORE": "nx600fd", "ARCH_EXT": "v"},
-                "nx600fdbv-ilm": {"DOWNLOAD": "sram", "CORE": "nx600fd", "ARCH_EXT": "v_zba_zbb_zbc_zbs"},
-                "nx600fdpv-ilm": {"DOWNLOAD": "ilm", "CORE": "nx600fd", "ARCH_EXT": "v_xxldsp"},
-                "nx600fdbpv-ilm": {"DOWNLOAD": "ddr", "CORE": "nx600fd", "ARCH_EXT": "v_zba_zbb_zbc_zbs_xxldsp"},
-                "nx600fv-ilm": {"DOWNLOAD": "sram", "CORE": "nx600f", "ARCH_EXT": "_zve64f"},
-                "nx600fbv-ilm": {"DOWNLOAD": "ilm", "CORE": "nx600f", "ARCH_EXT": "_zve64f_zba_zbb_zbc_zbs"},
-                "nx600fpv-ilm": {"DOWNLOAD": "flash", "CORE": "nx600f", "ARCH_EXT": "_zve64f_xxldsp"},
-                "nx600fbpv-ilm": {"DOWNLOAD": "flashxip", "CORE": "nx600f", "ARCH_EXT": "_zve64f_zba_zbb_zbc_zbs_xxldsp"}
+                "n600fdv": {"DOWNLOAD": "sram", "CORE": "n600fd", "ARCH_EXT": "_zve32f"},
+                "n600fdbv": {"DOWNLOAD": "flashxip", "CORE": "n600fd", "ARCH_EXT": "_zve32f_zba_zbb_zbc_zbs"},
+                "n600fdpv": {"DOWNLOAD": "ilm", "CORE": "n600fd", "ARCH_EXT": "_zve32f_xxldspn1x"},
+                "n600fdbpv": {"DOWNLOAD": "ddr", "CORE": "n600fd", "ARCH_EXT": "_zve32f_zba_zbb_zbc_zbs_xxldspn1x"},
+                "n600fv": {"DOWNLOAD": "flash", "CORE": "n600f", "ARCH_EXT": "_zve32f"},
+                "n600fbv": {"DOWNLOAD": "sram", "CORE": "n600f", "ARCH_EXT": "_zve32f_zba_zbb_zbc_zbs"},
+                "n600fpv": {"DOWNLOAD": "ilm", "CORE": "n600f", "ARCH_EXT": "_zve32f_xxldspn1x"},
+                "n600fbpv": {"DOWNLOAD": "flashxip", "CORE": "n600f", "ARCH_EXT": "_zve32f_zba_zbb_zbc_zbs_xxldspn1x"},
+                "nx600fdv": {"DOWNLOAD": "ddr", "CORE": "nx600fd", "ARCH_EXT": "v"},
+                "nx600fdbv": {"DOWNLOAD": "sram", "CORE": "nx600fd", "ARCH_EXT": "v_zba_zbb_zbc_zbs"},
+                "nx600fdpv": {"DOWNLOAD": "ilm", "CORE": "nx600fd", "ARCH_EXT": "v_xxldsp"},
+                "nx600fdbpv": {"DOWNLOAD": "ddr", "CORE": "nx600fd", "ARCH_EXT": "v_zba_zbb_zbc_zbs_xxldsp"},
+                "nx600fv": {"DOWNLOAD": "sram", "CORE": "nx600f", "ARCH_EXT": "_zve64f"},
+                "nx600fbv": {"DOWNLOAD": "ilm", "CORE": "nx600f", "ARCH_EXT": "_zve64f_zba_zbb_zbc_zbs"},
+                "nx600fpv": {"DOWNLOAD": "flash", "CORE": "nx600f", "ARCH_EXT": "_zve64f_xxldsp"},
+                "nx600fbpv": {"DOWNLOAD": "flashxip", "CORE": "nx600f", "ARCH_EXT": "_zve64f_zba_zbb_zbc_zbs_xxldsp"}
             },
             "checks": {
                 "PASS": ["all test are passed"],
@@ -75,14 +70,14 @@
     },
     "expecteds": {
         "application/baremetal/benchmark/whetstone" : {
-            "n201-ilm": { "build": true, "run": false },
-            "n201e-ilm" : {"build": true, "run": false}
+            "n200": { "build": true, "run": false },
+            "n200e" : {"build": true, "run": false}
         },
         "application" : {
-            "n201e-ilm" : {"build": true, "run": false}
+            "n200e" : {"build": true, "run": false}
         },
         "test" : {
-            "n201e-ilm" : {"build": true, "run": false}
+            "n200e" : {"build": true, "run": false}
         }
     },
     "expected": {
