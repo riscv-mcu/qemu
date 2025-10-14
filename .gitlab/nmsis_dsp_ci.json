@@ -1,0 +1,58 @@
+{
+    "run_config": {
+        "target": "qemu",
+        "xlspike": {
+            "timeout": 480
+        },
+        "qemu": {
+            "timeout": 240
+        }
+    },
+    "parallel": "-j",
+    "copy_objects": false,
+    "build_target": "clean all",
+    "build_config": {
+        "SOC": "evalsoc",
+        "DOWNLOAD": "ilm"
+    },
+    "checks": {
+        "PASS": ["passed", "Passed"],
+        "FAIL": ["MEPC", "failed", "Failed", "FAILURE", "ERROR", "test error apprears"]
+    },
+    "appdirs": [
+        "DSP/Examples/RISCV",
+        "DSP/Test",
+        "DSP/Benchmark"
+    ],
+    "build_configs": {
+        "rv32imac_zba_zbb_zbc_zbs": { "CORE": "n300", "ARCH_EXT": "_zba_zbb_zbc_zbs" },
+        "rv32imac_zba_zbb_zbc_zbs_xxldsp": { "CORE": "n300", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldsp" },
+        "rv32imafc_zba_zbb_zbc_zbs_xxldsp": { "CORE": "n300f", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldsp" },
+        "rv32imafc_zve32f_zba_zbb_zbc_zbs_xxldsp": { "CORE": "n300f", "ARCH_EXT": "_zve32f_zba_zbb_zbc_zbs_xxldsp" },
+        "rv32imafdc": { "CORE": "n300fd", "ARCH_EXT": "" },
+        "rv32imafdc_zba_zbb_zbc_zbs_xxldsp": { "CORE": "n300fd", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldsp" },
+        "rv32imafdc_zve32f_zba_zbb_zbc_zbs_xxldsp": { "CORE": "n300fd", "ARCH_EXT": "_zve32f_zba_zbb_zbc_zbs_xxldsp" },
+        "rv64imac": { "CORE": "nx900", "ARCH_EXT": "" },
+        "rv64imac_zba_zbb_zbc_zbs_xxldsp": { "CORE": "nx900", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldsp" },
+        "rv64imafc_zba_zbb_zbc_zbs_xxldsp": { "CORE": "nx900f", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldsp" },
+        "rv64imafc_zve64f_zba_zbb_zbc_zbs_xxldsp": { "CORE": "nx900f", "ARCH_EXT": "_zve64f_zba_zbb_zbc_zbs_xxldsp" },
+        "rv64imafdc_zba_zbb_zbc_zbs_xxldsp": { "CORE": "nx900fd", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldsp" },
+        "rv64imafdcv_zba_zbb_zbc_zbs_xxldsp": { "CORE": "nx900fd", "ARCH_EXT": "v_zba_zbb_zbc_zbs_xxldsp" },
+        "rv32imac_xxldspn1x": { "CORE": "n300", "ARCH_EXT": "_xxldspn1x" },
+        "rv32imafc_zve32f_zba_zbb_zbc_zbs_xxldspn1x": { "CORE": "n300f", "ARCH_EXT": "_zve32f_zba_zbb_zbc_zbs_xxldspn1x" },
+        "rv32imafdc_zve32f_zba_zbb_zbc_zbs_xxldspn1x": { "CORE": "n300fd", "ARCH_EXT": "_zve32f_zba_zbb_zbc_zbs_xxldspn1x" },
+        "rv32imac_zba_zbb_zbc_zbs_xxldspn2x": { "CORE": "n300", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldspn2x" },
+        "rv32imafc_zve32f_zba_zbb_zbc_zbs_xxldspn2x": { "CORE": "n300f", "ARCH_EXT": "_zve32f_zba_zbb_zbc_zbs_xxldspn2x" },
+        "rv32imafdc_zve32f_zba_zbb_zbc_zbs_xxldspn2x": { "CORE": "n300fd", "ARCH_EXT": "_zve32f_zba_zbb_zbc_zbs_xxldspn2x" },
+        "rv32imac_zba_zbb_zbc_zbs_xxldspn3x": { "CORE": "n300", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldspn3x" },
+        "rv32imafc_zve32f_zba_zbb_zbc_zbs_xxldspn3x": { "CORE": "n300f", "ARCH_EXT": "_zve32f_zba_zbb_zbc_zbs_xxldspn3x" },
+        "rv32imafdc_zba_zbb_zbc_zbs_xxldspn3x": { "CORE": "n300fd", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldspn3x" },
+        "rv32imafdc_zve32f_zba_zbb_zbc_zbs_xxldspn3x": { "CORE": "n300fd", "ARCH_EXT": "_zve32f_zba_zbb_zbc_zbs_xxldspn3x" },
+        "rv32imafc_zfh_zvfh_zve32f_zba_zbb_zbc_zbs_xxldspn1x": { "CORE": "n300f", "ARCH_EXT": "_zfh_zvfh_zve32f_zba_zbb_zbc_zbs_xxldspn1x" },
+        "rv32imafdc_zfh_zvfh_zve32f_zba_zbb_zbc_zbs_xxldspn1x": { "CORE": "n300fd", "ARCH_EXT": "_zfh_zvfh_zve32f_zba_zbb_zbc_zbs_xxldspn1x" },
+        "rv64imafc_zfh": { "CORE": "nx900f", "ARCH_EXT": "_zfh" },
+        "rv64imafc_zfh_zvfh_zve64f_zba_zbb_zbc_zbs_xxldsp": { "CORE": "nx900f", "ARCH_EXT": "_zfh_zvfh_zve64f_zba_zbb_zbc_zbs_xxldsp" },
+        "rv64imafdcv_zfh_zvfh": { "CORE": "nx900fd", "ARCH_EXT": "v_zfh_zvfh" },
+        "rv64imafdcv_zfh_zvfh_zba_zbb_zbc_zbs_xxldsp": { "CORE": "nx900fd", "ARCH_EXT": "v_zfh_zvfh_zba_zbb_zbc_zbs_xxldsp" }
+    }
+}
