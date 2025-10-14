@@ -246,6 +246,13 @@ test_nmsis:
         APPCFG=Scripts/Runner/nmsis_${NMSIS_LIB}_mini.json
       fi
       echo "Using APPCFG=${APPCFG} for NMSIS ${NMSIS_LIB}"
+    - |
+      if [ "${NMSIS_LIB}" == "nn" ] ; then
+        echo "Prepare NMSIS NN Reference Library"
+        ln -s $NUCLEI_SDK_ROOT/NMSIS/Library Library
+        echo "Generate NN Reference Library"
+        make gen_nnref_lib
+      fi
     - python3 $NUCLEI_SDK_ROOT/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg ${APPCFG} --logdir $NMSIS_LOGS/nmsis_${NMSIS_LIB} --parallel=-j --run_target qemu --run
   tags:
     - os::linux
