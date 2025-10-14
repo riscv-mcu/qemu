@@ -57,6 +57,7 @@ prepare_tools:
     - git clone -b develop --depth 1 git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git
     - cd nuclei-sdk
     - git describe --tags --always --abbrev=10 > build.txt
+    - echo "Nuclei SDK Version $(cat build.txt)"
     # rm unused .git
     - rm -rf .git
     # nmsis
@@ -65,6 +66,7 @@ prepare_tools:
     - git clone --depth 3 -b master git@gito.corp.nucleisys.com:software/library/NMSIS.git
     - cd NMSIS
     - git describe --tags --always --abbrev=10 > build.txt
+    - echo "NMSIS Version $(cat build.txt)"
     # rm unused .git
     - rm -rf .git
     - du -sh $CI_PROJECT_DIR/prebuilt
@@ -196,6 +198,7 @@ test_sdk:
         HWCFG=${NUCLEI_SDK_ROOT}/tools/scripts/nsdk_cli/configs/nuclei_fpga_eval_ci_bpv.json
       fi
       echo "Using HWCFG=${HWCFG}"
+    - echo "Nuclei SDK Version $(cat build.txt)"
     - python3 tools/scripts/nsdk_cli/nsdk_bench.py --appcfg tools/scripts/nsdk_cli/configs/application.json --hwcfg ${HWCFG} --parallel=-j --logdir logs/nuclei_fpga_eval_qemu_ci --run --run_target "qemu"
   tags:
     - os::linux
@@ -226,6 +229,7 @@ test_nmsis:
     - riscv64-unknown-elf-gcc -v
     ############################################################
     - cd $CI_PROJECT_DIR/prebuilt/NMSIS/
+    - echo "NMSIS Version $(cat build.txt)"
     - export NUCLEI_SDK_ROOT=$(readlink -f $CI_PROJECT_DIR/prebuilt/nuclei-sdk)
     - export NMSIS_LOGS=$(pwd)/NMSIS/Logs
     - mkdir $NMSIS_LOGS
