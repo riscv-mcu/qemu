@@ -485,6 +485,16 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         return;
     }
 
+    if (cpu->cfg.elen == 0)
+    {
+        if (cpu->cfg.ext_zve32x || cpu->cfg.ext_zve32f) {
+            cpu->cfg.elen = (cpu->cfg.ext_zve64x || cpu->cfg.ext_zve64f ||
+                    cpu->cfg.ext_zve64d || riscv_has_ext(env, RVV)) ? 64 : 32;
+        } else {
+            cpu->cfg.elen = 64;
+        }
+    }
+
     if (cpu->cfg.ext_zvl32b) {
         cpu->cfg.vlenb = 32 >> 3;
     }
