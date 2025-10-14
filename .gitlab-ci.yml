@@ -213,6 +213,9 @@ test_nmsis:
   timeout: 4h
   when: manual
   interruptible: true
+  parallel:
+    matrix:
+      - NMSIS_LIB: ["dsp", "nn"]
   script:
     # find qemu and gcc
     - cd $CI_PROJECT_DIR
@@ -238,19 +241,12 @@ test_nmsis:
     - cd $CI_PROJECT_DIR/prebuilt/NMSIS/NMSIS
     - pip3 install -r $NUCLEI_SDK_ROOT/tools/scripts/requirements.txt
     - |
-      APPCFG=${CI_PROJECT_DIR}/.gitlab/nmsis_dsp_ci.json
+      APPCFG=${CI_PROJECT_DIR}/.gitlab/nmsis_${NMSIS_LIB}_ci.json
       if [ ! -f ${APPCFG} ] ; then
-        APPCFG=Scripts/Runner/nmsis_dsp_mini.json
+        APPCFG=Scripts/Runner/nmsis_${NMSIS_LIB}_mini.json
       fi
-      echo "Using APPCFG=${APPCFG} for NMSIS DSP"
-    - python3 $NUCLEI_SDK_ROOT/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg ${APPCFG} --logdir $NMSIS_LOGS/nmsis_dsp --parallel=-j --run_target qemu --run
-    - |
-      APPCFG=${CI_PROJECT_DIR}/.gitlab/nmsis_nn_ci.json
-      if [ ! -f ${APPCFG} ] ; then
-        APPCFG=Scripts/Runner/nmsis_nn_mini.json
-      fi
-      echo "Using APPCFG=${APPCFG} for NMSIS NN"
-    - python3 $NUCLEI_SDK_ROOT/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg ${APPCFG}  --logdir $NMSIS_LOGS/nmsis_nn  --parallel=-j --run_target qemu --run
+      echo "Using APPCFG=${APPCFG} for NMSIS ${NMSIS_LIB}"
+    - python3 $NUCLEI_SDK_ROOT/tools/scripts/nsdk_cli/nsdk_bench.py --appcfg ${APPCFG} --logdir $NMSIS_LOGS/nmsis_${NMSIS_LIB} --parallel=-j --run_target qemu --run
   tags:
     - os::linux
     - env::docker
