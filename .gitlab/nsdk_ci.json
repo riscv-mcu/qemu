@@ -24,6 +24,8 @@
         "ux600fbp": {"DOWNLOAD": "flashxip", "CORE": "ux600f", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldsp"},
         "ux600fdbp": {"DOWNLOAD": "sram", "CORE": "ux600fd", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldsp"}
     },
+    "appdirs_ignore": [
+    ],
     "appconfig": {
         "application/baremetal/demo_dsp": {
             "build_configs" : {
@@ -49,46 +51,62 @@
                 "FAIL": ["test error apprears", "MEPC"]
             }
         },
-        "application/rtthread/msh": {
-            "build_config" : {},
-            "checks": {
-                "PASS": ["msh >", "Hello RT-Thread!"]
-            }
+        "application/baremetal/demo_plic": {
+            "build_config" : { "XLCFG_PLIC": "1" }
         },
-        "application/baremetal/benchmark/dhrystone": {
-            "build_config" : {},
-            "checks": {
-                "PASS": ["1000000/(User_Cycle/Number_Of_Runs)", "Please increase number"]
-            }
+        "application/baremetal/demo_smode_plic": {
+            "build_config" : { "XLCFG_PLIC": "1" }
         },
-        "application/baremetal/benchmark/dhrystone_v2.2": {
-            "build_config" : {},
-            "checks": {
-                "PASS": ["Measured time too small to obtain meaningful results"]
+        "application/baremetal/demo_cache": {
+            "build_config" : { "XLCFG_CCM": "1", "XLCFG_HPM": "1", "DOWNLOAD": "ddr" }
+        },
+        "application/baremetal/demo_pma": {
+            "build_config" : { "XLCFG_CCM": "1", "XLCFG_HPM": "1" }
+        },
+        "application/baremetal/smphello": {
+            "build_config" : { "SMP": "4"}
+        },
+        "application/freertos/smpdemo": {
+            "build_config" : { "SMP": "4"}
+        },
+        "application/baremetal/demo_cidu": {
+            "build_config" : { "SMP": "4"}
+        },
+        "application/freertos/demo_profiling": {
+            "build_config" : { "DOWNLOAD": "sram"}
+        },
+        "application/baremetal/demo_vnice": {
+            "build_configs" : {
+                 "n200": {"DOWNLOAD": "sram", "CORE": "n900f", "ARCH_EXT": "_zve32f_xxlcz"},
+                 "n200e": {"DOWNLOAD": "flashxip", "CORE": "n900fd", "ARCH_EXT": "_zve32f_zfh"},
+                 "n300": {"DOWNLOAD": "ilm", "CORE": "n900fd", "ARCH_EXT": "_zve32f_zba_zbb_zbc_zbs_zfh_xxldsp"},
+                 "n300bp": {"DOWNLOAD": "flash", "CORE": "n900f", "ARCH_EXT": "_zca_zcb_zcf_zcmp_zba_zbb_zbc_zbs_zve32f_xxldspn1x_xxlcz"},
+                 "n300fdbp": {"DOWNLOAD": "ilm", "CORE": "n900fd", "ARCH_EXT": "_zca_zcb_zcf_zcmp_zba_zbb_zbc_zbs_zicond_zve32f_xxldspn3x"},
+                 "ux600": {"DOWNLOAD": "sram", "CORE": "ux900fd", "ARCH_EXT": "v"},
+                 "ux600fbp": {"DOWNLOAD": "flashxip", "CORE": "ux900f", "ARCH_EXT": "_zve64f_zba_zbb_zbc_zbs_xxldsp"},
+                 "ux600fdbp": {"DOWNLOAD": "sram", "CORE": "ux900fd", "ARCH_EXT": "v_zba_zbb_zbc_zbs_zca_zcb_zcmp_zcmt_xxldsp"}
             }
         }
     },
     "expecteds": {
         "application/baremetal/benchmark/whetstone" : {
-            "n200": { "build": true, "run": false },
-            "n200e" : {"build": true, "run": false}
-        },
-        "application" : {
-            "n200e" : {"build": true, "run": false}
+            "n200": { "build": false, "run": false },
+            "n200e" : {"build": false, "run": false}
         },
         "test" : {
-            "n200e" : {"build": true, "run": false}
+            "n200e" : {"build": true, "run": true}
         }
     },
     "expected": {
         "application/baremetal/demo_nice": {"build": true, "run": true},
-        "application/rtthread/msh" : {"build": true, "run": false},
+        "application/rtthread/msh" : {"build": true, "run": true},
+        "application/baremetal/demo_clint_timer" : {"build": true, "run": true},
         "application/baremetal/demo_spmp": {"build": true, "run": true},
         "application/baremetal/demo_smpu": {"build": true, "run": true},
         "application/baremetal/demo_smode_eclic": {"build": true, "run": true},
         "application/baremetal/demo_cidu": {"build": true, "run": true},
-        "application/baremetal/demo_cache": {"build": true, "run": false},
-        "application/baremetal/demo_pma": {"build": true, "run": false},
+        "application/baremetal/demo_cache": {"build": true, "run": true},
+        "application/baremetal/demo_pma": {"build": true, "run": true},
         "test/core": {"build": true, "run": true}
     }
 }
