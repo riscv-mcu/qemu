@@ -57,11 +57,17 @@
         "application/baremetal/demo_smode_plic": {
             "build_config" : { "XLCFG_PLIC": "1" }
         },
+        "application/baremetal/demo_smode_eclic": {
+            "build_config" : { "XLCFG_TEE": "1" }
+        },
         "application/baremetal/demo_cache": {
             "build_config" : { "XLCFG_CCM": "1", "XLCFG_HPM": "1", "DOWNLOAD": "ddr" }
         },
         "application/baremetal/demo_pma": {
             "build_config" : { "XLCFG_CCM": "1", "XLCFG_HPM": "1" }
+        },
+        "application/baremetal/demo_smpu": {
+            "build_config" : { "XLCFG_TEE": "1", "XLCFG_SMPU": "1" }
         },
         "application/baremetal/smphello": {
             "build_config" : { "SMP": "4"}
