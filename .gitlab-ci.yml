@@ -177,7 +177,7 @@ build_windows_qemu:
 
 test_sdk:
   stage: test
-  timeout: 4h
+  timeout: 1h
   #when: manual
   interruptible: true
   script:
@@ -213,7 +213,7 @@ test_sdk:
 
 test_nmsis:
   stage: test
-  timeout: 4h
+  timeout: 1h
   when: manual
   interruptible: true
   parallel:
@@ -270,6 +270,38 @@ test_nmsis:
     name: "qemu_test_nmsis_job${CI_JOB_ID}_${CI_COMMIT_SHA::8}"
     paths:
       - $CI_PROJECT_DIR/prebuilt/NMSIS/NMSIS/Logs
+
+test_linux:
+  stage: test
+  timeout: 30min
+  #when: manual
+  interruptible: true
+  parallel:
+    matrix:
+      - QEMU_TEST_SH:
+        - "test_qemu_flash_all.sh"
+        - "test_qemu_rv64_hypervisor.sh"
+        - "test_qemu_rv64_all.sh"
+        - "test_qemu_rv32_all.sh"
+  script:
+    # find qemu and gcc
+    - cd $CI_PROJECT_DIR
+    - export QEMU_PATH_LINUX=$(readlink -f linux_qemu/bin)
+    - export PATH=$QEMU_PATH_LINUX:$PATH
+    #- export PATH=$CI_PROJECT_DIR/prebuilt/gcc/gcc/bin:$PATH
+    - qemu-system-riscv32 --version
+    ################################################
+    - QEMU_TEST_SH="/home/share/devtools/linuxsdk/qemu/${QEMU_TEST_SH}"
+    - echo "Start to do qemu test using script ${QEMU_TEST_SH}"
+    - ${QEMU_TEST_SH}
+  tags:
+    - env::shell
+    - user::xl_ci
+  artifacts:
+    name: "qemu_test_linux_job${CI_JOB_ID}_${CI_COMMIT_SHA::8}"
+    when: always
+    paths:
+      - qemurun_*.log
 
 make_qemu_zip:
   stage: deploy
