@@ -271,7 +271,7 @@ test_nmsis:
     paths:
       - $CI_PROJECT_DIR/prebuilt/NMSIS/NMSIS/Logs
 
-test_linux:
+test_linux_and_misc:
   stage: test
   timeout: 30min
   #when: manual
