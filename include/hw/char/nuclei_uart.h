@@ -59,6 +59,7 @@ typedef struct NucleiUARTState
 
     /*< public >*/
     qemu_irq irq;
+    qemu_irq plic_irq;
     MemoryRegion mmio;
     CharBackend chr;
     uint8_t rx_fifo[8];
@@ -75,6 +76,6 @@ typedef struct NucleiUARTState
 } NucleiUARTState;
 
 NucleiUARTState *nuclei_uart_create(MemoryRegion *address_space, hwaddr base, uint64_t size,
-                    Chardev *chr, uint32_t id, DeviceState *cidu, DeviceState *eclic, qemu_irq irq);
+                    Chardev *chr, uint32_t id, DeviceState *cidu, DeviceState *eclic, DeviceState *irqchip);
 
 #endif

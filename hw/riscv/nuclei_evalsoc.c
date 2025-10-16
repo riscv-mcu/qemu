@@ -1462,44 +1462,14 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                                  EVALSOC_ECLIC_NUM_SOURCES - CIDU_EXT_INT_OFST,
                                  s->eclic);
 
-    if (ms->firmware == NULL)
-    {
-        /* Create and connect UART interrupts to the ECLIC */
-        nuclei_uart_create(sys_mem,
-                        mst->uart0.addr_base,
-                        memmap[EVALSOC_UART0].size,
-                        serial_hd(0),
-                        PLIC_IRQ_TO_ECLIC_IRQ(mst->uart0.irq),
-                        s->cidu,
-                        s->eclic,
-                        NULL);
+    nuclei_uart_create(sys_mem, mst->uart0.addr_base, memmap[EVALSOC_UART0].size,
+                        serial_hd(0), mst->uart0.irq, s->cidu, s->eclic, s->irqchip);
 
-        nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion,
-                memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, s->eclic, mst->timer_freq);
-    }
-    else
-    {
-        nuclei_uart_create(sys_mem,
-                        mst->uart0.addr_base,
-                        memmap[EVALSOC_UART0].size,
-                        serial_hd(0),
-                        0,
-                        NULL,
-                        NULL,
-                        qdev_get_gpio_in(DEVICE(s->irqchip), mst->uart0.irq));
+    nuclei_uart_create(sys_mem, mst->uart1.addr_base, memmap[EVALSOC_UART1].size,
+                        serial_hd(1), mst->uart1.irq, s->cidu, s->eclic, s->irqchip);
 
-        nuclei_uart_create(sys_mem,
-                        mst->uart1.addr_base,
-                        memmap[EVALSOC_UART1].size,
-                        serial_hd(1),
-                        0,
-                        NULL,
-                        NULL,
-                        qdev_get_gpio_in(DEVICE(s->irqchip), mst->uart1.irq));
-
-        nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion,
-                memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, NULL, mst->timer_freq);
-    }
+    nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion,
+            memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, s->eclic, mst->timer_freq);
 
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->timer), errp))
     {
