@@ -291,7 +291,7 @@ test_linux:
     #- export PATH=$CI_PROJECT_DIR/prebuilt/gcc/gcc/bin:$PATH
     - qemu-system-riscv32 --version
     ################################################
-    - QEMU_TEST_SH="/home/share/devtools/linuxsdk/qemu/${QEMU_TEST_SH}"
+    - QEMU_TEST_SH="/home/share/devtools/toolcitests/${QEMU_TEST_SH}"
     - echo "Start to do qemu test using script ${QEMU_TEST_SH}"
     - ${QEMU_TEST_SH}
   tags:
