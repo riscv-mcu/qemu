@@ -74,7 +74,7 @@ prepare_tools:
     - env::docker
     - net::outside
   image: $IMAGE:$IMAGE_TAG
-  allow_failure: true
+  #allow_failure: true
   artifacts:
     when: always
     paths:
@@ -204,7 +204,7 @@ test_sdk:
     - os::linux
     - env::docker
   image: $IMAGE:$IMAGE_TAG
-  allow_failure: true
+  #allow_failure: true
   artifacts:
     name: "qemu_test_sdk_job${CI_JOB_ID}_${CI_COMMIT_SHA::8}"
     when: always
@@ -264,7 +264,7 @@ test_nmsis:
     - os::linux
     - env::docker
   image: $IMAGE:$IMAGE_TAG
-  allow_failure: true
+  #allow_failure: true
   artifacts:
     when: always
     name: "qemu_test_nmsis_job${CI_JOB_ID}_${CI_COMMIT_SHA::8}"
