@@ -283,6 +283,7 @@ test_linux_and_misc:
         - "test_qemu_rv64_hypervisor.sh"
         - "test_qemu_rv64_all.sh"
         - "test_qemu_rv32_all.sh"
+        - "test_qemu_rtos_all.sh"
   script:
     # find qemu and gcc
     - cd $CI_PROJECT_DIR
