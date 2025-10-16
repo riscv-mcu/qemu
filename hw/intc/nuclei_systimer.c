@@ -177,7 +177,7 @@ static void nuclei_clint_write(void *opaque, hwaddr addr, uint64_t value,
         if (!env) {
             error_report("clint: invalid timecmp hartid: %zu", hartid);
         } else if ((addr & 0x3) == 0) {
-            if (clint->eclic != NULL) {
+            if (riscv_intc_is_clic_mode(env)) {
                 clint->msip = value;
                 if ((clint->msip & 0x1) == 1) {
                     qemu_set_irq(*(clint->soft_irq[hartid]), 1);
