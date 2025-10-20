@@ -124,7 +124,7 @@ static uint64_t nuclei_clint_read(void *opaque, hwaddr addr, unsigned size)
         if (!env) {
             error_report("clint: invalid timecmp hartid: %zu", hartid);
         } else if ((addr & 0x3) == 0) {
-            return (env->mip & MIP_MSIP) > 0;
+            return clint->clint_msip[hartid];
         } else {
             error_report("clint: invalid read: %08x", (uint32_t)addr);
             return 0;
@@ -177,9 +177,9 @@ static void nuclei_clint_write(void *opaque, hwaddr addr, uint64_t value,
         if (!env) {
             error_report("clint: invalid timecmp hartid: %zu", hartid);
         } else if ((addr & 0x3) == 0) {
-            if (riscv_intc_is_clic_mode(env)) {
-                clint->msip = value;
-                if ((clint->msip & 0x1) == 1) {
+            clint->clint_msip[hartid] = value;
+            if ((riscv_intc_is_clic_mode(env))) {
+                if ((clint->clint_msip[hartid] & 0x1) == 1) {
                     qemu_set_irq(*(clint->soft_irq[hartid]), 1);
                 }else{
                     qemu_set_irq(*(clint->soft_irq[hartid]), 0);
@@ -363,8 +363,8 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
             timer_del(env->mtimer);
         break;
     case NUCLEI_SYSTIMER_REG_MSIP:
+        s->msip = value;
         if (riscv_intc_is_clic_mode(env)) {
-            s->msip = value;
             if ((s->msip & 0x1) == 1) {
                 qemu_set_irq(*(s->soft_irq[hartid]), 1);
             } else {
@@ -427,6 +427,7 @@ static void nuclei_timer_realize(DeviceState *dev, Error **errp)
     {
         s->num_harts = hart_numbers;
     }
+    memset(s->clint_msip, 0, sizeof(s->clint_msip));
 
     memory_region_init_io(&s->iomem, OBJECT(dev), &nuclei_timer_ops,
                           s,TYPE_NUCLEI_SYSTIMER, s->aperture_size);
@@ -498,7 +499,6 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_ba
 
         env->mtimecmp = 0;
         if (eclic != NULL) {
-            s->eclic = eclic;
             s->soft_irq[i] =&(NUCLEI_ECLIC(eclic)->irqs[i][Internal_SysTimerSW_IRQn]);
             s->timer_irq[i] = &(NUCLEI_ECLIC(eclic)->irqs[i][Internal_SysTimer_IRQn]);
         }
