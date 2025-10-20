@@ -77,7 +77,7 @@ static const MemoryRegionOps nuclei_iregion_ops = {
     .write = nuclei_iregion_write,
     .endianness = DEVICE_NATIVE_ENDIAN,
     .valid = {
-        .min_access_size = 2,
+        .min_access_size = 1,
         .max_access_size = 8
     }
 };
