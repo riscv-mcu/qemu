@@ -54,6 +54,8 @@ typedef struct NucleiSYSTIMERState
     qemu_irq **timer_irq;
     qemu_irq **soft_irq;
 
+    DeviceState *eclic;
+
     uint32_t mtime_lo;
     uint32_t mtime_hi;
     uint32_t mtimecmp_lo;
@@ -62,7 +64,6 @@ typedef struct NucleiSYSTIMERState
     uint32_t msftrst;
     uint32_t mtimectl;
     uint32_t msip;
-    uint32_t clint_msip[64];
 
     uint32_t hartid_base;
     uint32_t num_harts;
