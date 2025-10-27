@@ -21,7 +21,6 @@
 #include "qapi/error.h"
 #include "qemu/log.h"
 #include "hw/sysbus.h"
-#include "target/riscv/cpu.h"
 #include "chardev/char.h"
 #include "chardev/char-fe.h"
 #include "hw/hw.h"
@@ -56,10 +55,6 @@ static uint64_t uart_ip(NucleiUARTState *s)
 static void update_irq(NucleiUARTState *s)
 {
     int cond = 0;
-
-    CPUState *cpu = qemu_get_cpu(0);
-    CPURISCVState *env = cpu ? cpu_env(cpu) : NULL;
-
     s->txctrl |= 0x1;
     if (s->rx_fifo_len)
         s->rxctrl &= ~0x1;
@@ -74,19 +69,11 @@ static void update_irq(NucleiUARTState *s)
 
     if (cond)
     {
-        if (riscv_intc_is_clic_mode(env)) {
-            qemu_irq_raise(s->irq);
-        } else {
-            qemu_irq_raise(s->plic_irq);
-        }
+        qemu_irq_raise(s->irq);
     }
     else
     {
-        if (riscv_intc_is_clic_mode(env)) {
-            qemu_irq_lower(s->irq);
-        } else {
-            qemu_irq_lower(s->plic_irq);
-        }
+        qemu_irq_lower(s->irq);
     }
 }
 
@@ -261,7 +248,7 @@ type_init(nuclei_uart_register_types);
  * Create UART device.
  */
 NucleiUARTState *nuclei_uart_create(MemoryRegion *address_space, hwaddr base, uint64_t size,
-                    Chardev *chr, uint32_t id, DeviceState *cidu, DeviceState *eclic, DeviceState *irqchip)
+                    Chardev *chr, uint32_t id, DeviceState *cidu, DeviceState *eclic, qemu_irq irq)
 {
     DeviceState *dev;
     NucleiUARTState *s;
@@ -271,26 +258,24 @@ NucleiUARTState *nuclei_uart_create(MemoryRegion *address_space, hwaddr base, ui
     sbd = SYS_BUS_DEVICE(dev);
     s = NUCLEI_UART(dev);
 
-    memory_region_init_io(&s->mmio, NULL, &uart_ops, s,
-                          TYPE_NUCLEI_UART, size);
-    sysbus_init_mmio(sbd, &s->mmio);
-
     if (eclic) {
         if (cidu != NULL) {
-            s->irq = NUCLEI_CIDU(cidu)->external_irq[id - 1];
+            s->irq = NUCLEI_CIDU(cidu)->external_irq[id - CIDU_EXT_INT_OFST];
         } else {
-            s->irq = NUCLEI_ECLIC(eclic)->irqs[0][id + 18];
+            s->irq = NUCLEI_ECLIC(eclic)->irqs[0][id];
         }
-    }
-    if (irqchip) {
-        sysbus_init_irq(sbd, &s->plic_irq);
+    } else {
+        sysbus_init_mmio(sbd, &s->mmio);
+        sysbus_init_irq(sbd, &s->irq);
         sysbus_realize_and_unref(sbd, &error_fatal);
-        sysbus_connect_irq(sbd, 0, qdev_get_gpio_in(DEVICE(irqchip), id));
+        sysbus_connect_irq(sbd, 0, irq);
     }
 
     qemu_chr_fe_init(&s->chr, chr, &error_abort);
     qemu_chr_fe_set_handlers(&s->chr, uart_can_rx, uart_rx, uart_event,
                              uart_be_change, s, NULL, true);
+    memory_region_init_io(&s->mmio, NULL, &uart_ops, s,
+                          TYPE_NUCLEI_UART, size);
     memory_region_add_subregion(address_space, base, &s->mmio);
 
     return s;

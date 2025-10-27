@@ -110,6 +110,16 @@ static void nuclei_clint_write_timecmp(RISCVCPU *cpu, uint64_t value,
     timer_mod(cpu->env.mtimer, next);
 }
 
+/*
+ * Callback used when the timer set using timer_mod expires.
+ * Should raise the timer interrupt line
+ */
+static void nuclei_clint_timer_cb(void *opaque)
+{
+    RISCVCPU *cpu = opaque;
+    riscv_cpu_update_mip(&cpu->env, MIP_MTIP, BOOL_TO_MASK(1));
+}
+
 /* CPU wants to read rtc or timecmp register */
 static uint64_t nuclei_clint_read(void *opaque, hwaddr addr, unsigned size)
 {
@@ -460,12 +470,8 @@ static void nuclei_mtimecmp_cb(void *opaque) {
     RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(nuclei_systimer_get_current_cpu(opaque)));
     CPURISCVState *env = &cpu->env;
 
-    if (riscv_intc_is_clic_mode(env)) {
-        nuclei_eclic_systimer_cb(cpu->env.eclic);
-        timer_del(env->mtimer);
-    } else {
-        riscv_cpu_update_mip(env, MIP_MTIP, BOOL_TO_MASK(1));
-    }
+    nuclei_eclic_systimer_cb(cpu->env.eclic);
+    timer_del(env->mtimer);
 }
 
 DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_base,
@@ -501,9 +507,12 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_ba
             s->eclic = eclic;
             s->soft_irq[i] =&(NUCLEI_ECLIC(eclic)->irqs[i][Internal_SysTimerSW_IRQn]);
             s->timer_irq[i] = &(NUCLEI_ECLIC(eclic)->irqs[i][Internal_SysTimer_IRQn]);
+            riscv_cpu_set_rdtime_fn(env, nuclei_cpu_riscv_read_rtc, &(s->timebase_freq));
+            env->mtimer = timer_new_ns(QEMU_CLOCK_VIRTUAL, &nuclei_mtimecmp_cb, cpu);
+        } else {
+            riscv_cpu_set_rdtime_fn(env, nuclei_cpu_riscv_read_rtc, &(s->timebase_freq));
+            env->mtimer = timer_new_ns(QEMU_CLOCK_VIRTUAL, &nuclei_clint_timer_cb, cpu);
         }
-        riscv_cpu_set_rdtime_fn(env, nuclei_cpu_riscv_read_rtc, &(s->timebase_freq));
-        env->mtimer = timer_new_ns(QEMU_CLOCK_VIRTUAL, &nuclei_mtimecmp_cb, cpu);
     }
     sysbus_realize_and_unref(SYS_BUS_DEVICE(dev), &error_fatal);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, addr);
