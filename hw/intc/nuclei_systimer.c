@@ -248,6 +248,7 @@ static void nuclei_timer_reset(DeviceState *dev)
     s->msftrst = 0x0;
     s->mtimectl = 0x0;
     s->msip = 0x0;
+    s->ssip = 0x0;
 }
 
 static uint64_t nuclei_timer_read(void *opaque, hwaddr offset,
@@ -297,6 +298,9 @@ static uint64_t nuclei_timer_read(void *opaque, hwaddr offset,
         value = s->mtime_srw_ctrl;
         break;
     case NUCLEI_SYSTIMER_REG_MSFTRST:
+        break;
+    case NUCLEI_SYSTIMER_REG_SSIP:
+        value = s->ssip;
         break;
     case NUCLEI_SYSTIMER_REG_MTIMECTL:
         value = s->mtimectl;
@@ -366,6 +370,18 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
     case NUCLEI_SYSTIMER_REG_MSFTRST:
         if (value == 0x80000a5f)
             qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
+        break;
+    case NUCLEI_SYSTIMER_REG_SSIP:
+        if (riscv_intc_is_clic_mode(env)) {
+            s->ssip = value;
+            if ((s->ssip & 0x1) == 1) {
+                qemu_set_irq(NUCLEI_ECLIC(env->eclic)->irqs[hartid][Internal_SysTimerSW_S_IRQn], 1);
+            } else {
+                qemu_set_irq(NUCLEI_ECLIC(env->eclic)->irqs[hartid][Internal_SysTimerSW_S_IRQn], 0);
+            }
+        } else {
+            riscv_cpu_update_mip(env, MIP_SSIP, BOOL_TO_MASK(value));
+        }
         break;
     case NUCLEI_SYSTIMER_REG_MTIMECTL:
         s->mtimectl = value;

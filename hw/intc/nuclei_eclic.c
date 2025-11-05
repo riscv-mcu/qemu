@@ -474,7 +474,7 @@ static int level_compare(NucleiECLICState *eclic, ECLICPendingInterrupt *irq1, E
 extern uint32_t coren_int_16;
 extern uint32_t cidu_int_indicator;
 
-static void nuclei_eclic_irq_request(void *opaque, int id, int new_intip)
+void nuclei_eclic_irq_request(void *opaque, int id, int new_intip)
 {
     NucleiECLICState *eclic = NUCLEI_ECLIC(opaque);
     RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(nuclei_eclic_get_current_cpu(opaque)));
@@ -717,6 +717,10 @@ static void nuclei_eclic_realize(DeviceState *dev, Error **errp)
         eclic->active_count_s = 0;
 
         /* Init ECLIC IRQ */
+        eclic->irqs[i][Internal_SysTimerSW_S_IRQn] = qemu_allocate_irq(nuclei_eclic_irq_request,
+                                                                    eclic, Internal_SysTimerSW_S_IRQn);
+        eclic->irqs[i][Internal_SysTimer_S_IRQn] = qemu_allocate_irq(nuclei_eclic_irq_request,
+                                                                    eclic, Internal_SysTimer_S_IRQn);
         eclic->irqs[i][Internal_SysTimerSW_IRQn] = qemu_allocate_irq(nuclei_eclic_irq_request,
                                                                      eclic, Internal_SysTimerSW_IRQn);
         eclic->irqs[i][Internal_SysTimer_IRQn] = qemu_allocate_irq(nuclei_eclic_irq_request,

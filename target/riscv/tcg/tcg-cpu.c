@@ -803,6 +803,10 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         }
     }
 
+    if (cpu->cfg.ext_sstc) {
+        cpu->env.mcfg_info |= (1 << 26);
+    }
+
     if (cpu->cfg.ext_xxlcz) {
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczpstinc), true);
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczbmrk), true);

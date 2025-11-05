@@ -37,6 +37,7 @@
 #define NUCLEI_SYSTIMER_REG_MTIMECMPHI          (0x000C)
 #define NUCLEI_SYSTIMER_REG_MTIMER_SRW_CTRL     (0xFEC)
 #define NUCLEI_SYSTIMER_REG_MSFTRST             (0xFF0)
+#define NUCLEI_SYSTIMER_REG_SSIP                (0xFF4)
 #define NUCLEI_SYSTIMER_REG_MTIMECTL            (0xFF8)
 #define NUCLEI_SYSTIMER_REG_MSIP                (0xFFC)
 
@@ -64,6 +65,7 @@ typedef struct NucleiSYSTIMERState
     uint32_t msftrst;
     uint32_t mtimectl;
     uint32_t msip;
+    uint32_t ssip;
 
     uint32_t hartid_base;
     uint32_t num_harts;

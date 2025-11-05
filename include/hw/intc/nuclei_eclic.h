@@ -119,11 +119,11 @@ typedef struct NucleiECLICState
 enum
 {
     Internal_Reserved0_IRQn = 0,     /*!<  Internal reserved */
-    Internal_Reserved1_IRQn = 1,     /*!<  Internal reserved */
+    Internal_SysTimerSW_S_IRQn = 1,  /*!<  System Timer supervisor mode SW interrupt triggered by ssip */
     Internal_Reserved2_IRQn = 2,     /*!<  Internal reserved */
     Internal_SysTimerSW_IRQn = 3,    /*!<  System Timer SW interrupt */
     Internal_Reserved3_IRQn = 4,     /*!<  Internal reserved */
-    Internal_Reserved4_IRQn = 5,     /*!<  Internal reserved */
+    Internal_SysTimer_S_IRQn = 5,    /*!<  System Timer supervisor mode interrupt triggered by stimecmp csr */
     Internal_Reserved5_IRQn = 6,     /*!<  Internal reserved */
     Internal_SysTimer_IRQn = 7,      /*!<  System Timer Interrupt */
     Internal_Reserved6_IRQn = 8,     /*!<  Internal reserved */
@@ -152,6 +152,7 @@ void nuclei_eclic_next_interrupt(void *eclic, int mode, int hartid);
 bool nuclei_eclic_shv_interrupt(void *opaque, int mode, int hartid, int irq);
 bool nuclei_eclic_edge_triggered(void *opaque, int mode, int hartid, int irq);
 void nuclei_eclic_clean_pending(void *opaque, int mode, int hartid, int irq);
+void nuclei_eclic_irq_request(void *opaque, int id, int new_intip);
 
 #endif
 
