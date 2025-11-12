@@ -420,7 +420,7 @@ static inline void do_dkmda(CPURISCVState *env, void *vd, void *va,
 {
     int32_t *d = vd;
     int16_t *a = va, *b = vb;
-    if(((a[i * 2] == INT16_MIN) && (b[i * 2] == INT16_MIN)) || ((a[i * 2 + 1] == INT16_MIN) && (b[i * 2 + 1] == INT16_MIN))){
+    if(((a[i * 2] == INT16_MIN) && (b[i * 2] == INT16_MIN)) && ((a[i * 2 + 1] == INT16_MIN) && (b[i * 2 + 1] == INT16_MIN))){
         env->ucode = 1;
         d[i] = INT32_MAX;
     }else{
@@ -435,7 +435,7 @@ static inline void do_dkmxda(CPURISCVState *env, void *vd, void *va,
 {
     int32_t *d = vd;
     int16_t *a = va, *b = vb;
-    if(((a[i * 2] == INT16_MIN) && (b[i * 2] == INT16_MIN)) || ((a[i * 2 + 1] == INT16_MIN) && (b[i * 2 + 1] == INT16_MIN))){
+    if(((a[i * 2] == INT16_MIN) && (b[i * 2] == INT16_MIN)) && ((a[i * 2 + 1] == INT16_MIN) && (b[i * 2 + 1] == INT16_MIN))){
         env->ucode = 1;
         d[i] = INT32_MAX;
     }else{
