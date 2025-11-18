@@ -137,12 +137,25 @@ build_linux_qemu:
     - env::docker
   image: rego.corp.nucleisys.com/software/build-linux-qemu:latest
   script:
+    # build Slirp lib first
+    - pip3 install --upgrade meson>=0.60
+    - meson --version
+    - mkdir -p $CI_PROJECT_DIR/libslirp_install
+    - cd $CI_PROJECT_DIR
+    - git clone https://gitlab.freedesktop.org/slirp/libslirp.git
+    - cd libslirp
+    - git checkout v4.9.1
+    - meson setup build --prefix=$CI_PROJECT_DIR/libslirp_install --default-library=static
+    - ninja -C build install
+    - ls -lh $CI_PROJECT_DIR/libslirp_install/lib/x86_64-linux-gnu/libslirp.a
+    - ls -lh $CI_PROJECT_DIR/libslirp_install/include/slirp/
+
     # build
     - cd $CI_PROJECT_DIR
     - mkdir $CI_PROJECT_DIR/build -p
     - mkdir $CI_PROJECT_DIR/linux_qemu -p
     - cd build
-    - ../configure --prefix=$CI_PROJECT_DIR/linux_qemu --disable-pa --disable-linux-aio --disable-rbd --disable-vnc --disable-sdl --disable-sdl-image --target-list=riscv32-softmmu,riscv64-softmmu,riscv64-linux-user,riscv32-linux-user
+    - ../configure --prefix=$CI_PROJECT_DIR/linux_qemu --extra-cflags="-I${CI_PROJECT_DIR}/libslirp_install/include" --extra-ldflags="-L${CI_PROJECT_DIR}/libslirp_install/lib/x86_64-linux-gnu -lslirp -lglib-2.0" --disable-pa --disable-linux-aio --disable-rbd --disable-vnc --disable-sdl --disable-sdl-image --enable-slirp --target-list=riscv32-softmmu,riscv64-softmmu,riscv64-linux-user,riscv32-linux-user
     - make -j8
     - make install
     - echo "Linux qemu is successfully built, but not stripped"
