@@ -173,11 +173,41 @@ build_windows_qemu:
     name: rego.corp.nucleisys.com/software/build-windows-qemu:latest
     entrypoint: ["/bin/sh", "-c"]
   script:
+    # build Slirp lib first
+    - dnf install -y python3-pip
+    - dnf install -y --nogpgcheck mingw64-glib2
+    - pip3 install --upgrade meson>=0.60
+    - meson --version
+    - mkdir -p $CI_PROJECT_DIR/libslirp_win
+    - cd $CI_PROJECT_DIR
+    - git clone https://gitlab.freedesktop.org/slirp/libslirp.git
+    - cd libslirp
+    - git checkout v4.9.1
+    - |
+      cat > cross-fedora-mingw64.txt << EOF
+      [host_machine]
+      system = 'windows'
+      cpu_family = 'x86_64'
+      cpu = 'x86_64'
+      endian = 'little'
+
+      [binaries]
+      c = 'x86_64-w64-mingw32-gcc'
+      cpp = 'x86_64-w64-mingw32-g++'
+      ar = 'x86_64-w64-mingw32-ar'
+      pkg-config = 'x86_64-w64-mingw32-pkg-config'
+      strip = 'x86_64-w64-mingw32-strip'
+      EOF
+    - meson setup build --cross-file=cross-fedora-mingw64.txt --prefix=$CI_PROJECT_DIR/libslirp_win --default-library=static --pkg-config-path=/usr/x86_64-w64-mingw32/sys-root/mingw/lib/pkgconfig/
+    - ninja -C build install
+    - ls -lh $CI_PROJECT_DIR/libslirp_win/lib/libslirp.a
+    - ls -lh $CI_PROJECT_DIR/libslirp_win/include/slirp/
     # build
+    - cd $CI_PROJECT_DIR
     - mkdir $CI_PROJECT_DIR/build -p
     - mkdir $CI_PROJECT_DIR/windows_qemu/bin -p
     - cd build
-    - ../configure --cross-prefix=x86_64-w64-mingw32- --target-list=riscv32-softmmu,riscv64-softmmu --prefix=$CI_PROJECT_DIR/windows_qemu/bin
+    - ../configure --cross-prefix=x86_64-w64-mingw32- --target-list=riscv32-softmmu,riscv64-softmmu --prefix=$CI_PROJECT_DIR/windows_qemu/bin --extra-cflags="-I${CI_PROJECT_DIR}/libslirp_win/include" --extra-ldflags="-L${CI_PROJECT_DIR}/libslirp_win/lib -lslirp -lglib-2.0" --enable-slirp
     - make -j8
     - make install
     # copy necessary dlls required by qemu
