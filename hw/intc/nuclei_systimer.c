@@ -68,6 +68,10 @@ static void nuclei_timer_update_compare(NucleiSYSTIMERState *s)
 
     if ( real_time >= cmp) {
         qemu_set_irq(*(s->timer_irq[hartid]), 1);
+        if (s->mtimectl & 0x2) {
+            s->mtime_lo = 0;
+            s->mtime_hi = 0;
+        }
     } else {
         qemu_set_irq(*(s->timer_irq[hartid]), 0);
 
@@ -269,22 +273,14 @@ static uint64_t nuclei_timer_read(void *opaque, hwaddr offset,
 
     switch (offset) {
     case NUCLEI_SYSTIMER_REG_MTIMELO:
-        if (s->mtimectl) {
-            value = 0;
-        } else {
-            timebase_f = s->timebase_freq;
-            value = nuclei_cpu_riscv_read_rtc(&timebase_f);
-            s->mtime_lo = value & 0xffffffff;
-            s->mtime_hi = (value >> 32) & 0xffffffff;
-            value = s->mtime_lo;
-        }
+        timebase_f = s->timebase_freq;
+        value = nuclei_cpu_riscv_read_rtc(&timebase_f);
+        s->mtime_lo = value & 0xffffffff;
+        s->mtime_hi = (value >> 32) & 0xffffffff;
+        value = s->mtime_lo;
         break;
     case NUCLEI_SYSTIMER_REG_MTIMEHI:
-        if (s->mtimectl) {
-            value = 0;
-        } else {
-            value = s->mtime_hi;
-        }
+        value = s->mtime_hi;
         break;
     case NUCLEI_SYSTIMER_REG_MTIMECMPLO:
         s->mtimecmp_lo = (env->mtimecmp) & 0xFFFFFFFF;
