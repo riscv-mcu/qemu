@@ -1234,6 +1234,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     size_t plic_hart_config_len;
     bool msimode;
     hwaddr msi_addr;
+    uint32_t guest_bits;
 
     qdev_prop_set_uint32(DEVICE(&s->cpus), "num-harts", ms->smp.cpus);
     qdev_prop_set_uint32(DEVICE(&s->cpus), "hartid-base", 0);
@@ -1295,9 +1296,10 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                                 i, true, 1, EVALSOC_IRQCHIP_NUM_MSIS);
             }
             /* S-level IMSICs */
+            guest_bits = imsic_num_bits(mst->aia_guests + 1);
             msi_addr = memmap[EVALSOC_IMSIC_S].base;
             for (i = 0; i < ms->smp.cpus; i++) {
-                riscv_imsic_create(msi_addr + i * (1 + mst->aia_guests) * memmap[EVALSOC_IMSIC_S].size,
+                riscv_imsic_create(msi_addr + i * IMSIC_HART_SIZE(guest_bits),
                                 i, false, 1 + mst->aia_guests,
                                 EVALSOC_IRQCHIP_NUM_MSIS);
             }
