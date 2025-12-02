@@ -557,13 +557,39 @@ static unsigned long string_to_uint64(const char *str)
     return (unsigned long)num;
 }
 
+static void parse_json_keys_and_values(QDict *qdict, const char *key1, const char *key2, 
+                                 uint64_t *val1_ptr, uint64_t *val2_ptr)
+{
+    if (!qdict)
+        return;
+
+    const QDictEntry *entry;
+    for (entry = qdict_first(qdict); entry; entry = qdict_next(qdict, entry))
+    {
+        QString *qstr = qobject_to(QString, entry->value);
+        if (!qstr) continue;
+        const char *val = qstring_get_str(qstr);
+        if (!val) continue;
+
+        if (!strcmp(entry->key, key1))
+        {
+            *val1_ptr = string_to_uint64(val);
+        }
+        else if (!strcmp(entry->key, key2))
+        {
+            *val2_ptr = string_to_uint64(val);
+        }
+    }
+}
+
+
 static void parse_json_config(MachineState *machine)
 {
     EvalSoCState *s = RISCV_EVALSOC_MACHINE(machine);
 
     const char* json_filename = s->soccfg;
     QDict *options_page0 = NULL,*options_page1 = NULL,*options_page2 = NULL;
-    const QDictEntry *page0,*page1,*page2;
+    const QDictEntry *page0,*page1;
     GError *err = NULL;
     gchar *content = NULL;
     gsize len;
@@ -588,154 +614,37 @@ static void parse_json_config(MachineState *machine)
                         for (page1 = qdict_first(options_page1); page1; page1 = qdict_next(options_page1, page1))
                         {
                             options_page2 = qobject_to(QDict, page1->value);
-                            if(!strcmp(page1->key, "timer_freq"))//timer_freq
-                            {
-                                s->timer_freq = string_to_uint64(qstring_get_str(qobject_to(QString, page1->value)));
-                            }
-                            else if(!strcmp(page1->key, "irqmax"))//irqmax
-                            {
-                                s->irqmax = string_to_uint64(qstring_get_str(qobject_to(QString, page1->value)));
-                            }
-                            else if(!strcmp(page1->key, "cpu_freq"))//cpu_freq
-                            {
-                                s->cpu_freq = string_to_uint64(qstring_get_str(qobject_to(QString, page1->value)));
-                            }
-                            else if(!strcmp(page1->key, "ddr"))//ddr
-                            {
-                                page2 = qdict_first(options_page2);
-                                if(!strcmp(page2->key, "base"))//ddr base
-                                {
-                                    s->ddr.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                                page2 = qdict_next(options_page2, page2);
-                                if(!strcmp(page2->key, "size"))//ddr size
-                                {
-                                    s->ddr.addr_size = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                            }
-                            else if(!strcmp(page1->key, "ilm"))//ilm
-                            {
-                                page2 = qdict_first(options_page2);
-                                if(!strcmp(page2->key, "base"))//ilm base
-                                {
-                                    s->ilm.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                                page2 = qdict_next(options_page2, page2);
-                                if(!strcmp(page2->key, "size"))//ilm size
-                                {
-                                    s->ilm.addr_size = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                            }else if(!strcmp(page1->key, "dlm"))//dlm
-                            {
-                                page2 = qdict_first(options_page2);
-                                if(!strcmp(page2->key, "base"))//dlm base
-                                {
-                                    s->dlm.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                                page2 = qdict_next(options_page2, page2);
-                                if(!strcmp(page2->key, "size"))//dlm size
-                                {
-                                    s->dlm.addr_size = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                            }else if(!strcmp(page1->key, "sram"))//sram
-                            {
-                                page2 = qdict_first(options_page2);
-                                if(!strcmp(page2->key, "base"))//sram base
-                                {
-                                    s->sram.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                                page2 = qdict_next(options_page2, page2);
-                                if(!strcmp(page2->key, "size"))//sram size
-                                {
-                                    s->sram.addr_size = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                            }
-                            else if(!strcmp(page1->key, "norflash"))//norflash
-                            {
-                                page2 = qdict_first(options_page2);
-                                if(!strcmp(page2->key, "base"))//norflash base
-                                {
-                                    s->norflash.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                                page2 = qdict_next(options_page2, page2);
-                                if(!strcmp(page2->key, "size"))//norflash size
-                                {
-                                    s->norflash.addr_size = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                            }
-                            else if(!strcmp(page1->key, "iregion"))//iregion
-                            {
-                                page2 = qdict_first(options_page2);
-                                if(!strcmp(page2->key, "base"))
-                                {
-                                     s->iregion = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-
-                                }
-                            }
-                            else if(!strcmp(page1->key, "uart0"))//uart0
-                            {
-                                page2 = qdict_first(options_page2);
-                                if(!strcmp(page2->key, "base"))//uart0 base
-                                {
-                                    s->uart0.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                                page2 = qdict_next(options_page2, page2);
-                                if(!strcmp(page2->key, "irq"))//uart0 irq
-                                {
-                                    s->uart0.irq = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                            }
-                            else if(!strcmp(page1->key, "uart1"))//uart1
-                            {
-                                page2 = qdict_first(options_page2);
-                                if(!strcmp(page2->key, "base"))//uart1 base
-                                {
-                                    s->uart1.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                                page2 = qdict_next(options_page2, page2);
-                                if(!strcmp(page2->key, "irq"))//uart1 irq
-                                {
-                                    s->uart1.irq = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                            }
-                            else if(!strcmp(page1->key, "qspi0"))//qspi0
-                            {
-                                page2 = qdict_first(options_page2);
-                                if(!strcmp(page2->key, "base"))//qspi0 base
-                                {
-                                    s->qspi0.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                                page2 = qdict_next(options_page2, page2);
-                                if(!strcmp(page2->key, "irq"))//qspi0 irq
-                                {
-                                    s->qspi0.irq = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                            }
-                            else if(!strcmp(page1->key, "qspi1"))//qspi1
-                            {
-                                page2 = qdict_first(options_page2);
-                                if(!strcmp(page2->key, "base"))//qspi1 base
-                                {
-                                    s->qspi1.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                                page2 = qdict_next(options_page2, page2);
-                                if(!strcmp(page2->key, "irq"))//qspi1 irq
-                                {
-                                    s->qspi1.irq = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                            }
-                            else if(!strcmp(page1->key, "qspi2"))//qspi2
-                            {
-                                page2 = qdict_first(options_page2);
-                                if(!strcmp(page2->key, "base"))//qspi2 base
-                                {
-                                    s->qspi2.addr_base = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                                page2 = qdict_next(options_page2, page2);
-                                if(!strcmp(page2->key, "irq"))//qspi2 irq
-                                {
-                                    s->qspi2.irq = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
+                            if(!strcmp(page1->key, "timer_freq")) {
+                                const char *val = qstring_get_str(qobject_to(QString, page1->value));
+                                if (val) s->timer_freq = string_to_uint64(val);
+                            } else if(!strcmp(page1->key, "irqmax")) {
+                                const char *val = qstring_get_str(qobject_to(QString, page1->value));
+                                s->irqmax = string_to_uint64(val);
+                            } else if (!strcmp(page1->key, "cpu_freq")) {
+                                const char *val = qstring_get_str(qobject_to(QString, page1->value));
+                                s->cpu_freq = string_to_uint64(val);
+                            } else if (!strcmp(page1->key, "ddr")) {
+                                parse_json_keys_and_values(options_page2, "base", "size", &s->ddr.addr_base, &s->ddr.addr_size);
+                            } else if (!strcmp(page1->key, "ilm")) {
+                                parse_json_keys_and_values(options_page2, "base", "size", &s->ilm.addr_base, &s->ilm.addr_size);
+                            } else if (!strcmp(page1->key, "dlm")) {
+                                parse_json_keys_and_values(options_page2, "base", "size", &s->dlm.addr_base, &s->dlm.addr_size);
+                            } else if (!strcmp(page1->key, "sram")) {
+                                parse_json_keys_and_values(options_page2, "base", "size", &s->sram.addr_base, &s->sram.addr_size);
+                            } else if (!strcmp(page1->key, "norflash")) {
+                                parse_json_keys_and_values(options_page2, "base", "size", &s->norflash.addr_base, &s->norflash.addr_size);
+                            } else if (!strcmp(page1->key, "iregion")) {
+                                parse_json_keys_and_values(options_page2, "base", NULL, &s->iregion, NULL);
+                            } else if (!strcmp(page1->key, "uart0")) {
+                                parse_json_keys_and_values(options_page2, "base", "irq", &s->uart0.addr_base, &s->uart0.irq);
+                            } else if (!strcmp(page1->key, "uart1")) {
+                                parse_json_keys_and_values(options_page2, "base", "irq", &s->uart1.addr_base, &s->uart1.irq);
+                            } else if (!strcmp(page1->key, "qspi0")) {
+                                parse_json_keys_and_values(options_page2, "base", "irq", &s->qspi0.addr_base, &s->qspi0.irq);
+                            } else if (!strcmp(page1->key, "qspi1")) {
+                                parse_json_keys_and_values(options_page2, "base", "irq", &s->qspi1.addr_base, &s->qspi1.irq);
+                            } else if (!strcmp(page1->key, "qspi2")) {
+                                parse_json_keys_and_values(options_page2, "base", "irq", &s->qspi2.addr_base, &s->qspi2.irq);
                             }
                         }
                     }
@@ -745,42 +654,16 @@ static void parse_json_config(MachineState *machine)
                         for (page1 = qdict_first(options_page1); page1; page1 = qdict_next(options_page1, page1))
                         {
                             options_page2 = qobject_to(QDict, page1->value);
-                            if(!strcmp(page1->key, "ilm"))//ilm
-                            {
-                                page2 = qdict_first(options_page2);
-                                if(!strcmp(page2->key, "startaddr"))
-                                {
-                                     s->ilm.startup_addr = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-
-                                }
-                            }else if(!strcmp(page1->key, "flashxip"))//flashxip
-                            {
-                                page2 = qdict_first(options_page2);
-                                if(!strcmp(page2->key, "startaddr"))
-                                {
-                                     s->norflash.startup_addr = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                            }else if(!strcmp(page1->key, "flash"))//flash
-                            {
-                                page2 = qdict_first(options_page2);
-                                if(!strcmp(page2->key, "startaddr"))
-                                {
-                                     s->flash.startup_addr = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                            }else if(!strcmp(page1->key, "sram"))//sram
-                            {
-                                page2 = qdict_first(options_page2);
-                                if(!strcmp(page2->key, "startaddr"))
-                                {
-                                     s->sram.startup_addr = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
-                            }else if(!strcmp(page1->key, "ddr"))//ddr
-                            {
-                                page2 = qdict_first(options_page2);
-                                if(!strcmp(page2->key, "startaddr"))
-                                {
-                                     s->ddr.startup_addr = string_to_uint64(qstring_get_str(qobject_to(QString, page2->value)));
-                                }
+                            if (!strcmp(page1->key, "ilm")) {
+                                parse_json_keys_and_values(options_page2, "startaddr", NULL, &s->ilm.startup_addr, NULL);
+                            } else if (!strcmp(page1->key, "flashxip")) {
+                                parse_json_keys_and_values(options_page2, "startaddr", NULL, &s->norflash.startup_addr, NULL);
+                            } else if (!strcmp(page1->key, "flash")) {
+                                parse_json_keys_and_values(options_page2, "startaddr", NULL, &s->flash.startup_addr, NULL);
+                            } else if (!strcmp(page1->key, "sram")) {
+                                parse_json_keys_and_values(options_page2, "startaddr", NULL, &s->sram.startup_addr, NULL);
+                            } else if (!strcmp(page1->key, "ddr")) {
+                                parse_json_keys_and_values(options_page2, "startaddr", NULL, &s->ddr.startup_addr, NULL);
                             }
                         }
                     }
@@ -998,10 +881,10 @@ static void evalsoc_machine_init(MachineState *machine)
     DEBUGF("download mode is %s\n", s->download);
     DEBUGF("ddr     : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->ddr.addr_base,(long)s->ddr.addr_size,(long)s->ddr.startup_addr);
     DEBUGF("ilm     : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->ilm.addr_base,(long)s->ilm.addr_size,(long)s->ilm.startup_addr);
-    DEBUGF("dlm     : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->dlm.addr_base,(long)s->dlm.addr_size,(long)s->dlm.startup_addr);
     DEBUGF("sram    : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->sram.addr_base,(long)s->sram.addr_size,(long)s->sram.startup_addr);
     DEBUGF("norflash: base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->norflash.addr_base,(long)s->norflash.addr_size,(long)s->norflash.startup_addr);
     DEBUGF("flash   : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->flash.addr_base,(long)s->flash.addr_size,(long)s->flash.startup_addr);
+    DEBUGF("dlm     : base:0x%lx, size:0x%lx\n", (long)s->dlm.addr_base,(long)s->dlm.addr_size);
     DEBUGF("uart0   : base:0x%lx, irq:%d\n", (long)s->uart0.addr_base,(int)s->uart0.irq);
     DEBUGF("uart1   : base:0x%lx, irq:%d\n", (long)s->uart1.addr_base,(int)s->uart1.irq);
     DEBUGF("qspi0   : base:0x%lx, irq:%d\n", (long)s->qspi0.addr_base,(int)s->qspi0.irq);
