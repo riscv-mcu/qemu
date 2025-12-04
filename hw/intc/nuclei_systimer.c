@@ -105,7 +105,7 @@ static void nuclei_clint_write_timecmp(RISCVCPU *cpu, uint64_t value,
     }
 
     /* otherwise, set up the future timer interrupt */
-    riscv_cpu_update_mip(&cpu->env, MIP_MTIP, BOOL_TO_MASK(0));
+        riscv_cpu_update_mip(&cpu->env, MIP_MTIP, BOOL_TO_MASK(0));
     diff = cpu->env.timecmp - rtc_r;
     /* back to ns (note args switched in muldiv64) */
     next = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) +
@@ -479,10 +479,11 @@ static void nuclei_timer_register_types(void)
 type_init(nuclei_timer_register_types);
 
 static void nuclei_mtimecmp_cb(void *opaque) {
-    RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(nuclei_systimer_get_current_cpu(opaque)));
+    CPUState *cs = (CPUState *)opaque;
+    RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(cs->cpu_index));
     CPURISCVState *env = &cpu->env;
 
-    nuclei_eclic_systimer_cb(cpu->env.eclic);
+    nuclei_eclic_systimer_cb(env);
     timer_del(env->mtimer);
 }
 

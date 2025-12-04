@@ -36,7 +36,7 @@ static void riscv_stimer_cb(void *opaque)
     RISCVCPU *cpu = opaque;
 
     if (riscv_intc_is_clic_mode(&cpu->env)) {
-        nuclei_eclic_irq_request(cpu->env.eclic, Internal_SysTimer_S_IRQn, 1);
+        nuclei_eclic_irq_request(&cpu->env, Internal_SysTimer_S_IRQn, 1);
         timer_del(cpu->env.stimer);
     } else {
         riscv_cpu_update_mip(&cpu->env, MIP_STIP, BOOL_TO_MASK(1));
@@ -75,7 +75,7 @@ void riscv_timer_write_timecmp(CPURISCVState *env, QEMUTimer *timer,
             riscv_cpu_update_mip(env, MIP_STIP, BOOL_TO_MASK(1));
         }
         if (riscv_intc_is_clic_mode(env))
-            nuclei_eclic_irq_request(env->eclic, Internal_SysTimer_S_IRQn, 1);
+            nuclei_eclic_irq_request(env, Internal_SysTimer_S_IRQn, 1);
         return;
     }
 
@@ -89,7 +89,7 @@ void riscv_timer_write_timecmp(CPURISCVState *env, QEMUTimer *timer,
 
     // /* Clear the S mode SW intip in eclic */
     if (riscv_intc_is_clic_mode(env))
-        nuclei_eclic_irq_request(env->eclic, Internal_SysTimer_S_IRQn, 0);
+        nuclei_eclic_irq_request(env, Internal_SysTimer_S_IRQn, 0);
 
     /*
      * Sstc specification says the following about timer interrupt:

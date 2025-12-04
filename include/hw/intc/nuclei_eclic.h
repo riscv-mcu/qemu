@@ -144,7 +144,7 @@ DeviceState *nuclei_eclic_create(hwaddr addr, uint32_t aperture_size, bool prv_s
                                uint32_t num_harts, uint32_t num_sources,
                                uint8_t clicintctlbits);
 qemu_irq nuclei_eclic_get_irq(DeviceState *dev, int irq, int hartid);
-void nuclei_eclic_systimer_cb(DeviceState *dev);
+void nuclei_eclic_systimer_cb(void *opaque);
 void riscv_cpu_eclic_int_handler_start(void *eclic_ptr, int mode, int irq, int hartid);
 void riscv_cpu_eclic_int_handler_start_s(void *eclic_ptr, int mode, int irq, int hartid);
 bool riscv_intc_is_clic_mode(CPUArchState *env);

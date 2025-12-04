@@ -476,9 +476,9 @@ extern uint32_t cidu_int_indicator;
 
 void nuclei_eclic_irq_request(void *opaque, int id, int new_intip)
 {
-    NucleiECLICState *eclic = NUCLEI_ECLIC(opaque);
-    RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(nuclei_eclic_get_current_cpu(opaque)));
-    CPURISCVState *env = &cpu->env;
+    CPURISCVState *env = (CPURISCVState *)opaque;
+    NucleiECLICState *eclic = env->eclic;
+    CPUState *cpu = env_cpu(env);
 
     if (id < Internal_Reserved_Max_IRQn)
     {
@@ -488,29 +488,23 @@ void nuclei_eclic_irq_request(void *opaque, int id, int new_intip)
         }
         else
         {
-            for (int i = 0; i < eclic->num_harts; i++)
-            {
-                if (eclic->clicintie_s[i][id] & 0x1) {
-                    nuclei_eclic_update_intip_s(eclic, id, i, new_intip);
-                } else {
-                    nuclei_eclic_update_intip(eclic, id, i, new_intip);
-                }
+            if (eclic->clicintie_s[cpu->cpu_index][id] & 0x1) {
+                nuclei_eclic_update_intip_s(eclic, id, cpu->cpu_index, new_intip);
+            } else {
+                nuclei_eclic_update_intip(eclic, id, cpu->cpu_index, new_intip);
             }
         }
     }
     else
     {
-        for(int i = 0; i < eclic->num_harts; i++)
-        {
-            if (cidu_int_indicator != 0) {
-                if(cidu_int_indicator & (1U << i))
-                    nuclei_eclic_update_intip(eclic, id, i, new_intip);
+        if (cidu_int_indicator != 0) {
+            if(cidu_int_indicator & (1U << cpu->cpu_index))
+                nuclei_eclic_update_intip(eclic, id, cpu->cpu_index, new_intip);
+        } else {
+            if (eclic->clicintie_s[cpu->cpu_index][id] & 0x1) {
+                nuclei_eclic_update_intip_s(eclic, id, cpu->cpu_index, new_intip);
             } else {
-                if (env->priv <= PRV_S) {
-                    nuclei_eclic_update_intip_s(eclic, id, i, new_intip);
-                } else {
-                    nuclei_eclic_update_intip(eclic, id, i, new_intip);
-                }
+                nuclei_eclic_update_intip(eclic, id, cpu->cpu_index, new_intip);
             }
         }
     }
@@ -718,21 +712,21 @@ static void nuclei_eclic_realize(DeviceState *dev, Error **errp)
 
         /* Init ECLIC IRQ */
         eclic->irqs[i][Internal_SysTimerSW_S_IRQn] = qemu_allocate_irq(nuclei_eclic_irq_request,
-                                                                    eclic, Internal_SysTimerSW_S_IRQn);
+                                                                    &cpu->env, Internal_SysTimerSW_S_IRQn);
         eclic->irqs[i][Internal_SysTimer_S_IRQn] = qemu_allocate_irq(nuclei_eclic_irq_request,
-                                                                    eclic, Internal_SysTimer_S_IRQn);
+                                                                    &cpu->env, Internal_SysTimer_S_IRQn);
         eclic->irqs[i][Internal_SysTimerSW_IRQn] = qemu_allocate_irq(nuclei_eclic_irq_request,
-                                                                     eclic, Internal_SysTimerSW_IRQn);
+                                                                     &cpu->env, Internal_SysTimerSW_IRQn);
         eclic->irqs[i][Internal_SysTimer_IRQn] = qemu_allocate_irq(nuclei_eclic_irq_request,
-                                                                   eclic, Internal_SysTimer_IRQn);
+                                                                   &cpu->env, Internal_SysTimer_IRQn);
 
         eclic->irqs[i][Internal_Reserved14_IRQn] = qemu_allocate_irq(nuclei_eclic_irq_request,
-                                                                    eclic, Internal_Reserved14_IRQn);
+                                                                    &cpu->env, Internal_Reserved14_IRQn);
 
         for (id = Internal_Reserved_Max_IRQn; id < eclic->num_sources; id++)
         {
             eclic->irqs[i][id] = qemu_allocate_irq(nuclei_eclic_irq_request,
-                                                   eclic, id);
+                                                   &cpu->env, id);
         }
 
         cpu->env.eclic = eclic;
@@ -763,10 +757,10 @@ static void nuclei_eclic_register_types(void)
 
 type_init(nuclei_eclic_register_types);
 
-void nuclei_eclic_systimer_cb(DeviceState *dev)
+void nuclei_eclic_systimer_cb(void *opaque)
 {
-    NucleiECLICState *eclic = NUCLEI_ECLIC(dev);
-    nuclei_eclic_irq_request(eclic, Internal_SysTimer_IRQn, 1);
+    CPURISCVState *env = (CPURISCVState *)opaque;
+    nuclei_eclic_irq_request(env, Internal_SysTimer_IRQn, 1);
 }
 
 DeviceState *nuclei_eclic_create(hwaddr addr, uint32_t aperture_size, bool prv_s, bool prv_u, bool vector,
