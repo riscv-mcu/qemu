@@ -508,6 +508,7 @@ struct CPUArchState {
     bool irq_pending;
     void *eclic;
     void *clic;       /* clic interrupt controller */
+    void *systimer;
 
     hwaddr kernel_addr;
     hwaddr fdt_addr;

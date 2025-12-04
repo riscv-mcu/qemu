@@ -95,17 +95,27 @@ static void nuclei_clint_write_timecmp(RISCVCPU *cpu, uint64_t value,
     uint64_t diff;
     uint64_t w_timebase_freq = timebase_freq;
     uint64_t rtc_r = nuclei_cpu_riscv_read_rtc(&w_timebase_freq);
+    CPUState *cs = env_cpu(&cpu->env);
+    NucleiSYSTIMERState *clint = (NucleiSYSTIMERState *)cpu->env.systimer;
 
     cpu->env.timecmp = value;
     if (cpu->env.timecmp <= rtc_r) {
         /* if we're setting an MTIMECMP value in the "past",
            immediately raise the timer interrupt */
-        riscv_cpu_update_mip(&cpu->env, MIP_MTIP, BOOL_TO_MASK(1));
+        if (riscv_intc_is_clic_mode(&cpu->env)) {
+            qemu_set_irq(*(clint->timer_irq[cs->cpu_index]), 1);
+        } else {
+            riscv_cpu_update_mip(&cpu->env, MIP_MTIP, BOOL_TO_MASK(1));
+        }
         return;
     }
 
     /* otherwise, set up the future timer interrupt */
+    if (riscv_intc_is_clic_mode(&cpu->env)) {
+        qemu_set_irq(*(clint->timer_irq[cs->cpu_index]), 0);
+    } else {
         riscv_cpu_update_mip(&cpu->env, MIP_MTIP, BOOL_TO_MASK(0));
+    }
     diff = cpu->env.timecmp - rtc_r;
     /* back to ns (note args switched in muldiv64) */
     next = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) +
@@ -526,6 +536,7 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_ba
             riscv_cpu_set_rdtime_fn(env, nuclei_cpu_riscv_read_rtc, &(s->timebase_freq));
             env->mtimer = timer_new_ns(QEMU_CLOCK_VIRTUAL, &nuclei_clint_timer_cb, cpu);
         }
+        env->systimer = s;
     }
     sysbus_realize_and_unref(SYS_BUS_DEVICE(dev), &error_fatal);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, addr);
