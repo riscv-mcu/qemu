@@ -503,6 +503,20 @@ update_bootargs:
     }
 }
 
+static uint64_t riscv_imsic_dummy_read(void *opaque, hwaddr addr, unsigned size) {
+    return 0;
+}
+
+static void riscv_imsic_dummy_write(void *opaque, hwaddr addr, uint64_t val, unsigned size) {
+}
+
+static const MemoryRegionOps riscv_imsic_dummy_ops = {
+    .read = riscv_imsic_dummy_read,
+    .write = riscv_imsic_dummy_write,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+    .valid = {},
+};
+
 static QDict *parse_json_filename(const char *filename, Error **errp)
 {
     QObject *options_obj;
@@ -1291,17 +1305,33 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         if (msimode) {
             /* M-level IMSICs */
             msi_addr = memmap[EVALSOC_IMSIC_M].base;
-            for (i = 0; i < ms->smp.cpus; i++) {
-                riscv_imsic_create(msi_addr + i * memmap[EVALSOC_IMSIC_M].size,
-                                i, true, 1, EVALSOC_IRQCHIP_NUM_MSIS);
+            for (i = 0; i < EVALSOC_IMSIC_DEFAULT_HARTS; i++) {
+                if (i < ms->smp.cpus) {
+                    riscv_imsic_create(msi_addr + i * memmap[EVALSOC_IMSIC_M].size,
+                                        i, true, 1, EVALSOC_IRQCHIP_NUM_MSIS);
+                } else {
+                    MemoryRegion *mr = g_new(MemoryRegion, 1);
+                    char *ram_block_name = g_strdup_printf("imsic-M-reserved-ram-hart%d", i);
+                    memory_region_init_io(mr, NULL, &riscv_imsic_dummy_ops, NULL,
+                                        ram_block_name, memmap[EVALSOC_IMSIC_M].size);
+                    memory_region_add_subregion(get_system_memory(), msi_addr + i * memmap[EVALSOC_IMSIC_M].size, mr);
+                }
             }
             /* S-level IMSICs */
             guest_bits = imsic_num_bits(mst->aia_guests + 1);
             msi_addr = memmap[EVALSOC_IMSIC_S].base;
-            for (i = 0; i < ms->smp.cpus; i++) {
-                riscv_imsic_create(msi_addr + i * IMSIC_HART_SIZE(guest_bits),
-                                i, false, 1 + mst->aia_guests,
-                                EVALSOC_IRQCHIP_NUM_MSIS);
+            for (i = 0; i < EVALSOC_IMSIC_DEFAULT_HARTS; i++) {
+                if (i < ms->smp.cpus) {
+                    riscv_imsic_create(msi_addr + i * IMSIC_HART_SIZE(guest_bits),
+                                    i, false, 1 + mst->aia_guests,
+                                    EVALSOC_IRQCHIP_NUM_MSIS);
+                } else {
+                    MemoryRegion *mr = g_new(MemoryRegion, 1);
+                    char *ram_block_name = g_strdup_printf("imsic-S-reserved-ram-hart%d", i);
+                    memory_region_init_io(mr, NULL, &riscv_imsic_dummy_ops, NULL,
+                                        ram_block_name, IMSIC_HART_SIZE(guest_bits));
+                    memory_region_add_subregion(get_system_memory(), msi_addr + i * IMSIC_HART_SIZE(guest_bits), mr);
+                }
             }
         }
         
