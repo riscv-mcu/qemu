@@ -499,6 +499,7 @@ struct CPUArchState {
     target_ulong mmacro_dev_en;
     target_ulong mmacro_noc_en;
     target_ulong mmacro_ca_en;
+    target_ulong ssubm;
 
     /*nuclei timer comparators */
     uint64_t mtimecmp;
@@ -604,6 +605,7 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
 char *riscv_isa_string(RISCVCPU *cpu);
 int riscv_cpu_max_xlen(RISCVCPUClass *mcc);
 bool riscv_cpu_option_set(const char *optname);
+void nuclei_eclic_context_auto_saving(CPURISCVState *env);
 
 #ifndef CONFIG_USER_ONLY
 void riscv_isa_write_fdt(RISCVCPU *cpu, void *fdt, char *nodename);

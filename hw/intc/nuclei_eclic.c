@@ -58,6 +58,10 @@ bool riscv_intc_is_clic_mode(CPUArchState *env)
     return env->eclic && ((env->mtvec & 0x3F) == 3);
 }
 
+bool riscv_intc_is_eclicv2_mode(CPUArchState *env) {
+    return env->eclic && (env->mmisc_ctl & (1U << 21));
+}
+
 qemu_irq nuclei_eclic_get_irq(DeviceState *dev, int irq, int hartid)
 {
     NucleiECLICState *eclic = NUCLEI_ECLIC(dev);

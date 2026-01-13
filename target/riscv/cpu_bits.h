@@ -637,6 +637,21 @@
 #define CSR_NUCLEI_IRQCEDGE        0xbd3
 #define CSR_NUCLEI_IRQCINFO        0xbd4
 
+/* === Nuclei ECLIC V2 Registers === */
+#define CSR_NUCLEI_MTSPCSW          0x7d5
+#define CSR_NUCLEI_MSHADGPRLVL0     0x7e3
+#define CSR_NUCLEI_MSHADGPRLVL1     0x7e4
+#define CSR_NUCLEI_MECLIC_CTL       0x7e5
+#define CSR_NUCLEI_MTSP             0x7e6
+#define CSR_NUCLEI_PUSHSSUBM        0x94b
+#define CSR_NUCLEI_POPXRET          0x94c
+#define CSR_NUCLEI_STSPCSW          0x94d
+#define CSR_NUCLEI_SSUBM            0x9c4
+#define CSR_NUCLEI_SSHADGPRLVL0     0x9e3
+#define CSR_NUCLEI_SSHADGPRLVL1     0x9e4
+#define CSR_NUCLEI_SECLIC_CTL       0x9e5
+#define CSR_NUCLEI_STSP             0x9e6
+
 /* Performance Counters */
 #define CSR_MHPMCOUNTER3    0xb03
 #define CSR_MHPMCOUNTER4    0xb04

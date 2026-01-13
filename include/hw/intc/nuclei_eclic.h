@@ -148,6 +148,7 @@ void nuclei_eclic_systimer_cb(void *opaque);
 void riscv_cpu_eclic_int_handler_start(void *eclic_ptr, int mode, int irq, int hartid);
 void riscv_cpu_eclic_int_handler_start_s(void *eclic_ptr, int mode, int irq, int hartid);
 bool riscv_intc_is_clic_mode(CPUArchState *env);
+bool riscv_intc_is_eclicv2_mode(CPUArchState *env);
 void nuclei_eclic_next_interrupt(void *eclic, int mode, int hartid);
 bool nuclei_eclic_shv_interrupt(void *opaque, int mode, int hartid, int irq);
 bool nuclei_eclic_edge_triggered(void *opaque, int mode, int hartid, int irq);

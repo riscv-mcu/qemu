@@ -1769,6 +1769,44 @@ static target_ulong riscv_intr_pc(CPURISCVState *env, target_ulong tvec,
 }
 #endif
 
+// auto save context for non-vector intc
+void nuclei_eclic_context_auto_saving(CPURISCVState *env) {
+#if !defined(CONFIG_USER_ONLY)
+    target_ulong stack_addr;
+    uint32_t stack_ofst;
+    uint32_t gpr_size = 4;
+    void *xcause, *xepc, *xsubm;
+    uint32_t context_regs[17] = { 1, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15,
+                                16, 17, 28, 29, 30, 31 };
+    if (riscv_cpu_mxl(env) != MXL_RV32) {
+        gpr_size = 8;
+    }
+    env->gpr[2] -= gpr_size * ((!riscv_has_ext(env, RVE)) ? 20 : 14);
+    stack_addr = env->gpr[2];
+    // auto save gpr context
+    for (uint32_t i = 0; i < 17; i++) {
+        stack_ofst = i;
+        if (i > 10) {
+            if (riscv_has_ext(env, RVE)) {
+                continue;
+            } else {
+                stack_ofst += 4;
+            }
+        }
+        cpu_physical_memory_rw(stack_addr + gpr_size * stack_ofst,
+                                &env->gpr[context_regs[i]], gpr_size, 1);
+    }
+    // auto save csr context
+    xcause = (env->priv == PRV_S) ? &env->scause : &env->mcause;
+    xepc = (env->priv == PRV_S) ? &env->sepc : &env->mepc;
+    xsubm = (env->priv == PRV_S) ? &env->ssubm : &env->msubm;
+
+    cpu_physical_memory_rw(stack_addr + gpr_size * 11, xcause, gpr_size, 1);
+    cpu_physical_memory_rw(stack_addr + gpr_size * 12, xepc, gpr_size, 1);
+    cpu_physical_memory_rw(stack_addr + gpr_size * 13, xsubm, gpr_size, 1);
+#endif
+}
+
 /*
  * Handle Traps
  *
@@ -1972,6 +2010,10 @@ void riscv_cpu_do_interrupt(CPUState *cs)
                                         eclic_flag & 0xfff, cause, PRV_S);
 
         riscv_cpu_set_mode(env, PRV_S);
+        if (!nuclei_eclic_shv_interrupt(env->eclic, mode, cs->cpu_index, cause & 0x3FF)
+            && riscv_intc_is_eclicv2_mode(env)) {
+            nuclei_eclic_context_auto_saving(env);
+        }
     } else {
         /* handle the trap in M-mode */
         if (eclic_flag) {
@@ -2025,6 +2067,10 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         env->mtinst = tinst;
         env->pc = newpc;
         riscv_cpu_set_mode(env, PRV_M);
+        if (!nuclei_eclic_shv_interrupt(env->eclic, mode, cs->cpu_index, cause & 0x3FF)
+            && riscv_intc_is_eclicv2_mode(env)) {
+            nuclei_eclic_context_auto_saving(env);
+        }
     }
 
     /*

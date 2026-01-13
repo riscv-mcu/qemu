@@ -5405,6 +5405,61 @@ static int rmw_pushsepc(CPURISCVState *env, int csrno, target_ulong *ret_value,
     return RISCV_EXCP_NONE;
 }
 
+extern target_ulong helper_sret(CPURISCVState *env);
+extern target_ulong helper_mret(CPURISCVState *env);
+
+static int rmw_popxret(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                target_ulong new_value, target_ulong write_mask)
+{
+    uint64_t notify_addr = 0;
+    uint32_t riscv_addr_size = 4;
+    uint32_t stack_ofst;
+    target_ulong retpc;
+    void *xcause, *xepc, *xsubm;
+    uint32_t context_regs[17] = { 1, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15,
+                                  16, 17, 28, 29, 30, 31 };
+    // If in debug mode, directly return
+    if (env->debugger) {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+        return RISCV_EXCP_NONE;
+    }
+
+    if (riscv_cpu_mxl(env) != MXL_RV32) {
+        riscv_addr_size = 8;
+    }
+
+    xcause = (env->priv == PRV_S) ? &env->scause : &env->mcause;
+    xepc = (env->priv == PRV_S) ? &env->sepc : &env->mepc;
+    xsubm = (env->priv == PRV_S) ? &env->ssubm : &env->msubm;
+
+    notify_addr = env->gpr[2];
+    cpu_physical_memory_rw(notify_addr + riscv_addr_size * 13, xsubm, riscv_addr_size, 0);
+    cpu_physical_memory_rw(notify_addr + riscv_addr_size * 12, xepc, riscv_addr_size, 0);
+    cpu_physical_memory_rw(notify_addr + riscv_addr_size * 11, xcause, riscv_addr_size, 0);
+    // auto restore gpr context
+    for (uint32_t i = 0; i < 17; i++) {
+        stack_ofst = i;
+        if (i > 10) {
+            if (riscv_has_ext(env, RVE)) {
+                continue;
+            } else {
+                stack_ofst += 4;
+            }
+        }
+        cpu_physical_memory_rw(notify_addr + riscv_addr_size * stack_ofst,
+                                &env->gpr[context_regs[i]], riscv_addr_size, 0);
+    }
+    env->gpr[2] += riscv_addr_size * ((!riscv_has_ext(env, RVE)) ? 20 : 14);
+    retpc = (env->priv == PRV_S) ? helper_sret(env) : helper_mret(env);
+    /* After rmw_*, pc will be refreshed to the next instruction.
+     * Since the mepc we have saved is already the address of the next instruction,
+     * we need to roll back. */
+    env->pc = retpc - 4;
+    return RISCV_EXCP_NONE;
+}
+
 static int read_wfe(CPURISCVState *env, int csrno, target_ulong *val)
 {
     *val = env->wfe;
@@ -6526,6 +6581,21 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_IRQCLVL]        = { "irqclvl",        any, read_zero, write_ignore },
     [CSR_NUCLEI_IRQCEDGE]       = { "irqcedge",       any, read_zero, write_ignore },
     [CSR_NUCLEI_IRQCINFO]       = { "irqcinfo",       any, read_zero, write_ignore },
+
+    /* === Nuclei ECLIC V2 Registers === */
+    [CSR_NUCLEI_MTSPCSW]        = { "mtspcsw",        any, read_zero, write_ignore },
+    [CSR_NUCLEI_MSHADGPRLVL0]   = { "mshadgprlvl0",   any, read_zero, write_ignore },
+    [CSR_NUCLEI_MSHADGPRLVL1]   = { "mshadgprlvl1",   any, read_zero, write_ignore },
+    [CSR_NUCLEI_MECLIC_CTL]     = { "meclic_ctl",     any, read_zero, write_ignore },
+    [CSR_NUCLEI_MTSP]           = { "mtsp",           any, read_zero, write_ignore },
+    [CSR_NUCLEI_PUSHSSUBM]      = { "pushssubm",      smode, read_zero, write_ignore },
+    [CSR_NUCLEI_POPXRET]        = { "popxret",        any, NULL, NULL, rmw_popxret },
+    [CSR_NUCLEI_STSPCSW]        = { "stspcsw",        smode, read_zero, write_ignore },
+    [CSR_NUCLEI_SSUBM]          = { "ssubm",          smode, read_zero, write_ignore },
+    [CSR_NUCLEI_SSHADGPRLVL0]   = { "sshadgprlvl0",   smode, read_zero, write_ignore },
+    [CSR_NUCLEI_SSHADGPRLVL1]   = { "sshadgprlvl1",   smode, read_zero, write_ignore },
+    [CSR_NUCLEI_SECLIC_CTL]     = { "seclic_ctl",     smode, read_zero, write_ignore },
+    [CSR_NUCLEI_STSP]           = { "stsp",           smode, read_zero, write_ignore },
 
     /* Machine Mode Core Level Interrupt Controller */
     [CSR_MINTSTATUS]            = {"mintstatus",      any, read_mintstatus, write_mintthresh },
