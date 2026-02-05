@@ -5405,6 +5405,171 @@ static int rmw_pushsepc(CPURISCVState *env, int csrno, target_ulong *ret_value,
     return RISCV_EXCP_NONE;
 }
 
+static int rmw_mtspcsw(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                target_ulong new_value, target_ulong write_mask)
+{
+    target_ulong t;
+    if ((env->priv == PRV_M) && get_field(env->meclic_ctl, XECLIC_CTL_TSP_EN)) {
+        if ((((get_field(env->mcause, MCAUSE_MPIL) == 0) ^ (get_field(env->mintstatus, MINTSTATUS_MIL) == 0))
+            && (get_field(env->msubm, XSUBM_TYP) == SUBM_INT))
+            || ((env->priv != get_field(env->mstatus, MSTATUS_MPP)) && (get_field(env->msubm, XSUBM_TYP) > SUBM_INT))) {
+            t = new_value;
+            *ret_value = env->mtsp;
+            env->mtsp = t;
+        }
+    } else {
+        *ret_value =  new_value;
+    }
+    return RISCV_EXCP_NONE;
+}
+
+static int rmw_stspcsw(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                target_ulong new_value, target_ulong write_mask)
+{
+    target_ulong t;
+    if ((env->priv <= PRV_S) && get_field(env->seclic_ctl, XECLIC_CTL_TSP_EN)) {
+        if ((((get_field(env->scause, MCAUSE_MPIL) == 0) ^ (get_field(env->mintstatus, MINTSTATUS_SIL) == 0))
+            && (get_field(env->ssubm, XSUBM_TYP) == SUBM_INT))
+            || ((env->priv != get_field(env->mstatus, MSTATUS_SPP)) && (get_field(env->ssubm, XSUBM_TYP) > SUBM_INT))) {
+            t = new_value;
+            *ret_value = env->stsp;
+            env->mtsp = t;
+        }
+    } else {
+        *ret_value =  new_value;
+    }
+    return RISCV_EXCP_NONE;
+}
+
+static int read_ssubm(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->ssubm;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_ssubm(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->ssubm = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mshadgprlvl0(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mshadgprlvl0;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mshadgprlvl0(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mshadgprlvl0 = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mshadgprlvl1(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mshadgprlvl1;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mshadgprlvl1(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mshadgprlvl1 = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_sshadgprlvl0(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->sshadgprlvl0;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_sshadgprlvl0(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->sshadgprlvl0 = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_sshadgprlvl1(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->sshadgprlvl1;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_sshadgprlvl1(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->sshadgprlvl1 = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int rmw_pushssubm(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                target_ulong new_value, target_ulong write_mask)
+{
+    uint64_t notify_addr = 0;
+    uint32_t riscv_addr_size = 4;
+
+    // If in debug mode, directly return
+    if (env->debugger) {
+        if (ret_value) {
+            *ret_value = 0;
+        }
+        return RISCV_EXCP_NONE;
+    }
+    if (riscv_cpu_mxl(env) != MXL_RV32) {
+        riscv_addr_size = 8;
+    }
+    notify_addr = new_value * riscv_addr_size + env->gpr[2];
+    cpu_physical_memory_rw(notify_addr, &env->ssubm,  riscv_addr_size, 1);
+    return RISCV_EXCP_NONE;
+}
+
+static int read_meclic_ctl(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->meclic_ctl;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_meclic_ctl(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->meclic_ctl = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_seclic_ctl(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->seclic_ctl;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_seclic_ctl(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->seclic_ctl = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_mtsp(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->mtsp;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mtsp(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->mtsp = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int read_stsp(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->stsp;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_stsp(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->stsp = val;
+    return RISCV_EXCP_NONE;
+}
+
 extern target_ulong helper_sret(CPURISCVState *env);
 extern target_ulong helper_mret(CPURISCVState *env);
 
@@ -5414,10 +5579,13 @@ static int rmw_popxret(CPURISCVState *env, int csrno, target_ulong *ret_value,
     uint64_t notify_addr = 0;
     uint32_t riscv_addr_size = 4;
     uint32_t stack_ofst;
+    uint8_t current_grp, prev_grp;
     target_ulong retpc;
+    target_ulong xeclic_ctl, xtsp;
+    RISCVEclicShadowState *shadow = &env->eclic_shadow;
+    bool need_stack_pop;
     void *xcause, *xepc, *xsubm;
-    uint32_t context_regs[17] = { 1, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15,
-                                  16, 17, 28, 29, 30, 31 };
+
     // If in debug mode, directly return
     if (env->debugger) {
         if (ret_value) {
@@ -5430,28 +5598,77 @@ static int rmw_popxret(CPURISCVState *env, int csrno, target_ulong *ret_value,
         riscv_addr_size = 8;
     }
 
-    xcause = (env->priv == PRV_S) ? &env->scause : &env->mcause;
-    xepc = (env->priv == PRV_S) ? &env->sepc : &env->mepc;
-    xsubm = (env->priv == PRV_S) ? &env->ssubm : &env->msubm;
+    xcause = (env->priv <= PRV_S) ? &env->scause : &env->mcause;
+    xepc = (env->priv <= PRV_S) ? &env->sepc : &env->mepc;
+    xsubm = (env->priv <= PRV_S) ? &env->ssubm : &env->msubm;
+    xeclic_ctl = (env->priv <= PRV_S) ? env->seclic_ctl : env->meclic_ctl;
+    xtsp = (env->priv <= PRV_S) ? env->stsp : env->mtsp;
 
     notify_addr = env->gpr[2];
     cpu_physical_memory_rw(notify_addr + riscv_addr_size * 13, xsubm, riscv_addr_size, 0);
     cpu_physical_memory_rw(notify_addr + riscv_addr_size * 12, xepc, riscv_addr_size, 0);
     cpu_physical_memory_rw(notify_addr + riscv_addr_size * 11, xcause, riscv_addr_size, 0);
-    // auto restore gpr context
-    for (uint32_t i = 0; i < 17; i++) {
-        stack_ofst = i;
-        if (i > 10) {
-            if (riscv_has_ext(env, RVE)) {
-                continue;
-            } else {
-                stack_ofst += 4;
+
+    if((get_shadow_gpr_stack_size(env) > 0)) {
+        /* Based on the current grp stack popping information of the interrupt,
+         * decide whether to pop the register from the stack or directly release
+         * the corresponding shadow register group */
+        need_stack_pop = shadow->grp_stack[shadow->grp_stack_top].needs_stack_save;
+        current_grp = shadow->grp_stack[shadow->grp_stack_top].grp_index;
+        shadow_gpr_pop(env);
+        prev_grp = shadow->grp_stack[shadow->grp_stack_top].grp_index;
+
+        if (need_stack_pop) {
+            for (uint32_t i = 0; i < 17; i++) {
+                stack_ofst = i;
+                if (i > 10) {
+                    if (riscv_has_ext(env, RVE)) {
+                        continue;
+                    } else {
+                        stack_ofst += 4;
+                    }
+                }
+                cpu_physical_memory_rw(notify_addr + riscv_addr_size * stack_ofst,
+                                        &env->gpr[context_regs[i]], riscv_addr_size, 0);
             }
         }
-        cpu_physical_memory_rw(notify_addr + riscv_addr_size * stack_ofst,
-                                &env->gpr[context_regs[i]], riscv_addr_size, 0);
+
+        if (current_grp != prev_grp) {
+            /* If the shadow grp currently in use is not in the same as the shadow grp used
+             * in the previous interrupt, then after this interrupt returns, switch to that
+             * shadow grp; otherwise, it will still be executed under the current shadow grp. */
+            if (prev_grp) {
+                riscv_shadow_gpr_switch_grp(env, prev_grp);
+                shadow->shadow_grp_used[current_grp - 1] = 0;
+            } else {
+                /* If 'prev_grp' is 0, it indicates that this is the outermost interrupt
+                 * and you need to switch back to the base gpr of the main text. */
+                riscv_shadow_gpr_switch_grp(env, 0);
+                // shadow->shadow_grp_used[0] = 0; // 0或者9
+            }
+        }
     }
-    env->gpr[2] += riscv_addr_size * ((!riscv_has_ext(env, RVE)) ? 20 : 14);
+
+    if (get_field(xeclic_ctl, XECLIC_CTL_TSP_EN)) {
+        notify_addr = xtsp;
+        if (env->priv <= PRV_S) {
+            env->stsp= env->gpr[2] + riscv_addr_size * ((!riscv_has_ext(env, RVE)) ? 20 : 14);
+        } else {
+            env->mtsp= env->gpr[2] + riscv_addr_size * ((!riscv_has_ext(env, RVE)) ? 20 : 14);
+        }
+        env->gpr[2] = notify_addr;
+    } else {
+        env->gpr[2] += riscv_addr_size * ((!riscv_has_ext(env, RVE)) ? 20 : 14);
+    }
+
+    // set xsubm
+    if (env->priv <= PRV_S) {
+        env->ssubm = set_field(env->ssubm, XSUBM_TYP, get_field(env->ssubm, XSUBM_PTYP));
+        env->ssubm = set_field(env->ssubm, XSUBM_GPRIDX, get_field(env->ssubm, XSUBM_PGPRIDX));
+    } else {
+        env->msubm = set_field(env->msubm, XSUBM_TYP, get_field(env->msubm, XSUBM_PTYP));
+        env->msubm = set_field(env->msubm, XSUBM_GPRIDX, get_field(env->msubm, XSUBM_PGPRIDX));
+    }
     retpc = (env->priv == PRV_S) ? helper_sret(env) : helper_mret(env);
     /* After rmw_*, pc will be refreshed to the next instruction.
      * Since the mepc we have saved is already the address of the next instruction,
@@ -6583,19 +6800,19 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_IRQCINFO]       = { "irqcinfo",       any, read_zero, write_ignore },
 
     /* === Nuclei ECLIC V2 Registers === */
-    [CSR_NUCLEI_MTSPCSW]        = { "mtspcsw",        any, read_zero, write_ignore },
-    [CSR_NUCLEI_MSHADGPRLVL0]   = { "mshadgprlvl0",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_MSHADGPRLVL1]   = { "mshadgprlvl1",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_MECLIC_CTL]     = { "meclic_ctl",     any, read_zero, write_ignore },
-    [CSR_NUCLEI_MTSP]           = { "mtsp",           any, read_zero, write_ignore },
-    [CSR_NUCLEI_PUSHSSUBM]      = { "pushssubm",      smode, read_zero, write_ignore },
+    [CSR_NUCLEI_MTSPCSW]        = { "mtspcsw",        any, NULL, NULL, rmw_mtspcsw },
+    [CSR_NUCLEI_MSHADGPRLVL0]   = { "mshadgprlvl0",   any, read_mshadgprlvl0, write_mshadgprlvl0 },
+    [CSR_NUCLEI_MSHADGPRLVL1]   = { "mshadgprlvl1",   any, read_mshadgprlvl1, write_mshadgprlvl1 },
+    [CSR_NUCLEI_MECLIC_CTL]     = { "meclic_ctl",     any, read_meclic_ctl, write_meclic_ctl },
+    [CSR_NUCLEI_MTSP]           = { "mtsp",           any, read_mtsp, write_mtsp },
+    [CSR_NUCLEI_PUSHSSUBM]      = { "pushssubm",      smode, NULL, NULL, rmw_pushssubm },
     [CSR_NUCLEI_POPXRET]        = { "popxret",        any, NULL, NULL, rmw_popxret },
-    [CSR_NUCLEI_STSPCSW]        = { "stspcsw",        smode, read_zero, write_ignore },
-    [CSR_NUCLEI_SSUBM]          = { "ssubm",          smode, read_zero, write_ignore },
-    [CSR_NUCLEI_SSHADGPRLVL0]   = { "sshadgprlvl0",   smode, read_zero, write_ignore },
-    [CSR_NUCLEI_SSHADGPRLVL1]   = { "sshadgprlvl1",   smode, read_zero, write_ignore },
-    [CSR_NUCLEI_SECLIC_CTL]     = { "seclic_ctl",     smode, read_zero, write_ignore },
-    [CSR_NUCLEI_STSP]           = { "stsp",           smode, read_zero, write_ignore },
+    [CSR_NUCLEI_STSPCSW]        = { "stspcsw",        smode, NULL, NULL, rmw_stspcsw },
+    [CSR_NUCLEI_SSUBM]          = { "ssubm",          smode, read_ssubm, write_ssubm },
+    [CSR_NUCLEI_SSHADGPRLVL0]   = { "sshadgprlvl0",   smode, read_sshadgprlvl0, write_sshadgprlvl0 },
+    [CSR_NUCLEI_SSHADGPRLVL1]   = { "sshadgprlvl1",   smode, read_sshadgprlvl1, write_sshadgprlvl1 },
+    [CSR_NUCLEI_SECLIC_CTL]     = { "seclic_ctl",     smode, read_seclic_ctl, write_seclic_ctl },
+    [CSR_NUCLEI_STSP]           = { "stsp",           smode, read_stsp, write_stsp },
 
     /* Machine Mode Core Level Interrupt Controller */
     [CSR_MINTSTATUS]            = {"mintstatus",      any, read_mintstatus, write_mintthresh },

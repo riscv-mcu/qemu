@@ -394,7 +394,7 @@ target_ulong helper_mret(CPURISCVState *env)
     if (riscv_intc_is_clic_mode(env)) {
         CPUState *cs = env_cpu(env);
         bql_lock();
-        nuclei_eclic_next_interrupt(env->eclic, PRV_M, cs->cpu_index);
+        nuclei_eclic_next_interrupt(env->eclic, prev_priv, cs->cpu_index);
         bql_unlock();
     }
 

@@ -166,6 +166,27 @@ typedef struct PMUCTRState {
     target_ulong irq_overflow_left;
 } PMUCTRState;
 
+#define SHADOW_GPR_GROUPS 9
+#define SHADOW_GPR_COUNT 17     /* Callee saved reg count */
+#define TOTAL_GPR_GROUPS (1 + SHADOW_GPR_GROUPS * 2)
+
+/* Callee saved reg index */
+static const uint8_t context_regs[SHADOW_GPR_COUNT] = {
+    1, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15,
+    16, 17, 28, 29, 30, 31
+};
+
+typedef struct {
+    uint8_t current_grp;    /* The gpr group currently in use */
+    target_ulong gpr_banks[TOTAL_GPR_GROUPS][32];
+    struct {
+        uint8_t grp_index;
+        bool needs_stack_save;
+    } grp_stack[(SHADOW_GPR_GROUPS + 1) * 2];
+    int8_t grp_stack_top;
+    uint8_t shadow_grp_used[(SHADOW_GPR_GROUPS + 1) * 2]; /* Mark whether the shadow group has been used */
+} RISCVEclicShadowState;
+
 struct CPUArchState {
     target_ulong gpr[32];
     target_ulong gprh[32]; /* 64 top bits of the 128-bit registers */
@@ -499,7 +520,21 @@ struct CPUArchState {
     target_ulong mmacro_dev_en;
     target_ulong mmacro_noc_en;
     target_ulong mmacro_ca_en;
+    target_ulong mtspcsw;
+    target_ulong mshadgprlvl0;
+    target_ulong mshadgprlvl1;
+    target_ulong meclic_ctl;
+    target_ulong mtsp;
+    target_ulong pushssubm;
+    target_ulong popxret;
+    target_ulong stspcsw;
     target_ulong ssubm;
+    target_ulong sshadgprlvl0;
+    target_ulong sshadgprlvl1;
+    target_ulong seclic_ctl;
+    target_ulong stsp;
+
+    RISCVEclicShadowState eclic_shadow;
 
     /*nuclei timer comparators */
     uint64_t mtimecmp;
@@ -605,7 +640,7 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
 char *riscv_isa_string(RISCVCPU *cpu);
 int riscv_cpu_max_xlen(RISCVCPUClass *mcc);
 bool riscv_cpu_option_set(const char *optname);
-void nuclei_eclic_context_auto_saving(CPURISCVState *env);
+void nuclei_eclic_context_auto_saving(CPURISCVState *env, int int_vec_mode, int irq_level);
 
 #ifndef CONFIG_USER_ONLY
 void riscv_isa_write_fdt(RISCVCPU *cpu, void *fdt, char *nodename);

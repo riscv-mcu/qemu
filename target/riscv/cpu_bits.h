@@ -1053,6 +1053,23 @@ typedef enum RISCVException {
 #define SCAUSE_SPIL                        0x00ff0000 /* spil[7:0] */
 #define SCAUSE_EXCCODE                     0x00000fff /* exccode[11:0] */
 
+/* Machine  sub-mode defined by Nuclei */
+#define SUBM_NOR 0      /* Normal Machine Mode */
+#define SUBM_INT 1      /* Interrupt Handling Mode */
+#define SUBM_EXC 2      /* Exception Handing Mode */
+#define SUBM_NMI 3      /* NMI Handing Mode */
+
+/* msubm */
+#define XSUBM_PGPRIDX                      0x000f8000 /* pgpridx[4:0] */
+#define XSUBM_GPRIDX                       0x00007c00 /* pgpridx[4:0] */
+#define XSUBM_PTYP                         0x00000300 /* ptyp[1:0] */
+#define XSUBM_TYP                          0x000000c0 /* typ[1:0] */
+
+/* eclic_ctl */
+#define XECLIC_CTL_SHADOW_EN               0x00000004 /* shadow_en */
+#define XECLIC_CTL_TSP_EN                  0x00000002 /* tsp_en */
+#define XECLIC_CTL_FEAT_EN                 0x00000001 /* Mapping of xmisc_ctl[21] ：HW_AUTO_CONTEXT */
+
 /* MIE masks */
 #define MIE_SEIE                           (1 << IRQ_S_EXT)
 #define MIE_UEIE                           (1 << IRQ_U_EXT)

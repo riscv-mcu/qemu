@@ -82,6 +82,7 @@ typedef struct NucleiECLICState
     uint32_t eclicintctlbits;
     uint32_t eclic_mmode_base;
     uint64_t mclicbase;
+    uint32_t shadow_gpr_num;
     /* config */
     uint8_t cliccfg[ECLIC_MAX_HARTS];   /*  nlbits(1~4) */
     uint32_t clicinfo[ECLIC_MAX_HARTS]; /*  NUM_INTERRUPT(0~12)  VERSION(13~20) CLICINTCTLBITS(21~24) */
@@ -142,13 +143,18 @@ enum
 
 DeviceState *nuclei_eclic_create(hwaddr addr, uint32_t aperture_size, bool prv_s, bool prv_u, bool vector,
                                uint32_t num_harts, uint32_t num_sources,
-                               uint8_t clicintctlbits);
+                               uint8_t clicintctlbits, uint32_t shadow_gpr_num);
 qemu_irq nuclei_eclic_get_irq(DeviceState *dev, int irq, int hartid);
 void nuclei_eclic_systimer_cb(void *opaque);
 void riscv_cpu_eclic_int_handler_start(void *eclic_ptr, int mode, int irq, int hartid);
 void riscv_cpu_eclic_int_handler_start_s(void *eclic_ptr, int mode, int irq, int hartid);
 bool riscv_intc_is_clic_mode(CPUArchState *env);
 bool riscv_intc_is_eclicv2_mode(CPUArchState *env);
+void shadow_gpr_push(CPUArchState *env, uint8_t grp, bool stack_save);
+void shadow_gpr_pop(CPUArchState *env);
+int get_shadow_gpr_stack_size(CPUArchState *env);
+void riscv_shadow_gpr_switch_grp(CPUArchState *env, uint8_t grp_index);
+void riscv_backup_shadow_gpr(CPUArchState *env, uint8_t grp_index);
 void nuclei_eclic_next_interrupt(void *eclic, int mode, int hartid);
 bool nuclei_eclic_shv_interrupt(void *opaque, int mode, int hartid, int irq);
 bool nuclei_eclic_edge_triggered(void *opaque, int mode, int hartid, int irq);

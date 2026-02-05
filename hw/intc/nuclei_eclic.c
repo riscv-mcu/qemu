@@ -62,6 +62,65 @@ bool riscv_intc_is_eclicv2_mode(CPUArchState *env) {
     return env->eclic && (env->mmisc_ctl & (1U << 21));
 }
 
+void shadow_gpr_push(CPUArchState *env, uint8_t grp, bool stack_save)
+{
+    RISCVEclicShadowState *shadow = &env->eclic_shadow;
+    if (shadow->grp_stack_top < (SHADOW_GPR_GROUPS - 1)) {
+        shadow->grp_stack_top++;
+        shadow->grp_stack[shadow->grp_stack_top].grp_index = grp;
+        shadow->grp_stack[shadow->grp_stack_top].needs_stack_save = stack_save;
+    } else {
+        error_report("ECLIC shadow grp stack overflow!\n");
+        exit(1);
+    }
+}
+
+void shadow_gpr_pop(CPUArchState *env)
+{
+    RISCVEclicShadowState *shadow = &env->eclic_shadow;
+    if (shadow->grp_stack_top >= 0) {
+        shadow->grp_stack_top--;
+    }
+}
+
+int get_shadow_gpr_stack_size(CPUArchState *env)
+{
+    return env->eclic_shadow.grp_stack_top + 1;
+}
+
+/* Switch to the specified register group */
+void riscv_shadow_gpr_switch_grp(CPUArchState *env, uint8_t grp_index)
+{
+    RISCVEclicShadowState *shadow;
+
+    if (!env || !&env->eclic_shadow) {
+        return;
+    }
+    shadow = &env->eclic_shadow;
+
+    if (grp_index == shadow->current_grp) {
+        return;
+    }
+
+    shadow->current_grp = grp_index;
+    for (int i = 0; i < SHADOW_GPR_COUNT; i++) {
+        uint8_t reg_idx = context_regs[i];
+        // to do: only part of callee saved registers are switched under rv32e.
+        env->gpr[reg_idx] = shadow->gpr_banks[grp_index][reg_idx];
+    }
+}
+
+/* Backup shadow gpr for interrupt return use */
+void riscv_backup_shadow_gpr(CPUArchState *env, uint8_t grp_index)
+{
+    RISCVEclicShadowState *shadow;
+    shadow = &env->eclic_shadow;
+    for (int i = 0; i < SHADOW_GPR_COUNT; i++) {
+        uint8_t reg_idx = context_regs[i];
+        shadow->gpr_banks[grp_index][reg_idx] = env->gpr[reg_idx];
+    }
+}
+
 qemu_irq nuclei_eclic_get_irq(DeviceState *dev, int irq, int hartid)
 {
     NucleiECLICState *eclic = NUCLEI_ECLIC(dev);
@@ -103,7 +162,7 @@ static uint64_t nuclei_eclic_read(void *opaque, hwaddr offset, unsigned size)
         value = eclic->cliccfg[hartid] & 0xFF;
         break;
     case NUCLEI_ECLIC_REG_CLICINFO:
-        value = (CLICINTCTLBITS << 21) | (0x1 << 13) | eclic->num_sources;
+        value = (eclic->shadow_gpr_num) << 25 |(CLICINTCTLBITS << 21) | (0x1 << 13) | eclic->num_sources;
         break;
     case NUCLEI_ECLIC_REG_MINTTHRESH:
         value = ((uint32_t)eclic->mth[hartid] << 24);
@@ -294,6 +353,7 @@ static Property nuclei_eclic_properties[] = {
     DEFINE_PROP_UINT32("aperture-size", NucleiECLICState, aperture_size, 0),
     DEFINE_PROP_UINT32("num-sources", NucleiECLICState, num_sources, 0),
     DEFINE_PROP_UINT64("mclicbase", NucleiECLICState, mclicbase, 0),
+    DEFINE_PROP_UINT32("shadow-gpr-num", NucleiECLICState, shadow_gpr_num, 0),
     DEFINE_PROP_END_OF_LIST(),
 };
 
@@ -688,6 +748,20 @@ static void nuclei_eclic_update_intctl(NucleiECLICState *eclic, int mode, int ir
     nuclei_eclic_next_interrupt(eclic, mode, hartid);
 }
 
+static void nuclei_eclic_shadow_gpr_init(CPURISCVState *env)
+{
+    RISCVEclicShadowState *shadow =  &env->eclic_shadow;
+
+    if (!shadow) {
+        error_report("Failed to allocate shadow GPR system");
+        return;
+    }
+    memset(shadow->gpr_banks, 0, sizeof(shadow->gpr_banks));
+    /* The basic GPR group (Bank 0) is used by default. */
+    shadow->current_grp = 0;
+    shadow->grp_stack_top = -1;
+}
+
 static void nuclei_eclic_realize(DeviceState *dev, Error **errp)
 {
     NucleiECLICState *eclic = NUCLEI_ECLIC(dev);
@@ -734,7 +808,7 @@ static void nuclei_eclic_realize(DeviceState *dev, Error **errp)
         }
 
         cpu->env.eclic = eclic;
-
+        nuclei_eclic_shadow_gpr_init(&cpu->env);
     }
 }
 
@@ -769,7 +843,7 @@ void nuclei_eclic_systimer_cb(void *opaque)
 
 DeviceState *nuclei_eclic_create(hwaddr addr, uint32_t aperture_size, bool prv_s, bool prv_u, bool vector,
                                  uint32_t num_harts, uint32_t num_sources,
-                                 uint8_t clicintctlbits)
+                                 uint8_t clicintctlbits, uint32_t shadow_gpr_num)
 {
     DeviceState *dev = qdev_new(TYPE_NUCLEI_ECLIC);
 
@@ -785,6 +859,7 @@ DeviceState *nuclei_eclic_create(hwaddr addr, uint32_t aperture_size, bool prv_s
     qdev_prop_set_uint32(dev, "eclicintctlbits", clicintctlbits);
     qdev_prop_set_uint64(dev, "mclicbase", addr);
     qdev_prop_set_uint32(dev, "aperture-size", aperture_size);
+    qdev_prop_set_uint32(dev, "shadow-gpr-num", shadow_gpr_num);
 
     sysbus_realize_and_unref(SYS_BUS_DEVICE(dev), &error_fatal);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, addr);

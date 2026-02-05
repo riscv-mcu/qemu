@@ -1365,7 +1365,8 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                                    false, false, true,
                                    ms->smp.cpus,
                                    get_irq_number_alignment(PLIC_IRQ_TO_ECLIC_IRQ(mst->irqmax)),
-                                   EVALSOC_CLIC_INTCTLBITS);
+                                   EVALSOC_CLIC_INTCTLBITS,
+                                   SHADOW_GPR_GROUPS);
 
     s->smpcc = nuclei_smpcc_create(memmap[EVALSOC_SMP].base + mst->iregion,
                                memmap[EVALSOC_SMP].size,
