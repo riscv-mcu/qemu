@@ -449,6 +449,8 @@ struct CPUArchState {
     target_ulong mclicbase; /* clic-spec */
     target_ulong mscratchcsw;
     target_ulong mscratchcswl;
+    target_ulong sscratchcsw;
+    target_ulong sscratchcswl;
 
     /* NMI  CSR*/
     target_ulong mnvec;

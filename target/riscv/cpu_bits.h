@@ -211,6 +211,7 @@
 #define CSR_SINTSTATUS      0x146 /* clic-spec-draft */
 #define CSR_SINTTHRESH      0x147 /* clic-spec-draft */
 #define CSR_SSCRATCHCSW     0x148
+#define CSR_SSCRATCHCSWL    0x149
 
 /* Sstc supervisor CSRs */
 #define CSR_STIMECMP        0x14D

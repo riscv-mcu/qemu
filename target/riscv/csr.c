@@ -4994,6 +4994,61 @@ static int rmw_mscratchcswl(CPURISCVState *env, int csrno, target_ulong *ret_val
     return RISCV_EXCP_NONE;
 }
 
+static int read_sscratchcsw(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->sscratchcsw;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_sscratchcsw(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->sscratchcsw = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int rmw_sscratchcsw(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                target_ulong new_value, target_ulong write_mask)
+{
+    target_ulong t;
+    if(get_field(env->scause, SCAUSE_SPP) != PRV_S)
+    {
+        t = new_value;
+        *ret_value = env->sscratch;
+        env->sscratch = t;
+    }else{
+        *ret_value = new_value;
+    }
+    return RISCV_EXCP_NONE;
+}
+
+static int read_sscratchcswl(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = env->sscratchcswl;
+    return RISCV_EXCP_NONE;
+}
+
+static int write_sscratchcswl(CPURISCVState *env, int csrno, target_ulong val)
+{
+    env->sscratchcswl = val;
+    return RISCV_EXCP_NONE;
+}
+
+static int rmw_sscratchcswl(CPURISCVState *env, int csrno, target_ulong *ret_value,
+                target_ulong new_value, target_ulong write_mask)
+{
+    target_ulong t;
+    if( (get_field(env->scause, SCAUSE_SPIL) == 0)
+        != (get_field(env->mintstatus, MINTSTATUS_SIL) == 0))
+    {
+        t = new_value;
+        *ret_value = env->sscratch;
+        env->sscratch = t;
+    }else{
+        *ret_value =  new_value;
+    }
+    return RISCV_EXCP_NONE;
+}
+
 static int read_mnvec(CPURISCVState *env, int csrno, target_ulong *val)
 {
     *val = env->mnvec;
@@ -6476,7 +6531,8 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_MINTSTATUS]            = {"mintstatus",      any, read_mintstatus, write_mintthresh },
     /* Supervisor Mode Core Level Interrupt Controller */
     [CSR_SINTSTATUS]            = {"sintstatus",      smode, read_sintstatus, write_sintthresh },
-    [CSR_SSCRATCHCSW]           = {"sscratchcsw",     any, read_zero, write_ignore },
+    [CSR_SSCRATCHCSW]           = {"sscratchcsw",     any, read_sscratchcsw, write_sscratchcsw, rmw_sscratchcsw },
+    [CSR_SSCRATCHCSWL]          = {"sscratchcswl",    any, read_sscratchcswl, write_sscratchcswl, rmw_sscratchcswl },
     /* Supervisor Mode Core Level Interrupt Controller */
     [CSR_STVT]                  = { "stvt",           smode, read_stvt, write_stvt },
     [CSR_SNXTI]                 = { "snxti",          smode, NULL, NULL, rmw_snxti },
