@@ -2001,10 +2001,9 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         mode = (cause >> 12) & 0x3;
         level = (cause >> 14) & 0xFF;
         cause &= 0x3ff;
-        cause |= get_field(env->mstatus, MSTATUS_MPP) << 28;
+        cause = set_field(cause, MCAUSE_MPP, env->priv);
         if (mode <= PRV_S)
         {
-            cause |= get_field(env->mstatus, MSTATUS_SPP) << 28;
             cause |= get_field(env->mintstatus, MINTSTATUS_SIL) << 16;
             env->mintstatus = set_field(env->mintstatus, MINTSTATUS_SIL, level);
             env->ssubm = set_field(env->ssubm, XSUBM_PTYP, get_field(env->ssubm, XSUBM_TYP));
@@ -2013,7 +2012,6 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         } else {
             cause |= get_field(env->mintstatus, MINTSTATUS_MIL) << 16;
             cause |= get_field(env->mstatus, MSTATUS_MPIE) << 27;
-            cause = set_field(cause, MCAUSE_MPP, PRV_M);
             cause = set_field(cause, MCAUSE_INTERRUPT, 1);
             env->mintstatus = set_field(env->mintstatus, MINTSTATUS_MIL, level);
             env->msubm = set_field(env->msubm, XSUBM_PTYP, get_field(env->msubm, XSUBM_TYP));
@@ -2152,10 +2150,9 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         s = set_field(s, MSTATUS_MPIE, get_field(s, MSTATUS_MIE));
         s = set_field(s, MSTATUS_MPP, env->priv);
         s = set_field(s, MSTATUS_MIE, 0);
-        cause = set_field(cause, MCAUSE_MPP, env->priv);
         env->mstatus = s;
         env->mcause = cause | ((target_ulong)(async | eclic_flag) <<
-                               (TARGET_LONG_BITS - 1));;
+                               (TARGET_LONG_BITS - 1));
         env->mepc = env->pc;
         env->mtval = tval;
         env->mtval2 = mtval2;
