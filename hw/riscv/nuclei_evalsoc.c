@@ -67,36 +67,39 @@ uint32_t debug_flag = 0;
 #endif
 
 #define IREGION_BASE_ADDR   (0x18000000)
+#define IREGION_MAX_SIZE    (0x8000000)
+#define IREGION_MIN_SIZE    (0x400000)
 
 static const struct MemmapEntry
 {
     hwaddr base;
     hwaddr size;
+    const char *name;
 }  evalsoc_memmap[] = {
-    [EVALSOC_IINFO]   = { EVALSOC_IINFO_BASE,             EVALSOC_IINFO_SIZE },
-    [EVALSOC_MROM]    = { EVALSOC_MROM_BASE,              EVALSOC_MROM_SIZE  },
-    [EVALSOC_TEST]    = { EVALSOC_TEST_BASE,              EVALSOC_TEST_SIZE  },
-    [EVALSOC_GPIO]    = { EVALSOC_GPIO_BASE,              EVALSOC_GPIO_SIZE  },
-    [EVALSOC_UART0]   = { EVALSOC_UART0_BASE,             EVALSOC_UART0_SIZE },
-    [EVALSOC_UART1]   = { EVALSOC_UART1_BASE,             EVALSOC_UART1_SIZE },
-    [EVALSOC_QSPI0]   = { EVALSOC_QSPI0_BASE,             EVALSOC_QSPI0_SIZE },
-    [EVALSOC_QSPI1]   = { EVALSOC_QSPI1_BASE,             EVALSOC_QSPI1_SIZE },
-    [EVALSOC_QSPI2]   = { EVALSOC_QSPI2_BASE,             EVALSOC_QSPI2_SIZE },
-    [EVALSOC_XIP]     = { EVALSOC_XIP_BASE,               EVALSOC_XIP_SIZE   },
-    [EVALSOC_DEBUG]   = { IREGION_DEBUG_OFS,              IREGION_DEBUG_SIZE },
-    [EVALSOC_TIMER]   = { IREGION_TIMER_OFS,              IREGION_TIMER_SIZE },
-    [EVALSOC_PLIC]    = { IREGION_PLIC_OFS,               IREGION_PLIC_SIZE  },
-    [EVALSOC_APLIC_M] = { EVALSOC_APLIC_M_BASE,           EVALSOC_APLIC_M_SIZE },
-    [EVALSOC_APLIC_S] = { EVALSOC_APLIC_S_BASE,           EVALSOC_APLIC_S_SIZE },
-    [EVALSOC_IMSIC_M] = { EVALSOC_IMSIC_M_BASE,           EVALSOC_IMSIC_MINTF_SIZE },
-    [EVALSOC_IMSIC_S] = { EVALSOC_IMSIC_S_BASE,           EVALSOC_IMSIC_SINTF_SIZE },
-    [EVALSOC_ECLIC]   = { IREGION_ECLIC_OFS,              IREGION_ECLIC_SIZE },
-    [EVALSOC_CIDU]    = { IREGION_IDU_OFS,                IREGION_IDU_SIZE   },
-    [EVALSOC_SMP]     = { IREGION_SMP_OFS,                IREGION_SMP_SIZE   },
-    [EVALSOC_DDR]     = { EVALSOC_DDR_BASE,               EVALSOC_DDR_SIZE   },
-    [EVALSOC_ILM]     = { EVALSOC_ILM_BASE,               EVALSOC_ILM_SIZE   },
-    [EVALSOC_DLM]     = { EVALSOC_DLM_BASE,               EVALSOC_DLM_SIZE   },
-    [EVALSOC_SRAM]    = { EVALSOC_SRAM_BASE,              EVALSOC_SRAM_SIZE  },
+    [EVALSOC_IINFO]   = { IREGION_IINFO_OFS,              IREGION_IINFO_SIZE,   "IINFO"},
+    [EVALSOC_MROM]    = { EVALSOC_MROM_BASE,              EVALSOC_MROM_SIZE,    "MROM" },
+    [EVALSOC_TEST]    = { EVALSOC_TEST_BASE,              EVALSOC_TEST_SIZE,    "TEST" },
+    [EVALSOC_GPIO]    = { EVALSOC_GPIO_BASE,              EVALSOC_GPIO_SIZE,    "GPIO" },
+    [EVALSOC_UART0]   = { EVALSOC_UART0_BASE,             EVALSOC_UART0_SIZE,   "UART0"},
+    [EVALSOC_UART1]   = { EVALSOC_UART1_BASE,             EVALSOC_UART1_SIZE,   "UART1"},
+    [EVALSOC_QSPI0]   = { EVALSOC_QSPI0_BASE,             EVALSOC_QSPI0_SIZE,   "QSPI0"},
+    [EVALSOC_QSPI1]   = { EVALSOC_QSPI1_BASE,             EVALSOC_QSPI1_SIZE,   "QSPI1"},
+    [EVALSOC_QSPI2]   = { EVALSOC_QSPI2_BASE,             EVALSOC_QSPI2_SIZE,   "QSPI2"},
+    [EVALSOC_XIP]     = { EVALSOC_XIP_BASE,               EVALSOC_XIP_SIZE,     "XIP"  },
+    [EVALSOC_DEBUG]   = { IREGION_DEBUG_OFS,              IREGION_DEBUG_SIZE,   "DEBUG"},
+    [EVALSOC_TIMER]   = { IREGION_TIMER_OFS,              IREGION_TIMER_SIZE,   "TIMER"},
+    [EVALSOC_PLIC]    = { IREGION_PLIC_OFS,               IREGION_PLIC_SIZE,    "PLIC" },
+    [EVALSOC_APLIC_M] = { EVALSOC_APLIC_M_BASE,           EVALSOC_APLIC_M_SIZE, "APLIC_M"},
+    [EVALSOC_APLIC_S] = { EVALSOC_APLIC_S_BASE,           EVALSOC_APLIC_S_SIZE, "APLIC_S"},
+    [EVALSOC_IMSIC_M] = { EVALSOC_IMSIC_M_BASE,           EVALSOC_IMSIC_MINTF_SIZE, "IMSIC_M"},
+    [EVALSOC_IMSIC_S] = { EVALSOC_IMSIC_S_BASE,           EVALSOC_IMSIC_SINTF_SIZE, "IMSIC_S"},
+    [EVALSOC_ECLIC]   = { IREGION_ECLIC_OFS,              IREGION_ECLIC_SIZE,   "ECLIC"},
+    [EVALSOC_CIDU]    = { IREGION_IDU_OFS,                IREGION_IDU_SIZE,     "CIDU"},
+    [EVALSOC_SMP]     = { IREGION_SMP_OFS,                IREGION_SMP_SIZE,     "SMP"},
+    [EVALSOC_DDR]     = { EVALSOC_DDR_BASE,               EVALSOC_DDR_SIZE,     "DDR"},
+    [EVALSOC_ILM]     = { EVALSOC_ILM_BASE,               EVALSOC_ILM_SIZE,     "ILM"},
+    [EVALSOC_DLM]     = { EVALSOC_DLM_BASE,               EVALSOC_DLM_SIZE,     "DLM"},
+    [EVALSOC_SRAM]    = { EVALSOC_SRAM_BASE,              EVALSOC_SRAM_SIZE,    "CLINT"},
     [EVALSOC_CLINT]   = { IREGION_TIMER_OFS + 0x1000,     0xF000 },//MTIME in CLINT mode
 };
 
@@ -164,7 +167,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
                                (long)EVALSOC_DDR_BASE);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
-        (hwaddr)s->ddr.addr_base >> 32, (hwaddr)s->ddr.addr_base,
+        (hwaddr)s->ddr.base >> 32, (hwaddr)s->ddr.base,
         mem_size >> 32, mem_size);
     qemu_fdt_setprop_string(fdt, nodename, "device_type", "memory");
     g_free(nodename);
@@ -210,7 +213,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     }
 
     nodename = g_strdup_printf("/soc/clint@%lx",
-                               (long)((long)memmap[EVALSOC_CLINT].base + s->iregion));
+                               (long)((long)memmap[EVALSOC_CLINT].base + s->iregion.base));
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "riscv,clint0");
     // qemu_fdt_setprop(fdt, nodename, "interrupts-extended",
@@ -219,11 +222,11 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     g_free(nodename);
 
     nodename = g_strdup_printf("/soc/timer@%lx",
-                               (long)((long)memmap[EVALSOC_TIMER].base + s->iregion));
+                               (long)((long)memmap[EVALSOC_TIMER].base + s->iregion.base));
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,timer0");
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           0x0, memmap[EVALSOC_TIMER].base + s->iregion,
+                           0x0, memmap[EVALSOC_TIMER].base + s->iregion.base,
                            0x0, memmap[EVALSOC_TIMER].size);
     g_free(nodename);
 
@@ -282,7 +285,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
 
     plic_phandle = phandle++;
     nodename = g_strdup_printf("/soc/interrupt-controller@%lx",
-                               (long)((long)memmap[EVALSOC_PLIC].base + s->iregion));
+                               (long)((long)memmap[EVALSOC_PLIC].base + s->iregion.base));
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_cell(fdt, nodename, "#interrupt-cells", 1);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "riscv,plic0");
@@ -290,7 +293,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     qemu_fdt_setprop(fdt, nodename, "interrupts-extended",
                      cells, (ms->smp.cpus * 4 ) * sizeof(uint32_t));
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           0x0, memmap[EVALSOC_PLIC].base + s->iregion,
+                           0x0, memmap[EVALSOC_PLIC].base + s->iregion.base,
                            0x0, memmap[EVALSOC_PLIC].size);
     qemu_fdt_setprop_cell(fdt, nodename, "riscv,ndev", 0x35);
     qemu_fdt_setprop_cell(fdt, nodename, "phandle", plic_phandle);
@@ -404,11 +407,11 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     g_free(nodename);
 
     nodename = g_strdup_printf("/soc/spi@%lx",
-                               (long)s->qspi0.addr_base);
+                               (long)s->qspi0.base);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,spi0");
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           0x0, (hwaddr)s->qspi0.addr_base,
+                           0x0, (hwaddr)s->qspi0.base,
                            0x0, memmap[EVALSOC_QSPI0].size,
                            0x0, 0x20000000,
                            0x0, 0x10000000);
@@ -422,7 +425,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     g_free(nodename);
 
     nodename = g_strdup_printf("/soc/spi@%lx/flash@0",
-                               (long)s->qspi0.addr_base);
+                               (long)s->qspi0.base);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_cell(fdt, nodename, "spi-rx-bus-width", 4);
     qemu_fdt_setprop_cell(fdt, nodename, "spi-tx-bus-width", 4);
@@ -434,11 +437,11 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     g_free(nodename);
 
     nodename = g_strdup_printf("/soc/spi@%lx",
-                               (long)s->qspi2.addr_base);
+                               (long)s->qspi2.base);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,spi0");
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           0x0, (hwaddr)s->qspi2.addr_base,
+                           0x0, (hwaddr)s->qspi2.base,
                            0x0, memmap[EVALSOC_QSPI2].size);
     qemu_fdt_setprop_string(fdt, nodename, "reg-names", "control");
     qemu_fdt_setprop_cells(fdt, nodename, "clocks", hfclk_phandle);
@@ -450,7 +453,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     g_free(nodename);
 
     nodename = g_strdup_printf("/soc/spi@%lx/mmc@0",
-                               (long)s->qspi2.addr_base);
+                               (long)s->qspi2.base);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "mmc-spi-slot");
     qemu_fdt_setprop_cells(fdt, nodename, "reg", 0x0);
@@ -462,11 +465,11 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     uart_phandle = phandle++;
     qemu_fdt_add_subnode(fdt, "/aliases");
     nodename = g_strdup_printf("/soc/serial@%lx",
-                               (long)s->uart0.addr_base);
+                               (long)s->uart0.base);
     qemu_fdt_add_subnode(fdt, nodename);
     qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,uart0");
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           0x0, s->uart0.addr_base,
+                           0x0, s->uart0.base,
                            0x0, memmap[EVALSOC_UART0].size);
     qemu_fdt_setprop_cell(fdt, nodename, "clocks", hfclk_phandle);
     qemu_fdt_setprop_cell(fdt, nodename, "interrupt-parent", plic_phandle);
@@ -571,28 +574,23 @@ static unsigned long string_to_uint64(const char *str)
     return (unsigned long)num;
 }
 
-static void parse_json_keys_and_values(QDict *qdict, const char *key1, const char *key2, 
-                                 uint64_t *val1_ptr, uint64_t *val2_ptr)
+static void parse_json_keys_and_values(QDict *qdict, const JsonFieldMapping *key_map,
+                                        uint8_t num_keys)
 {
-    if (!qdict)
+    if (!qdict || !key_map || (num_keys == 0))
         return;
 
-    const QDictEntry *entry;
-    for (entry = qdict_first(qdict); entry; entry = qdict_next(qdict, entry))
-    {
-        QString *qstr = qobject_to(QString, entry->value);
-        if (!qstr) continue;
-        const char *val = qstring_get_str(qstr);
-        if (!val) continue;
-
-        if (!strcmp(entry->key, key1))
-        {
-            *val1_ptr = string_to_uint64(val);
+    for (size_t i = 0; i < num_keys; i++) {
+        const JsonFieldMapping *mapping = &key_map[i];
+        QObject *obj = qdict_get(qdict, mapping->key);
+        if (!obj) {
+            continue;
         }
-        else if (!strcmp(entry->key, key2))
-        {
-            *val2_ptr = string_to_uint64(val);
+        const char *str_val = qstring_get_str(qobject_to(QString, obj));
+        if (!g_strcmp0(str_val, "")) {
+            continue;
         }
+        *(uint64_t *)mapping->field_ptr = string_to_uint64(str_val);
     }
 }
 
@@ -608,6 +606,99 @@ static void parse_json_config(MachineState *machine)
     gchar *content = NULL;
     gsize len;
     Error *local_err = NULL;
+
+    const JsonFieldMapping ddr_mappings[] = {
+        {"base", &s->ddr.base, "ddr.base"},
+        {"size", &s->ddr.size, "ddr.size"},
+    };
+    const JsonFieldMapping ilm_mappings[] = {
+        {"base", &s->ilm.base, "ilm.base"},
+        {"size", &s->ilm.size, "ilm.size"},
+    };
+    const JsonFieldMapping dlm_mappings[] = {
+        {"base", &s->dlm.base, "dlm.base"},
+        {"size", &s->dlm.size, "dlm.size"},
+    };
+    const JsonFieldMapping sram_mappings[] = {
+        {"base", &s->sram.base, "sram.base"},
+        {"size", &s->sram.size, "sram.size"},
+    };
+    const JsonFieldMapping norflash_mappings[] = {
+        {"base", &s->norflash.base, "norflash.base"},
+        {"size", &s->norflash.size, "norflash.size"},
+    };
+
+    // Peripherals mapping
+    const JsonFieldMapping iregion_mappings[] = {
+        {"base",  &s->iregion.base,     "iregion.base"},
+        {"size",  &s->iregion.size,     "iregion.size"},
+        {"debug", &s->iregion.debug_en, "iregion.debug"},
+        {"eclic", &s->iregion.eclic_en, "iregion.eclic"},
+        {"smpcc", &s->iregion.smpcc_en, "iregion.smpcc"},
+        {"cidu",  &s->iregion.cidu_en,  "iregion.cidu"},
+        {"plic",  &s->iregion.plic_en,  "iregion.plic"},
+    };
+    const JsonFieldMapping mrom_mappings[] = {
+        {"base",    &s->mrom.base,     "test.base"},
+        {"size",    &s->mrom.irq,      "test.irq"},
+    };
+    const JsonFieldMapping test_mappings[] = {
+        {"base",    &s->test.base,     "test.base"},
+        {"size",    &s->test.irq,      "test.irq"},
+        {"enable",  &s->test.enable,   "test.enable"},
+    };
+    const JsonFieldMapping gpio_mappings[] = {
+        {"base",    &s->gpio.base,     "gpio.base"},
+        {"size",    &s->gpio.irq,      "gpio.irq"},
+        {"enable",  &s->gpio.enable,   "gpio.enable"},
+    };
+    const JsonFieldMapping uart0_mappings[] = {
+        {"base",    &s->uart0.base,     "uart0.base"},
+        {"size",    &s->uart0.size,     "uart0.size"},
+        {"irq",     &s->uart0.irq,      "uart0.irq"},
+        {"enable",  &s->uart0.enable,   "uart0.enable"},
+    };
+    const JsonFieldMapping uart1_mappings[] = {
+        {"base",    &s->uart1.base,     "uart1.base"},
+        {"size",    &s->uart1.size,     "uart1.size"},
+        {"irq",     &s->uart1.irq,      "uart1.irq"},
+        {"enable",  &s->uart1.enable,   "uart1.enable"},
+    };
+    const JsonFieldMapping qspi0_mappings[] = {
+        {"base",    &s->qspi0.base,     "qspi0.base"},
+        {"size",    &s->qspi0.size,     "qspi0.size"},
+        {"irq",     &s->qspi0.irq,      "qspi0.irq"},
+        {"enable",  &s->qspi0.enable,   "qspi0.enable"},
+    };
+    const JsonFieldMapping qspi1_mappings[] = {
+        {"base",    &s->qspi1.base,     "qspi1.base"},
+        {"size",    &s->qspi1.size,     "qspi1.size"},
+        {"irq",     &s->qspi1.irq,      "qspi1.irq"},
+        {"enable",  &s->qspi1.enable,   "qspi1.enable"},
+    };
+    const JsonFieldMapping qspi2_mappings[] = {
+        {"base",    &s->qspi2.base,     "qspi2.base"},
+        {"size",    &s->qspi2.size,     "qspi2.size"},
+        {"irq",     &s->qspi2.irq,      "qspi2.irq"},
+        {"enable",  &s->qspi2.enable,   "qspi2.enable"},
+    };
+
+    // Download mapping
+    const JsonFieldMapping ilm_download_mappings[] = {
+        {"startaddr", &s->ilm.startup_addr, "ilm.startup_addr"},
+    };
+    const JsonFieldMapping flashxip_download_mappings[] = {
+        {"startaddr", &s->norflash.startup_addr, "norflash.startup_addr"},
+    };
+    const JsonFieldMapping flash_download_mappings[] = {
+        {"startaddr", &s->flash.startup_addr, "flash.startup_addr"},
+    };
+    const JsonFieldMapping sram_download_mappings[] = {
+        {"startaddr", &s->sram.startup_addr, "sram.startup_addr"},
+    };
+    const JsonFieldMapping ddr_download_mappings[] = {
+        {"startaddr", &s->ddr.startup_addr, "ddr.startup_addr"},
+    };
 
     if(json_filename != NULL)
     {
@@ -630,35 +721,42 @@ static void parse_json_config(MachineState *machine)
                             options_page2 = qobject_to(QDict, page1->value);
                             if(!strcmp(page1->key, "timer_freq")) {
                                 const char *val = qstring_get_str(qobject_to(QString, page1->value));
-                                if (val) s->timer_freq = string_to_uint64(val);
+                                if (g_strcmp0(val, "")) s->timer_freq = string_to_uint64(val);
                             } else if(!strcmp(page1->key, "irqmax")) {
                                 const char *val = qstring_get_str(qobject_to(QString, page1->value));
-                                s->irqmax = string_to_uint64(val);
+                                if (g_strcmp0(val, "")) s->irqmax = string_to_uint64(val);
                             } else if (!strcmp(page1->key, "cpu_freq")) {
                                 const char *val = qstring_get_str(qobject_to(QString, page1->value));
-                                s->cpu_freq = string_to_uint64(val);
+                                if (g_strcmp0(val, "")) s->cpu_freq = string_to_uint64(val);
                             } else if (!strcmp(page1->key, "ddr")) {
-                                parse_json_keys_and_values(options_page2, "base", "size", &s->ddr.addr_base, &s->ddr.addr_size);
+                                parse_json_keys_and_values(options_page2, ddr_mappings, ARRAY_SIZE(ddr_mappings));
                             } else if (!strcmp(page1->key, "ilm")) {
-                                parse_json_keys_and_values(options_page2, "base", "size", &s->ilm.addr_base, &s->ilm.addr_size);
+                                parse_json_keys_and_values(options_page2, ilm_mappings, ARRAY_SIZE(ilm_mappings));
                             } else if (!strcmp(page1->key, "dlm")) {
-                                parse_json_keys_and_values(options_page2, "base", "size", &s->dlm.addr_base, &s->dlm.addr_size);
+                                parse_json_keys_and_values(options_page2, dlm_mappings, ARRAY_SIZE(dlm_mappings));
                             } else if (!strcmp(page1->key, "sram")) {
-                                parse_json_keys_and_values(options_page2, "base", "size", &s->sram.addr_base, &s->sram.addr_size);
+                                parse_json_keys_and_values(options_page2, sram_mappings, ARRAY_SIZE(sram_mappings));
                             } else if (!strcmp(page1->key, "norflash")) {
-                                parse_json_keys_and_values(options_page2, "base", "size", &s->norflash.addr_base, &s->norflash.addr_size);
+                                parse_json_keys_and_values(options_page2, norflash_mappings, ARRAY_SIZE(norflash_mappings));
                             } else if (!strcmp(page1->key, "iregion")) {
-                                parse_json_keys_and_values(options_page2, "base", NULL, &s->iregion, NULL);
+                                parse_json_keys_and_values(options_page2, iregion_mappings, ARRAY_SIZE(iregion_mappings));
+                                s->iregion.size = (s->iregion.plic_en) ? IREGION_MAX_SIZE : IREGION_MIN_SIZE;
+                            } else if (!strcmp(page1->key, "mrom")) {
+                                parse_json_keys_and_values(options_page2, mrom_mappings, ARRAY_SIZE(mrom_mappings));
+                            } else if (!strcmp(page1->key, "test")) {
+                                parse_json_keys_and_values(options_page2, test_mappings, ARRAY_SIZE(test_mappings));
+                            } else if (!strcmp(page1->key, "gpio")) {
+                                parse_json_keys_and_values(options_page2, gpio_mappings, ARRAY_SIZE(gpio_mappings));
                             } else if (!strcmp(page1->key, "uart0")) {
-                                parse_json_keys_and_values(options_page2, "base", "irq", &s->uart0.addr_base, &s->uart0.irq);
+                                parse_json_keys_and_values(options_page2, uart0_mappings, ARRAY_SIZE(uart0_mappings));
                             } else if (!strcmp(page1->key, "uart1")) {
-                                parse_json_keys_and_values(options_page2, "base", "irq", &s->uart1.addr_base, &s->uart1.irq);
+                                parse_json_keys_and_values(options_page2, uart1_mappings, ARRAY_SIZE(uart1_mappings));
                             } else if (!strcmp(page1->key, "qspi0")) {
-                                parse_json_keys_and_values(options_page2, "base", "irq", &s->qspi0.addr_base, &s->qspi0.irq);
+                                parse_json_keys_and_values(options_page2, qspi0_mappings, ARRAY_SIZE(qspi0_mappings));
                             } else if (!strcmp(page1->key, "qspi1")) {
-                                parse_json_keys_and_values(options_page2, "base", "irq", &s->qspi1.addr_base, &s->qspi1.irq);
+                                parse_json_keys_and_values(options_page2, qspi1_mappings, ARRAY_SIZE(qspi1_mappings));
                             } else if (!strcmp(page1->key, "qspi2")) {
-                                parse_json_keys_and_values(options_page2, "base", "irq", &s->qspi2.addr_base, &s->qspi2.irq);
+                                parse_json_keys_and_values(options_page2, qspi2_mappings, ARRAY_SIZE(qspi2_mappings));
                             }
                         }
                     }
@@ -669,15 +767,15 @@ static void parse_json_config(MachineState *machine)
                         {
                             options_page2 = qobject_to(QDict, page1->value);
                             if (!strcmp(page1->key, "ilm")) {
-                                parse_json_keys_and_values(options_page2, "startaddr", NULL, &s->ilm.startup_addr, NULL);
+                                parse_json_keys_and_values(options_page2, ilm_download_mappings, ARRAY_SIZE(ilm_download_mappings));
                             } else if (!strcmp(page1->key, "flashxip")) {
-                                parse_json_keys_and_values(options_page2, "startaddr", NULL, &s->norflash.startup_addr, NULL);
+                                parse_json_keys_and_values(options_page2, flashxip_download_mappings, ARRAY_SIZE(flashxip_download_mappings));
                             } else if (!strcmp(page1->key, "flash")) {
-                                parse_json_keys_and_values(options_page2, "startaddr", NULL, &s->flash.startup_addr, NULL);
+                                parse_json_keys_and_values(options_page2, flash_download_mappings, ARRAY_SIZE(flash_download_mappings));
                             } else if (!strcmp(page1->key, "sram")) {
-                                parse_json_keys_and_values(options_page2, "startaddr", NULL, &s->sram.startup_addr, NULL);
+                                parse_json_keys_and_values(options_page2, sram_download_mappings, ARRAY_SIZE(sram_download_mappings));
                             } else if (!strcmp(page1->key, "ddr")) {
-                                parse_json_keys_and_values(options_page2, "startaddr", NULL, &s->ddr.startup_addr, NULL);
+                                parse_json_keys_and_values(options_page2, ddr_download_mappings, ARRAY_SIZE(ddr_download_mappings));
                             }
                         }
                     }
@@ -696,43 +794,81 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
     struct MemmapEntry *memoryRegion = g_new0(struct MemmapEntry, EVALSOC_DEV_END);
     memcpy(memoryRegion, evalsoc_memmap, sizeof(struct MemmapEntry) * EVALSOC_DEV_END);
     //json config
-    memoryRegion[EVALSOC_ILM].base = s->ilm.addr_base;
-    memoryRegion[EVALSOC_ILM].size = s->ilm.addr_size;
-    memoryRegion[EVALSOC_DLM].base = s->dlm.addr_base;
-    memoryRegion[EVALSOC_DLM].size = s->dlm.addr_size;
-    memoryRegion[EVALSOC_SRAM].base = s->sram.addr_base;
-    memoryRegion[EVALSOC_SRAM].size = s->sram.addr_size;
-    memoryRegion[EVALSOC_DDR].base = s->ddr.addr_base;
-    memoryRegion[EVALSOC_DDR].size = s->ddr.addr_size;
-    memoryRegion[EVALSOC_XIP].base = s->norflash.addr_base;
-    memoryRegion[EVALSOC_XIP].size = s->norflash.addr_size;
-    memoryRegion[EVALSOC_UART0].base = s->uart0.addr_base;
-    memoryRegion[EVALSOC_UART1].base = s->uart1.addr_base;
-    memoryRegion[EVALSOC_QSPI0].base = s->qspi0.addr_base;
-    memoryRegion[EVALSOC_QSPI1].base = s->qspi1.addr_base;
-    memoryRegion[EVALSOC_QSPI2].base = s->qspi2.addr_base;
+    memoryRegion[EVALSOC_ILM].base = s->ilm.base;
+    memoryRegion[EVALSOC_ILM].size = s->ilm.size;
+    memoryRegion[EVALSOC_DLM].base = s->dlm.base;
+    memoryRegion[EVALSOC_DLM].size = s->dlm.size;
+    memoryRegion[EVALSOC_SRAM].base = s->sram.base;
+    memoryRegion[EVALSOC_SRAM].size = s->sram.size;
+    memoryRegion[EVALSOC_DDR].base = s->ddr.base;
+    memoryRegion[EVALSOC_DDR].size = s->ddr.size;
+    memoryRegion[EVALSOC_XIP].base = s->norflash.base;
+    memoryRegion[EVALSOC_XIP].size = s->norflash.size;
+    memoryRegion[EVALSOC_MROM].base = s->mrom.base;
+    memoryRegion[EVALSOC_MROM].size = s->mrom.size;
+    memoryRegion[EVALSOC_TEST].base = s->test.base;
+    memoryRegion[EVALSOC_TEST].size = s->test.size;
+    memoryRegion[EVALSOC_GPIO].base = s->gpio.base;
+    memoryRegion[EVALSOC_GPIO].size = s->gpio.size;
+    memoryRegion[EVALSOC_UART0].base = s->uart0.base;
+    memoryRegion[EVALSOC_UART0].size = s->uart0.size;
+    memoryRegion[EVALSOC_UART1].base = s->uart1.base;
+    memoryRegion[EVALSOC_UART1].size = s->uart1.size;
+    memoryRegion[EVALSOC_QSPI0].base = s->qspi0.base;
+    memoryRegion[EVALSOC_QSPI0].size = s->qspi0.size;
+    memoryRegion[EVALSOC_QSPI1].base = s->qspi1.base;
+    memoryRegion[EVALSOC_QSPI1].size = s->qspi1.size;
+    memoryRegion[EVALSOC_QSPI2].base = s->qspi2.base;
+    memoryRegion[EVALSOC_QSPI2].size = s->qspi2.size;
     //iregion offset
-    memoryRegion[EVALSOC_DEBUG].base = memmap[EVALSOC_DEBUG].base + s->iregion;
-    memoryRegion[EVALSOC_TIMER].base = memmap[EVALSOC_TIMER].base + s->iregion;
-    memoryRegion[EVALSOC_PLIC].base = memmap[EVALSOC_PLIC].base + s->iregion;
-    memoryRegion[EVALSOC_ECLIC].base = memmap[EVALSOC_ECLIC].base + s->iregion;
-    memoryRegion[EVALSOC_SMP].base = memmap[EVALSOC_SMP].base + s->iregion;
-    memoryRegion[EVALSOC_CLINT].base = memmap[EVALSOC_CLINT].base + s->iregion;
+    memoryRegion[EVALSOC_IINFO].base = memmap[EVALSOC_IINFO].base + s->iregion.base;
+    memoryRegion[EVALSOC_DEBUG].base = memmap[EVALSOC_DEBUG].base + s->iregion.base;
+    memoryRegion[EVALSOC_TIMER].base = memmap[EVALSOC_TIMER].base + s->iregion.base;
+    memoryRegion[EVALSOC_PLIC].base = memmap[EVALSOC_PLIC].base + s->iregion.base;
+    memoryRegion[EVALSOC_ECLIC].base = memmap[EVALSOC_ECLIC].base + s->iregion.base;
+    memoryRegion[EVALSOC_SMP].base = memmap[EVALSOC_SMP].base + s->iregion.base;
 
     for (size_t i = 0; i < EVALSOC_DEV_END; ++i) {
         if (i == EVALSOC_CLINT || i == EVALSOC_ILM || i == EVALSOC_DLM || i == EVALSOC_SRAM) continue;
+
+        if (i == EVALSOC_DEBUG
+            || (i == EVALSOC_ECLIC && !s->iregion.eclic_en)
+            || (i == EVALSOC_SMP && !s->iregion.smpcc_en)
+            || (i == EVALSOC_CIDU && !s->iregion.cidu_en)
+            || (i == EVALSOC_PLIC && !s->iregion.plic_en)
+            || (i == EVALSOC_TEST && !s->test.enable)
+            || (i == EVALSOC_GPIO && !s->gpio.enable)
+            || (i == EVALSOC_UART0 && !s->uart0.enable)
+            || (i == EVALSOC_UART1 && !s->uart1.enable)
+            || (i == EVALSOC_QSPI0 && !s->qspi0.enable)
+            || (i == EVALSOC_QSPI1 && !s->qspi1.enable)
+            || (i == EVALSOC_QSPI2 && !s->qspi2.enable))
+            continue;
         hwaddr start1 = memoryRegion[i].base;
         hwaddr end1 = start1 + memoryRegion[i].size;
 
         for (size_t j = 0; j < EVALSOC_DEV_END; ++j) {
             if (i == j || j == EVALSOC_CLINT || j == EVALSOC_ILM || j == EVALSOC_DLM || j == EVALSOC_SRAM) continue; // Skip comparing with itself
+            if (j == EVALSOC_DEBUG
+                || (j == EVALSOC_ECLIC && !s->iregion.eclic_en)
+                || (j == EVALSOC_SMP && !s->iregion.smpcc_en)
+                || (j == EVALSOC_CIDU && !s->iregion.cidu_en)
+                || (j == EVALSOC_PLIC && !s->iregion.plic_en)
+                || (j == EVALSOC_TEST && !s->test.enable)
+                || (j == EVALSOC_GPIO && !s->gpio.enable)
+                || (j == EVALSOC_UART0 && !s->uart0.enable)
+                || (j == EVALSOC_UART1 && !s->uart1.enable)
+                || (j == EVALSOC_QSPI0 && !s->qspi0.enable)
+                || (j == EVALSOC_QSPI1 && !s->qspi1.enable)
+                || (j == EVALSOC_QSPI2 && !s->qspi2.enable))
+                continue;
 
             hwaddr start2 = memoryRegion[j].base;
             hwaddr end2 = start2 + memoryRegion[j].size;
 
             // If there is overlap, return true
             if (!(end1 <= start2 || end2 <= start1)) {
-                printf("memory is overlap, [%lx:%lx] and [%lx:%lx]\n", (long)start1, (long)end1, (long)start2, (long)end2);
+                printf("memory is overlap, %s: [%lx:%lx] and %s: [%lx:%lx]\n", memoryRegion[i].name, (long)start1, (long)end1, memoryRegion[j].name, (long)start2, (long)end2);
                 return true;
             }
         }
@@ -762,19 +898,19 @@ static void evalsoc_machine_init(MachineState *machine)
 
     parse_json_config(machine);
 
-    if(s->ddr.addr_base == -1)
+    if(s->ddr.base == -1)
     {
-        s->ddr.addr_base = memmap[EVALSOC_DDR].base;
+        s->ddr.base = memmap[EVALSOC_DDR].base;
         s->ddr.startup_addr = (s->ddr.startup_addr == -1) ? 0xA0000000 : s->ddr.startup_addr;
     }
     else
     {
-        s->ddr.startup_addr = (s->ddr.startup_addr == -1) ? s->ddr.addr_base : s->ddr.startup_addr;
+        s->ddr.startup_addr = (s->ddr.startup_addr == -1) ? s->ddr.base : s->ddr.startup_addr;
     }
-    s->ilm.startup_addr = (s->ilm.startup_addr == -1) ? s->ilm.addr_base : s->ilm.startup_addr;
-    s->sram.startup_addr = (s->sram.startup_addr == -1) ? s->sram.addr_base : s->sram.startup_addr;
-    s->norflash.startup_addr = (s->norflash.startup_addr == -1) ? s->norflash.addr_base : s->norflash.startup_addr;
-    s->dlm.startup_addr = (s->dlm.startup_addr == -1) ? s->dlm.addr_base : s->dlm.startup_addr;
+    s->ilm.startup_addr = (s->ilm.startup_addr == -1) ? s->ilm.base : s->ilm.startup_addr;
+    s->sram.startup_addr = (s->sram.startup_addr == -1) ? s->sram.base : s->sram.startup_addr;
+    s->norflash.startup_addr = (s->norflash.startup_addr == -1) ? s->norflash.base : s->norflash.startup_addr;
+    s->dlm.startup_addr = (s->dlm.startup_addr == -1) ? s->dlm.base : s->dlm.startup_addr;
 
     /*if flash startup_addr not set, use flashxip startup_addr*/
     s->flash.startup_addr = (s->flash.startup_addr == -1) ? s->norflash.startup_addr: s->flash.startup_addr;
@@ -796,46 +932,41 @@ static void evalsoc_machine_init(MachineState *machine)
 
     //ilm
     memory_region_init_ram(&s->soc.ilm, NULL, "riscv.evalsoc.ram.ilm",
-                           s->ilm.addr_size, &error_fatal);
-    memory_region_add_subregion(system_memory, s->ilm.addr_base,
+                           s->ilm.size, &error_fatal);
+    memory_region_add_subregion(system_memory, s->ilm.base,
                                 &s->soc.ilm);
     //dlm
     memory_region_init_ram(&s->soc.dlm, NULL, "riscv.evalsoc.ram.dlm",
-                           s->dlm.addr_size, &error_fatal);
-    memory_region_add_subregion(system_memory, s->dlm.addr_base,
+                           s->dlm.size, &error_fatal);
+    memory_region_add_subregion(system_memory, s->dlm.base,
                                 &s->soc.dlm);
     //sram
     memory_region_init_ram(&s->soc.sram, NULL, "riscv.evalsoc.ram.sram",
-                           s->sram.addr_size, &error_fatal);
-    memory_region_add_subregion(system_memory, s->sram.addr_base,
+                           s->sram.size, &error_fatal);
+    memory_region_add_subregion(system_memory, s->sram.base,
                                 &s->soc.sram);
 
-    // memory_region_init_ram(&s->soc.ims, NULL, "riscv.evalsoc.ram.sram",
-    //                        s->sram.addr_size, &error_fatal);
-    // memory_region_add_subregion(system_memory, s->sram.addr_base,
-    //                             &s->soc.sram);
-
     // ddr
-    //if -m 128M or no -m,s->ddr.addr_size is first json,then EVALSOC_DDR_SIZE
+    //if -m 128M or no -m,s->ddr.size is first json,then EVALSOC_DDR_SIZE
     if(machine->ram_size != 128 * MiB)
     {
-        s->ddr.addr_size = machine->ram_size;
+        s->ddr.size = machine->ram_size;
     }
 
     memory_region_init_ram(&s->soc.ddr, NULL, "riscv.evalsoc.ram.ddr",
-                           s->ddr.addr_size, &error_fatal);
-    memory_region_add_subregion(system_memory, s->ddr.addr_base,
+                           s->ddr.size, &error_fatal);
+    memory_region_add_subregion(system_memory, s->ddr.base,
                                 &s->soc.ddr);
 
     memory_region_init_ram(&s->soc.xip_mem, NULL, "riscv.evalsoc.flashxip",
-        s->norflash.addr_size, &error_fatal);
+        s->norflash.size, &error_fatal);
     memory_region_add_subregion(system_memory,
-        s->norflash.addr_base, &s->soc.xip_mem);
+        s->norflash.base, &s->soc.xip_mem);
 
     // Evalsoc custom csr info init
     for (i = 0; i < machine->smp.cpus; i ++) {
-        s->soc.cpus.harts[i].env.milm_ctl |= s->ilm.addr_base & 0x1;
-        s->soc.cpus.harts[i].env.mdlm_ctl |= s->dlm.addr_base & 0x1;
+        s->soc.cpus.harts[i].env.milm_ctl |= s->ilm.base & 0x1;
+        s->soc.cpus.harts[i].env.mdlm_ctl |= s->dlm.base & 0x1;
         s->soc.cpus.harts[i].env.mstack_bound = EVALSOC_MSTACK_BOUND;
         s->soc.cpus.harts[i].env.mstack_base = EVALSOC_MSTACK_BASE;
         s->soc.cpus.harts[i].env.mcache_ctl = EVALSOC_MCACHE_CTL;
@@ -850,10 +981,10 @@ static void evalsoc_machine_init(MachineState *machine)
         s->soc.cpus.harts[i].env.mtlb_ctl = EVALSOC_MTLB_CTL;
         s->soc.cpus.harts[i].env.mmisc_ctl1 = EVALSOC_MMISC_CTL1;
 
-        s->soc.cpus.harts[i].env.msmpcfg_info = ((memmap[EVALSOC_SMP].base + s->iregion) & ~(1<<10)) | 0xF;
+        s->soc.cpus.harts[i].env.msmpcfg_info = ((memmap[EVALSOC_SMP].base + s->iregion.base) & ~(1<<10)) | 0xF;
 
         // note: The iregion function is optional and cannot be forced to be set.
-        s->soc.cpus.harts[i].env.mirgb_info = (s->iregion & ~(1<<10)) | 0xF;;
+        s->soc.cpus.harts[i].env.mirgb_info = (s->iregion.base & ~(1<<10)) | 0xF;
     }
     /* load/create device tree */
     if (machine->dtb) {
@@ -893,19 +1024,23 @@ static void evalsoc_machine_init(MachineState *machine)
         start_addr = s->norflash.startup_addr;
     }
     DEBUGF("download mode is %s\n", s->download);
-    DEBUGF("ddr     : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->ddr.addr_base,(long)s->ddr.addr_size,(long)s->ddr.startup_addr);
-    DEBUGF("ilm     : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->ilm.addr_base,(long)s->ilm.addr_size,(long)s->ilm.startup_addr);
-    DEBUGF("sram    : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->sram.addr_base,(long)s->sram.addr_size,(long)s->sram.startup_addr);
-    DEBUGF("norflash: base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->norflash.addr_base,(long)s->norflash.addr_size,(long)s->norflash.startup_addr);
-    DEBUGF("flash   : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->flash.addr_base,(long)s->flash.addr_size,(long)s->flash.startup_addr);
-    DEBUGF("dlm     : base:0x%lx, size:0x%lx\n", (long)s->dlm.addr_base,(long)s->dlm.addr_size);
-    DEBUGF("uart0   : base:0x%lx, irq:%d\n", (long)s->uart0.addr_base,(int)s->uart0.irq);
-    DEBUGF("uart1   : base:0x%lx, irq:%d\n", (long)s->uart1.addr_base,(int)s->uart1.irq);
-    DEBUGF("qspi0   : base:0x%lx, irq:%d\n", (long)s->qspi0.addr_base,(int)s->qspi0.irq);
-    DEBUGF("qspi1   : base:0x%lx, irq:%d\n", (long)s->qspi1.addr_base,(int)s->qspi1.irq);
-    DEBUGF("qspi2   : base:0x%lx, irq:%d\n", (long)s->qspi2.addr_base,(int)s->qspi2.irq);
-    DEBUGF("iregion : 0x%lx\n", (long)s->iregion);
+    DEBUGF("ddr     : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->ddr.base,(long)s->ddr.size,(long)s->ddr.startup_addr);
+    DEBUGF("ilm     : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->ilm.base,(long)s->ilm.size,(long)s->ilm.startup_addr);
+    DEBUGF("sram    : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->sram.base,(long)s->sram.size,(long)s->sram.startup_addr);
+    DEBUGF("norflash: base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->norflash.base,(long)s->norflash.size,(long)s->norflash.startup_addr);
+    DEBUGF("flash   : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->flash.base,(long)s->flash.size,(long)s->flash.startup_addr);
+    DEBUGF("dlm     : base:0x%lx, size:0x%lx\n", (long)s->dlm.base,(long)s->dlm.size);
+    DEBUGF("mrom    : base:0x%lx, size:0x%lx\n", (long)s->mrom.base,(long)s->mrom.size);
+    DEBUGF("test    : base:0x%lx, size:0x%lx\n", (long)s->test.base,(long)s->test.size);
+    DEBUGF("gpio    : base:0x%lx, size:0x%lx\n", (long)s->gpio.base,(long)s->gpio.size);
+    DEBUGF("uart0   : base:0x%lx, size:0x%lx, irq:%d\n", (long)s->uart0.base, (long)s->uart0.size, (int)s->uart0.irq);
+    DEBUGF("uart1   : base:0x%lx, size:0x%lx, irq:%d\n", (long)s->uart1.base, (long)s->uart1.size, (int)s->uart1.irq);
+    DEBUGF("qspi0   : base:0x%lx, size:0x%lx, irq:%d\n", (long)s->qspi0.base, (long)s->qspi0.size, (int)s->qspi0.irq);
+    DEBUGF("qspi1   : base:0x%lx, size:0x%lx, irq:%d\n", (long)s->qspi1.base, (long)s->qspi1.size, (int)s->qspi1.irq);
+    DEBUGF("qspi2   : base:0x%lx, size:0x%lx, irq:%d\n", (long)s->qspi2.base, (long)s->qspi2.size, (int)s->qspi2.irq);
+    DEBUGF("iregion : base:0x%lx, size:0x%lx\n", (long)s->iregion.base,(long)s->iregion.size);
     DEBUGF("irqmax  : %d\n", (int)s->irqmax);
+    DEBUGF("timer_freq : %d\n", (int)s->timer_freq);
     DEBUGF("firmware startup addr:0x%lx\n", (long)start_addr);
 
     if (machine->firmware) {
@@ -945,7 +1080,7 @@ static void evalsoc_machine_init(MachineState *machine)
         */
         kernel_entry = 0;
 
-        fdt_load_addr = riscv_compute_fdt_addr(s->ddr.addr_base,
+        fdt_load_addr = riscv_compute_fdt_addr(s->ddr.base,
                                             machine->ram_size,
                                            machine);
         riscv_load_fdt(fdt_load_addr, machine->fdt);
@@ -987,7 +1122,7 @@ static void evalsoc_machine_init(MachineState *machine)
                                  memmap[EVALSOC_MROM].size,
                                  sizeof(reset_vec), kernel_entry);
 
-     /* Connect an SPI flash to SPI0 */
+    /* Connect an SPI flash to SPI0 */
     flash_dev = qdev_new("w25q512jv");
     dinfo = drive_get(IF_MTD, 0, 0);
     if (dinfo)
@@ -1012,12 +1147,12 @@ static void evalsoc_machine_init(MachineState *machine)
     card_dev = qdev_new(TYPE_SD_CARD_SPI);
     qdev_prop_set_drive_err(card_dev, "drive", blk, &error_fatal);
     qdev_realize_and_unref(card_dev,
-                           qdev_get_child_bus(sd_dev, "sd-bus"),
-                           &error_fatal);
+                        qdev_get_child_bus(sd_dev, "sd-bus"),
+                        &error_fatal);
 
     bool is_32_bit = riscv_is_32bit(&s->soc.cpus);
 
-    nuclei_iregion_create(memmap[EVALSOC_IINFO].base + s->iregion, is_32_bit);
+    nuclei_iregion_create(memmap[EVALSOC_IINFO].base + s->iregion.base, is_32_bit);
 }
 
 static void evalsoc_machine_instance_init(Object *obj)
@@ -1032,37 +1167,61 @@ static void evalsoc_machine_instance_init(Object *obj)
             2.plic  irq 0: wire 0 external irq:irq[1...1023]
     */
     s->irqmax = EVALSOC_PLIC_INT_MAX;
-    s->iregion = IREGION_BASE_ADDR;
-    s->ddr.addr_base = -1;
-    s->ddr.addr_size = memmap[EVALSOC_DDR].size;
+    s->iregion.base = IREGION_BASE_ADDR;
+    s->iregion.size = IREGION_MAX_SIZE;
+    s->iregion.debug_en = 1;
+    s->iregion.eclic_en = 1;
+    s->iregion.smpcc_en = 1;
+    s->iregion.cidu_en = 1;
+    s->iregion.plic_en = 1;
+    s->ddr.base = -1;
+    s->ddr.size = memmap[EVALSOC_DDR].size;
     s->ddr.startup_addr = -1;
-    s->sram.addr_base = memmap[EVALSOC_SRAM].base;
-    s->sram.addr_size = memmap[EVALSOC_SRAM].size;
+    s->sram.base = memmap[EVALSOC_SRAM].base;
+    s->sram.size = memmap[EVALSOC_SRAM].size;
     s->sram.startup_addr = -1;
-    s->ilm.addr_base = memmap[EVALSOC_ILM].base;
-    s->ilm.addr_size = memmap[EVALSOC_ILM].size;
+    s->ilm.base = memmap[EVALSOC_ILM].base;
+    s->ilm.size = memmap[EVALSOC_ILM].size;
     s->ilm.startup_addr = -1;
-    s->dlm.addr_base = memmap[EVALSOC_DLM].base;
-    s->dlm.addr_size = memmap[EVALSOC_DLM].size;
+    s->dlm.base = memmap[EVALSOC_DLM].base;
+    s->dlm.size = memmap[EVALSOC_DLM].size;
     s->dlm.startup_addr = -1;
-    s->flash.addr_base = memmap[EVALSOC_XIP].base;
-    s->flash.addr_size = memmap[EVALSOC_XIP].size;
+    s->flash.base = memmap[EVALSOC_XIP].base;
+    s->flash.size = memmap[EVALSOC_XIP].size;
     s->flash.startup_addr = -1;
-    s->norflash.addr_base = memmap[EVALSOC_XIP].base;
-    s->norflash.addr_size = memmap[EVALSOC_XIP].size;
+    s->norflash.base = memmap[EVALSOC_XIP].base;
+    s->norflash.size = memmap[EVALSOC_XIP].size;
     s->norflash.startup_addr = -1;
-    s->uart0.addr_base = memmap[EVALSOC_UART0].base;
+    s->mrom.base = memmap[EVALSOC_MROM].base;
+    s->mrom.size = memmap[EVALSOC_MROM].size;
+    s->test.base = memmap[EVALSOC_TEST].base;
+    s->test.size = memmap[EVALSOC_TEST].size;
+    s->test.enable = 1;
+    s->gpio.base = memmap[EVALSOC_GPIO].base;
+    s->gpio.size = memmap[EVALSOC_GPIO].size;
+    s->gpio.enable = 1;
+    s->uart0.base = memmap[EVALSOC_UART0].base;
+    s->uart0.size = memmap[EVALSOC_UART0].size;
     s->uart0.irq = EVALSOC_PLIC_UART0_IRQ;
-    s->uart1.addr_base = memmap[EVALSOC_UART1].base;
+    s->uart0.enable = 1;
+    s->uart1.base = memmap[EVALSOC_UART1].base;
+    s->uart1.size = memmap[EVALSOC_UART1].size;
     s->uart1.irq = EVALSOC_PLIC_UART1_IRQ;
-    s->qspi0.addr_base = memmap[EVALSOC_QSPI0].base;
+    s->uart1.enable = 1;
+    s->qspi0.base = memmap[EVALSOC_QSPI0].base;
+    s->qspi0.size = memmap[EVALSOC_QSPI0].size;
     s->qspi0.irq = EVALSOC_PLIC_SPI0_IRQ;
-    s->qspi1.addr_base = memmap[EVALSOC_QSPI1].base;
+    s->qspi0.enable = 1;
+    s->qspi1.base = memmap[EVALSOC_QSPI1].base;
+    s->qspi1.size = memmap[EVALSOC_QSPI1].size;
     s->qspi1.irq = EVALSOC_PLIC_SPI1_IRQ;
-    s->qspi2.addr_base = memmap[EVALSOC_QSPI2].base;
+    s->qspi1.enable = 1;
+    s->qspi2.base = memmap[EVALSOC_QSPI2].base;
+    s->qspi2.size = memmap[EVALSOC_QSPI2].size;
     s->qspi2.irq = EVALSOC_PLIC_SPI2_IRQ;
+    s->qspi2.enable = 1;
 
-    object_property_add_uint64_ptr(obj, "iregion", &s->iregion,
+    object_property_add_uint64_ptr(obj, "iregion", &s->iregion.base,
                                    OBJ_PROP_FLAG_READWRITE);
     object_property_set_description(obj, "iregion",
                                     "Set iregion");
@@ -1288,18 +1447,20 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     /* MMIO */
 
     if (mst->aia_type == EVALSOC_AIA_TYPE_NONE) {
-        s->irqchip = sifive_plic_create(memmap[EVALSOC_PLIC].base + mst->iregion,
-                                    plic_hart_config, ms->smp.cpus, 0,
-                                    mst->irqmax > EVALSOC_PLIC_NUM_SOURCES ? EVALSOC_PLIC_NUM_SOURCES : mst->irqmax,
-                                    EVALSOC_PLIC_NUM_PRIORITIES,
-                                    EVALSOC_PLIC_PRIORITY_BASE,
-                                    EVALSOC_PLIC_PENDING_BASE,
-                                    EVALSOC_PLIC_ENABLE_BASE,
-                                    EVALSOC_PLIC_ENABLE_STRIDE,
-                                    EVALSOC_PLIC_CONTEXT_BASE,
-                                    EVALSOC_PLIC_CONTEXT_STRIDE,
-                                    memmap[EVALSOC_PLIC].size);
-        g_free(plic_hart_config);
+        if (mst->iregion.plic_en) {
+            s->irqchip = sifive_plic_create(memmap[EVALSOC_PLIC].base + mst->iregion.base,
+                                        plic_hart_config, ms->smp.cpus, 0,
+                                        mst->irqmax > EVALSOC_PLIC_NUM_SOURCES ? EVALSOC_PLIC_NUM_SOURCES : mst->irqmax,
+                                        EVALSOC_PLIC_NUM_PRIORITIES,
+                                        EVALSOC_PLIC_PRIORITY_BASE,
+                                        EVALSOC_PLIC_PENDING_BASE,
+                                        EVALSOC_PLIC_ENABLE_BASE,
+                                        EVALSOC_PLIC_ENABLE_STRIDE,
+                                        EVALSOC_PLIC_CONTEXT_BASE,
+                                        EVALSOC_PLIC_CONTEXT_STRIDE,
+                                        memmap[EVALSOC_PLIC].size);
+            g_free(plic_hart_config);
+        }
     } else {
         msimode = (mst->aia_type == EVALSOC_AIA_TYPE_APLIC_IMSIC) ? true : false;
         if (msimode) {
@@ -1357,63 +1518,70 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                 msimode, false, s->irqchip);
         }
     }
-    
 
+    s->eclic = (mst->iregion.eclic_en) ?
+                nuclei_eclic_create(memmap[EVALSOC_ECLIC].base + mst->iregion.base,
+                    memmap[EVALSOC_ECLIC].size,
+                    false, false, true,
+                    ms->smp.cpus,
+                    get_irq_number_alignment(PLIC_IRQ_TO_ECLIC_IRQ(mst->irqmax)),
+                    EVALSOC_CLIC_INTCTLBITS,
+                    SHADOW_GPR_GROUPS) : NULL;
 
-    s->eclic = nuclei_eclic_create(memmap[EVALSOC_ECLIC].base + mst->iregion,
-                                   memmap[EVALSOC_ECLIC].size,
-                                   false, false, true,
-                                   ms->smp.cpus,
-                                   get_irq_number_alignment(PLIC_IRQ_TO_ECLIC_IRQ(mst->irqmax)),
-                                   EVALSOC_CLIC_INTCTLBITS,
-                                   SHADOW_GPR_GROUPS);
+    s->smpcc = (mst->iregion.smpcc_en) ?
+                nuclei_smpcc_create(memmap[EVALSOC_SMP].base + mst->iregion.base,
+                    memmap[EVALSOC_SMP].size,
+                    &smpcc_cfg) : NULL;
 
-    s->smpcc = nuclei_smpcc_create(memmap[EVALSOC_SMP].base + mst->iregion,
-                               memmap[EVALSOC_SMP].size,
-                               &smpcc_cfg);
-
-    s->cidu = nuclei_cidu_create(memmap[EVALSOC_CIDU].base + mst->iregion,
-                                 memmap[EVALSOC_CIDU].size,
-                                 ms->smp.cpus,
-                                 EVALSOC_ECLIC_NUM_SOURCES - CIDU_EXT_INT_OFST,
-                                 s->eclic);
+    s->cidu = (mst->iregion.cidu_en) ?
+                nuclei_cidu_create(memmap[EVALSOC_CIDU].base + mst->iregion.base,
+                    memmap[EVALSOC_CIDU].size,
+                    ms->smp.cpus,
+                    EVALSOC_ECLIC_NUM_SOURCES - CIDU_EXT_INT_OFST,
+                    s->eclic) : NULL;
 
     if (ms->firmware == NULL)
     {
-        /* Create and connect UART interrupts to the ECLIC */
-        nuclei_uart_create(sys_mem,
-                        mst->uart0.addr_base,
-                        memmap[EVALSOC_UART0].size,
-                        serial_hd(0),
-                        PLIC_IRQ_TO_ECLIC_IRQ(mst->uart0.irq),
-                        s->cidu,
-                        s->eclic,
-                        NULL);
+        if (mst->uart0.enable) {
+            /* Create and connect UART interrupts to the ECLIC */
+            nuclei_uart_create(sys_mem,
+                            mst->uart0.base,
+                            memmap[EVALSOC_UART0].size,
+                            serial_hd(0),
+                            PLIC_IRQ_TO_ECLIC_IRQ(mst->uart0.irq),
+                            s->cidu,
+                            s->eclic,
+                            NULL);
+        }
 
-        nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion,
+        nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion.base,
                 memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, s->eclic, mst->timer_freq);
     }
     else
     {
-        nuclei_uart_create(sys_mem,
-                        mst->uart0.addr_base,
-                        memmap[EVALSOC_UART0].size,
-                        serial_hd(0),
-                        0,
-                        NULL,
-                        NULL,
-                        qdev_get_gpio_in(DEVICE(s->irqchip), mst->uart0.irq));
+        if (mst->uart0.enable && s->irqchip) {
+            nuclei_uart_create(sys_mem,
+                            mst->uart0.base,
+                            memmap[EVALSOC_UART0].size,
+                            serial_hd(0),
+                            0,
+                            NULL,
+                            NULL,
+                            qdev_get_gpio_in(DEVICE(s->irqchip), mst->uart0.irq));
+        }
 
-        nuclei_uart_create(sys_mem,
-                        mst->uart1.addr_base,
-                        memmap[EVALSOC_UART1].size,
-                        serial_hd(1),
-                        0,
-                        NULL,
-                        NULL,
-                        qdev_get_gpio_in(DEVICE(s->irqchip), mst->uart1.irq));
+        if (mst->uart1.enable && s->irqchip) {
+            nuclei_uart_create(sys_mem,
+                            mst->uart1.base,
+                            memmap[EVALSOC_UART1].size,
+                            serial_hd(1),
+                            0,
+                            NULL,
+                            NULL,
+                            qdev_get_gpio_in(DEVICE(s->irqchip), mst->uart1.irq));
+        }
 
-        nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion,
+        nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion.base,
                 memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, NULL, mst->timer_freq);
     }
 
@@ -1422,39 +1590,49 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         return;
     }
 
-    qdev_prop_set_uint32(DEVICE(&s->gpio), "ngpio", 32);
-    if (!sysbus_realize(SYS_BUS_DEVICE(&s->gpio), errp))
-    {
-        return;
-    }
-    sysbus_mmio_map(SYS_BUS_DEVICE(&s->gpio), 0, memmap[EVALSOC_GPIO].base);
 
-    /* Pass all GPIOs to the SOC layer so they are available to the board */
-    qdev_pass_gpios(DEVICE(&s->gpio), dev, NULL);
+        qdev_prop_set_uint32(DEVICE(&s->gpio), "ngpio", 32);
+        if (!sysbus_realize(SYS_BUS_DEVICE(&s->gpio), errp))
+        {
+            return;
+        }
+    if (mst->gpio.enable) {
+        sysbus_mmio_map(SYS_BUS_DEVICE(&s->gpio), 0, memmap[EVALSOC_GPIO].base);
 
-    /* Connect GPIO interrupts to the PLIC */
-    for (i = 0; i < 32; i++)
-    {
-        sysbus_connect_irq(SYS_BUS_DEVICE(&s->gpio), i,
-                           qdev_get_gpio_in(DEVICE(s->irqchip),
-                                            EVALSOC_PLIC_GPIO_IRQ0 + i));
+        /* Pass all GPIOs to the SOC layer so they are available to the board */
+        qdev_pass_gpios(DEVICE(&s->gpio), dev, NULL);
+        /* Connect GPIO interrupts to the PLIC */
+        if (s->irqchip) {
+            for (i = 0; i < 32; i++)
+            {
+                sysbus_connect_irq(SYS_BUS_DEVICE(&s->gpio), i,
+                                qdev_get_gpio_in(DEVICE(s->irqchip),
+                                                    EVALSOC_PLIC_GPIO_IRQ0 + i));
+            }
+        }
     }
 
     sysbus_realize(SYS_BUS_DEVICE(&s->spi0), errp);
-
-    sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi0), 0,
-                    mst->qspi0.addr_base);
-    sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi0), 0,
-                       qdev_get_gpio_in(DEVICE(s->irqchip), mst->qspi0.irq));
+    if (mst->qspi0.enable) {
+        sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi0), 0,
+                        mst->qspi0.base);
+        if (s->irqchip)
+            sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi0), 0,
+                        qdev_get_gpio_in(DEVICE(s->irqchip), mst->qspi0.irq));
+    }
 
     sysbus_realize(SYS_BUS_DEVICE(&s->spi2), errp);
-    sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi2), 0,
-                    mst->qspi2.addr_base);
-    sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi2), 0,
-                       qdev_get_gpio_in(DEVICE(s->irqchip), mst->qspi2.irq));
+    if (mst->qspi2.enable) {
+        sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi2), 0,
+                        mst->qspi2.base);
+        if (s->irqchip)
+            sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi2), 0,
+                            qdev_get_gpio_in(DEVICE(s->irqchip), mst->qspi2.irq));
+    }
 
     /* Nuclei Test MMIO device */
-    nuclei_test_create(memmap[EVALSOC_TEST].base);
+    if (mst->test.enable)
+        nuclei_test_create(memmap[EVALSOC_TEST].base);
 }
 
 static Property evalsoc_soc_props[] = {

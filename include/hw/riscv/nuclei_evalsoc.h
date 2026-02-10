@@ -95,11 +95,28 @@ typedef struct EvalSoCSoCState {
 } EvalSoCSoCState;
 
 typedef struct {
-    uint64_t addr_base;
-    uint64_t addr_size;
+    const char *key;
+    void *field_ptr;
+    const char *field_name; // debug use
+} JsonFieldMapping;
+
+typedef struct {
+    uint64_t base;
+    uint64_t size;
     uint64_t irq;
     uint64_t startup_addr;
+    uint64_t enable;
 } evalsoc_device_info;
+
+typedef struct {
+    uint64_t base;
+    uint64_t size;
+    uint64_t debug_en;
+    uint64_t eclic_en;
+    uint64_t smpcc_en;
+    uint64_t cidu_en;
+    uint64_t plic_en;
+} evalsoc_iregion_info;
 
 typedef struct
 {
@@ -111,18 +128,23 @@ typedef struct
 
     const char *download;
     const char *soccfg;
-    uint64_t iregion;
+    evalsoc_iregion_info iregion;
     evalsoc_device_info ddr;
     evalsoc_device_info ilm;
     evalsoc_device_info dlm;
     evalsoc_device_info norflash;
     evalsoc_device_info sram;
     evalsoc_device_info flash;
+    evalsoc_device_info mrom;
+    evalsoc_device_info test;
+    evalsoc_device_info gpio;
     evalsoc_device_info uart0;
     evalsoc_device_info uart1;
     evalsoc_device_info qspi0;
     evalsoc_device_info qspi1;
     evalsoc_device_info qspi2;
+    evalsoc_device_info aplic;
+    evalsoc_device_info imsic;
     uint64_t cpu_freq;
     uint64_t timer_freq;
     uint64_t irqmax;
@@ -241,8 +263,6 @@ enum
 #define EVALSOC_PLIC_CONTEXT_BASE 0x200000
 #define EVALSOC_PLIC_CONTEXT_STRIDE 0x1000
 
-#define EVALSOC_IINFO_BASE          (0)
-#define EVALSOC_IINFO_SIZE          (0x1000)
 #define EVALSOC_MROM_BASE           (0x1000)
 #define EVALSOC_MROM_SIZE           (0xf000)
 #define EVALSOC_TEST_BASE           (0x100000)
@@ -281,6 +301,7 @@ enum
 
 /* IREGION Offsets */
 #define IREGION_IINFO_OFS           (0x0)
+#define IREGION_IINFO_SIZE          (0x10000)
 #define IREGION_DEBUG_OFS           (0x10000)
 #define IREGION_DEBUG_SIZE          (0x1000)
 #define IREGION_ECLIC_OFS           (0x20000)
