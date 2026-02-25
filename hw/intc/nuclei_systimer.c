@@ -361,8 +361,8 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
         }
         break;
     case NUCLEI_SYSTIMER_REG_MTIMECMPHI:
+        s->mtimecmp_hi = value;
         if (riscv_intc_is_clic_mode(env)) {
-            s->mtimecmp_hi = value;
             nuclei_timer_update_compare(s);
         } else {
             timecmp_lo = env->timecmp;
