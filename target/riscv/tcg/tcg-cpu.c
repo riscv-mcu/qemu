@@ -466,6 +466,16 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         return;
     }
 
+    if (cpu->cfg.ext_xxlvfbf) {
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlfbf), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvfbfmin), true);
+    }
+
+    if (cpu->cfg.ext_xxlfbf) {
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zfh), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zfbfmin), true);
+    }
+
     if (cpu->cfg.ext_zfh) {
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zfhmin), true);
     }
@@ -837,16 +847,6 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
 
     if (cpu->cfg.ext_xxlvqmacc) {
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zve32x), true);
-    }
-
-    if (cpu->cfg.ext_xxlvfbf) {
-        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlfbf), true);
-        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvfbfmin), true);
-    }
-
-    if (cpu->cfg.ext_xxlfbf) {
-        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zfh), true);
-        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zfbfmin), true);
     }
 
     /*

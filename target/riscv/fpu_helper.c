@@ -787,24 +787,32 @@ uint64_t helper_fcvt_h_lu(CPURISCVState *env, target_ulong rs1)
 uint64_t helper_fcvt_h_s(CPURISCVState *env, uint64_t rs1)
 {
     float32 frs1 = check_nanbox_s(env, rs1);
-    return nanbox_h(env, float32_to_float16(frs1, true, &env->fp_status));
+    return (env->mmisc_ctl1 & 0x1) ?
+        nanbox_h(env, float32_to_bfloat16(frs1, &env->fp_status)) :
+        nanbox_h(env, float32_to_float16(frs1, true, &env->fp_status));
 }
 
 uint64_t helper_fcvt_s_h(CPURISCVState *env, uint64_t rs1)
 {
     float16 frs1 = check_nanbox_h(env, rs1);
-    return nanbox_s(env, float16_to_float32(frs1, true, &env->fp_status));
+    return (env->mmisc_ctl1 & 0x1) ?
+        nanbox_s(env, bfloat16_to_float32(frs1, &env->fp_status)) :
+        nanbox_s(env, float16_to_float32(frs1, true, &env->fp_status));
 }
 
 uint64_t helper_fcvt_h_d(CPURISCVState *env, uint64_t rs1)
 {
-    return nanbox_h(env, float64_to_float16(rs1, true, &env->fp_status));
+    return (env->mmisc_ctl1 & 0x1) ?
+        nanbox_h(env, float64_to_bfloat16(rs1, &env->fp_status)) :
+        nanbox_h(env, float64_to_float16(rs1, true, &env->fp_status));
 }
 
 uint64_t helper_fcvt_d_h(CPURISCVState *env, uint64_t rs1)
 {
     float16 frs1 = check_nanbox_h(env, rs1);
-    return float16_to_float64(frs1, true, &env->fp_status);
+    return (env->mmisc_ctl1 & 0x1) ?
+        bfloat16_to_float64(frs1, &env->fp_status) :
+        float16_to_float64(frs1, true, &env->fp_status);
 }
 
 uint64_t helper_fcvt_bf16_s(CPURISCVState *env, uint64_t rs1)
