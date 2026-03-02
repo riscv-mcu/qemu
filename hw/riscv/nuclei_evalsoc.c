@@ -724,7 +724,13 @@ static void parse_json_config(MachineState *machine)
                                 if (g_strcmp0(val, "")) s->timer_freq = string_to_uint64(val);
                             } else if(!strcmp(page1->key, "irqmax")) {
                                 const char *val = qstring_get_str(qobject_to(QString, page1->value));
-                                if (g_strcmp0(val, "")) s->irqmax = string_to_uint64(val);
+                                if (g_strcmp0(val, "")) {
+                                    if (string_to_uint64(val) < EVALSOC_PLIC_INT_MAX) {
+                                        error_report("irqmax is less than the default supported irq number: %d!", EVALSOC_PLIC_INT_MAX);
+                                        exit(1);
+                                    }
+                                    s->irqmax = string_to_uint64(val);
+                                }
                             } else if (!strcmp(page1->key, "cpu_freq")) {
                                 const char *val = qstring_get_str(qobject_to(QString, page1->value));
                                 if (g_strcmp0(val, "")) s->cpu_freq = string_to_uint64(val);
