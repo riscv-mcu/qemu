@@ -525,3 +525,44 @@ uint64_t qemu_plugin_u64_sum(qemu_plugin_u64 entry)
     }
     return total;
 }
+
+/* ===== Custom RISC-V Instruction Handler Registry ===== */
+
+/* plugin global is defined in core.c; declare it here to access the lock */
+extern struct qemu_plugin_state plugin;
+
+typedef struct {
+    qemu_plugin_id_t              id;
+    qemu_plugin_nice_cb_t  cb;
+    void                         *userdata;
+} CustomInsnHandler;
+
+CustomInsnHandler *insn_handler;
+
+void qemu_plugin_register_nice_handler(qemu_plugin_id_t id,
+                                              qemu_plugin_nice_cb_t cb,
+                                              void *userdata)
+{
+    qemu_rec_mutex_lock(&plugin.lock);
+
+    insn_handler = g_new0(CustomInsnHandler, 1);
+    insn_handler->id       = id;
+    insn_handler->cb       = cb;
+    insn_handler->userdata = userdata;
+
+    qemu_rec_mutex_unlock(&plugin.lock);
+}
+
+bool qemu_plugin_dispatch_nice(unsigned int vcpu_index,
+                                      qemu_plugin_nice_info_t *info)
+{
+    bool handled = false;
+
+    qemu_rec_mutex_lock(&plugin.lock);
+    if (insn_handler->cb(vcpu_index, info, insn_handler->userdata)) {
+        handled = true;
+    }
+    qemu_rec_mutex_unlock(&plugin.lock);
+
+    return handled;
+}

@@ -1132,6 +1132,44 @@ static uint32_t opcode_at(DisasContextBase *dcbase, target_ulong pc)
 /* Include decoders for Nuclei xxlvqmacc extensions */
 #include "insn_trans/trans_xxlvqmacc.c.inc"
 
+/*
+ * Catch-all decoder for plugin-handled custom RISC-V instructions.
+ *
+ * Matches any 32-bit instruction whose opcode field is:
+ *   custom-0  0x0b (0b000_1011)
+ *   custom-1  0x2b (0b010_1011)
+ *   custom-2  0x5b (0b101_1011)
+ *   custom-3  0x7b (0b111_1011)
+ *
+ * This decoder is intentionally placed LAST in the decoders[] table so
+ * that instructions already handled by built-in decoders (e.g. Nuclei
+ * nice/V-nice instructions that also use custom-0) are never intercepted
+ * here.  At runtime the TCG helper dispatches to any plugin-registered
+ * handler; if none is found it raises an illegal-instruction exception.
+ */
+static bool decode_nice(DisasContext *ctx, uint32_t opcode32)
+{
+    uint32_t opcode7 = opcode32 & 0x7f;
+
+    if (opcode7 != 0x0b && opcode7 != 0x2b && opcode7 != 0x5b && opcode7 != 0x7b) {
+        return false;
+    }
+
+    if (((opcode7 == 0x7b) && (has_xxldsp_p(ctx->cfg_ptr) || has_xxlcz_p(ctx->cfg_ptr)))
+        || ((opcode7 == 0x5b) && has_xxlcz_p(ctx->cfg_ptr))) {
+        return false;
+    }
+
+    /*
+     * Save the opcode so that the illegal-instruction exception
+     * (raised inside the helper when no plugin handles the insn)
+     * can report the correct faulting instruction.
+     */
+    decode_save_opc(ctx);
+    gen_helper_nice(tcg_env, tcg_constant_i32(opcode32));
+    return true;
+}
+
 /* The specification allows for longer insns, but not supported by qemu. */
 #define MAX_INSN_LEN  4
 
@@ -1155,6 +1193,8 @@ static void decode_opc(CPURISCVState *env, DisasContext *ctx, uint16_t opcode)
         { has_XVentanaCondOps_p,  decode_XVentanaCodeOps },
         { has_xxlcz_p,  decode_xxlcz },
         { has_xxldsp_p, decode_xxldsp },
+        /* Must be last: catch-all for plugin-handled custom-0/1/2/3 insns */
+        { always_true_p,  decode_nice },
     };
 
     ctx->virt_inst_excp = false;

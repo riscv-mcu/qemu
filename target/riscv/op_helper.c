@@ -25,6 +25,7 @@
 #include "exec/cpu_ldst.h"
 #include "exec/helper-proto.h"
 #include "qemu/main-loop.h"
+#include "qemu/plugin.h"
 
 #if !defined(CONFIG_USER_ONLY)
 #include "hw/intc/riscv_clic.h"
@@ -584,3 +585,114 @@ target_ulong helper_hyp_hlvx_wu(CPURISCVState *env, target_ulong addr)
 }
 
 #endif /* !CONFIG_USER_ONLY */
+
+/* ===== Plugin-dispatched custom RISC-V instruction helper ===== *
+ *
+ * Called at runtime for every instruction with opcode custom-0 (0x0b),
+ * custom-1 (0x2b), custom-2 (0x5b), or custom-3 (0x7b) that was not
+ * handled by a built-in decoder.  Decodes the instruction fields, reads source
+ * register values, calls registered plugin handlers, and writes the
+ * result back to the destination register.
+ *
+ * Instruction encoding:
+ *   [31:25] funct7   [24:20] rs2   [19:15] rs1
+ *   [14]    xd       [13]    xs1   [12]    xs2
+ *   [11:7]  rd       [6:0]   opcode
+ *
+ * funct7 type bits:
+ *   [6] is_mac  — rd is rs3 accumulator
+ *   [5] is_fpu  — all register indices refer to FP registers
+ *   [4] is_pair — use 64-bit even/odd GPR pairs
+ */
+void helper_nice(CPURISCVState *env, uint32_t insn)
+{
+    qemu_plugin_nice_info_t info;
+    CPUState *cs = env_cpu(env);
+
+    uint32_t rd     = (insn >>  7) & 0x1f;
+    uint32_t xs2    = (insn >> 12) & 0x1;
+    uint32_t xs1    = (insn >> 13) & 0x1;
+    uint32_t xd     = (insn >> 14) & 0x1;
+    uint32_t rs1    = (insn >> 15) & 0x1f;
+    uint32_t rs2    = (insn >> 20) & 0x1f;
+    uint32_t funct7 = (insn >> 25) & 0x7f;
+    uint32_t opcode7 = insn & 0x7f;
+
+    memset(&info, 0, sizeof(info));
+    info.insn        = insn;
+    info.opcode_type = opcode7;
+    info.funct7      = (uint8_t)funct7;
+    info.rd          = (uint8_t)rd;
+    info.rs1         = (uint8_t)rs1;
+    info.rs2         = (uint8_t)rs2;
+    info.xd          = (uint8_t)xd;
+    info.xs1         = (uint8_t)xs1;
+    info.xs2         = (uint8_t)xs2;
+    info.is_mac      = (funct7 >> 6) & 1;
+    info.is_fpu      = (funct7 >> 5) & 1;
+    info.is_pair     = (funct7 >> 4) & 1;
+
+    /* FPU availability check (independent of is_pair / is_mac) */
+    if (info.is_fpu && !riscv_has_ext(env, RVF)) {
+        riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, GETPC());
+        return;
+    }
+
+    /*
+     * Read each operand independently.
+     * is_fpu / is_pair select the register file; is_mac is orthogonal.
+     *
+     *   is_fpu=1            → use FPR (takes priority over is_pair)
+     *   is_fpu=0, is_pair=1 → use even/odd GPR pair (64-bit)
+     *   is_fpu=0, is_pair=0 → use standard GPR
+     *
+     * READ_REG_LO: low 32-bit (or full 64-bit for FPR / GPR on rv64)
+     * READ_REG_HI: high 32-bit of GPR pair (0 for FPR or non-pair GPR)
+     */
+#define READ_REG_LO(idx) \
+    (info.is_fpu  ? env->fpr[(idx)] \
+   : info.is_pair ? env->gpr[(idx) & ~1u] \
+   :                env->gpr[(idx)])
+
+#define READ_REG_HI(idx) \
+    ((!info.is_fpu && info.is_pair && (((idx) & ~1u) + 1 < 32)) \
+     ? env->gpr[((idx) & ~1u) + 1] : 0)
+
+    if (xs1) {
+        info.rs1_val    = READ_REG_LO(rs1);
+        info.rs1_val_hi = READ_REG_HI(rs1);
+    }
+    if (xs2) {
+        info.rs2_val    = READ_REG_LO(rs2);
+        info.rs2_val_hi = READ_REG_HI(rs2);
+    }
+    /* is_mac=1 → rd is accumulator INPUT; independent of xd */
+    if (info.is_mac) {
+        info.rd_val     = READ_REG_LO(rd);
+        info.rd_val_hi  = READ_REG_HI(rd);
+    }
+
+#undef READ_REG_LO
+#undef READ_REG_HI
+
+    if (!qemu_plugin_dispatch_nice(cs->cpu_index, &info)) {
+        /* No plugin handled it — raise illegal instruction */
+        riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, GETPC());
+        return;
+    }
+
+    /* Write result back to destination register */
+    if (xd && rd != 0) {
+        if (info.is_fpu) {
+            env->fpr[rd] = info.result;
+        } else if (info.is_pair) {
+            uint32_t rde = rd & ~1u;
+            if (rde != 0 && rde + 1 < 32) {
+                env->gpr[rde]     = (uint32_t)info.result;
+                env->gpr[rde + 1] = (uint32_t)(info.result >> 32);
+            }
+        } else {
+            env->gpr[rd] = info.result;
+        }
+    }
+}

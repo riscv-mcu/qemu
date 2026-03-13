@@ -17,6 +17,7 @@ NAMES += execlog
 NAMES += hotblocks
 NAMES += hotpages
 NAMES += howvec
+NAMES += nice
 
 # The lockstep example communicates using unix sockets,
 # and can't be easily made to work on windows.
@@ -42,6 +43,7 @@ SONAMES := $(addsuffix $(SO_SUFFIX),$(addprefix lib,$(NAMES)))
 PLUGIN_CFLAGS := $(shell $(PKG_CONFIG) --cflags glib-2.0)
 PLUGIN_CFLAGS += -fPIC -Wall
 PLUGIN_CFLAGS += -I$(TOP_SRC_PATH)/include/qemu
+PLUGIN_CFLAGS += -I$(SRC_PATH)
 
 all: $(SONAMES)
 
@@ -59,6 +61,14 @@ lib%$(SO_SUFFIX): %.o
 	$(CC) -shared -o $@ $^ $(LDLIBS)
 endif
 
+
+# nice uses dlopen/dlsym at runtime — needs -ldl on Linux
+ifneq ($(CONFIG_WIN32),y)
+ifneq ($(CONFIG_DARWIN),y)
+libnice$(SO_SUFFIX): nice.o
+	$(CC) -shared -o $@ $^ $(LDLIBS) -ldl
+endif
+endif
 
 clean:
 	rm -f *.o *$(SO_SUFFIX) *.d

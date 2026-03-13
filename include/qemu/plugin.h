@@ -232,6 +232,20 @@ static inline void qemu_plugin_disable_mem_helpers(CPUState *cpu)
 }
 
 /**
+ * qemu_plugin_dispatch_nice() - dispatch a custom RISC-V instruction
+ * @vcpu_index: index of the executing vCPU
+ * @info: decoded instruction context (inputs filled, plugin writes result)
+ *
+ * Called from the TCG helper at instruction execution time.  Iterates
+ * registered custom-instruction handlers until one returns true.
+ *
+ * Returns true if a handler consumed the instruction, false otherwise
+ * (caller should raise an illegal-instruction exception).
+ */
+bool qemu_plugin_dispatch_nice(unsigned int vcpu_index,
+                                      qemu_plugin_nice_info_t *info);
+
+/**
  * qemu_plugin_user_exit(): clean-up callbacks before calling exit callbacks
  *
  * This is a user-mode only helper that ensure we have fully cleared
@@ -318,6 +332,13 @@ void qemu_plugin_add_dyn_cb_arr(GArray *arr)
 
 static inline void qemu_plugin_disable_mem_helpers(CPUState *cpu)
 { }
+
+static inline bool
+qemu_plugin_dispatch_nice(unsigned int vcpu_index,
+                                  qemu_plugin_nice_info_t *info)
+{
+    return false;
+}
 
 static inline void qemu_plugin_user_exit(void)
 { }
