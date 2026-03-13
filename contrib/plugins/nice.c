@@ -3,10 +3,15 @@
  *                 (custom-0/1/2/3) to handler functions in a user-supplied
  *                 shared library.
  *
- * The user compiles their own .so (no compiler required on the QEMU host):
+ * The user compiles their own shared library:
  *
- *   gcc -O2 -shared -fPIC \
- *       -I/path/to/include user_nice.c -o libuser_nice.so
+ *   Linux/macOS:
+ *     gcc -O2 -shared -fPIC \
+ *         -I/path/to/include user_nice.c -o libuser_nice.so
+ *
+ *   Windows:
+ *     gcc -O2 -shared \
+ *         -I/path/to/include user_nice.c -o user_nice.dll
  *
  * Then pass the library path as a plugin argument:
  *
@@ -20,7 +25,27 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#include <dlfcn.h>
+
+/* Dynamic library loading: use Win32 API on Windows, dlfcn elsewhere */
+#ifdef _WIN32
+#  include <windows.h>
+#  define dl_open(path)   ((void *)LoadLibraryA(path))
+#  define dl_sym(h, name) ((void *)GetProcAddress((HMODULE)(h), (name)))
+#  define dl_close(h)     FreeLibrary((HMODULE)(h))
+static const char *dl_error(void)
+{
+    static char buf[256];
+    FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                   NULL, GetLastError(), 0, buf, sizeof(buf), NULL);
+    return buf;
+}
+#else
+#  include <dlfcn.h>
+#  define dl_open(path)   dlopen((path), RTLD_NOW | RTLD_LOCAL)
+#  define dl_sym(h, name) dlsym((h), (name))
+#  define dl_close(h)     dlclose(h)
+#  define dl_error()      dlerror()
+#endif
 
 #include <glib.h>
 #include <qemu-plugin.h>
@@ -171,7 +196,7 @@ static bool nice_handler(unsigned int vcpu_index,
 static void plugin_exit(qemu_plugin_id_t id, void *p)
 {
     if (g_dl_handle) {
-        dlclose(g_dl_handle);
+        dl_close(g_dl_handle);
         g_dl_handle = NULL;
     }
 }
@@ -207,19 +232,19 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_install(qemu_plugin_id_t id,
         return -1;
     }
 
-    g_dl_handle = dlopen(lib_path, RTLD_NOW | RTLD_LOCAL);
+    g_dl_handle = dl_open(lib_path);
     if (!g_dl_handle) {
-        fprintf(stderr, "NICE: dlopen('%s') failed: %s\n",
-                lib_path, dlerror());
+        fprintf(stderr, "NICE: failed to load '%s': %s\n",
+                lib_path, dl_error());
         return -1;
     }
 
-    g_insn_defs = (nice_def_t *)dlsym(g_dl_handle, "nice_defs");
+    g_insn_defs = (nice_def_t *)dl_sym(g_dl_handle, "nice_defs");
     if (!g_insn_defs) {
         fprintf(stderr,
                 "NICE: symbol 'nice_defs' not found in '%s': %s\n",
-                lib_path, dlerror());
-        dlclose(g_dl_handle);
+                lib_path, dl_error());
+        dl_close(g_dl_handle);
         g_dl_handle = NULL;
         return -1;
     }
