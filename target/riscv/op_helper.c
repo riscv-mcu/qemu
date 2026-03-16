@@ -638,6 +638,28 @@ void helper_nice(CPURISCVState *env, uint32_t insn)
         return;
     }
 
+    /* Populate vector context when V extension is enabled.
+     * Pointer layout follows vreg_ofs() in trans_rvv.c.inc:
+     *   (uint8_t *)env->vreg + reg * vlenb
+     * Pointers remain NULL (memset above) when V is not enabled.         */
+    if (riscv_has_ext(env, RVV)) {
+        uint32_t vlenb = env_archcpu(env)->cfg.vlenb;
+        info.vlenb    = vlenb;
+        info.vl       = env->vl;
+        info.vtype    = env->vtype;
+        info.vstart   = env->vstart;
+        info.vill     = (uint8_t)env->vill;
+        info.vsew     = (uint8_t)FIELD_EX64(env->vtype, VTYPE, VSEW);
+        info.vlmul    = (int8_t)sextract32(
+                            FIELD_EX64(env->vtype, VTYPE, VLMUL), 0, 3);
+        info.vta      = (uint8_t)FIELD_EX64(env->vtype, VTYPE, VTA);
+        info.vma      = (uint8_t)FIELD_EX64(env->vtype, VTYPE, VMA);
+        info.rs1_vreg = (uint64_t *)((uint8_t *)env->vreg + rs1 * vlenb);
+        info.rs2_vreg = (uint64_t *)((uint8_t *)env->vreg + rs2 * vlenb);
+        info.rd_vreg  = (uint64_t *)((uint8_t *)env->vreg + rd  * vlenb);
+        info.v0_vreg  = (uint64_t *)env->vreg; /* v0 is always vreg[0]   */
+    }
+
     /*
      * Read each operand independently.
      * is_fpu / is_pair select the register file; is_mac is orthogonal.
@@ -681,8 +703,10 @@ void helper_nice(CPURISCVState *env, uint32_t insn)
         return;
     }
 
-    /* Write result back to destination register */
-    if (xd && rd != 0) {
+    /* Write result back to destination register.
+     * Skip scalar writeback for CI_CALL_VEC: the handler writes vd directly
+     * through rd_vreg; result_is_vec is set by nice.c to signal this.      */
+    if (xd && rd != 0 && !info.result_is_vec) {
         if (info.is_fpu) {
             env->fpr[rd] = info.result;
         } else if (info.is_pair) {

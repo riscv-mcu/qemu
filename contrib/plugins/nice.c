@@ -73,6 +73,7 @@ typedef double (*fn_d_v)(void);
 typedef double (*fn_d_d)(double);
 typedef double (*fn_d_d_d)(double, double);
 typedef double (*fn_d_d_d_d)(double, double, double);
+typedef void (*fn_vec_t)(qemu_plugin_nice_info_t *);
 
 /* -----------------------------------------------------------------------
  * Advanced / internal: FPR bit-cast helpers (float/double ↔ uint64_t)
@@ -133,6 +134,11 @@ static bool nice_handler(unsigned int vcpu_index,
         uint8_t info_funct3 = (info->xd << 2) | (info->xs1 << 1) | info->xs2;
         if (e->funct3 != info_funct3) continue;
 
+        /* CI_CALL_VEC: bitmask filter on element width (vsew_enc & (1<<vsew)) */
+        if (e->call_type == CI_CALL_VEC &&
+            e->vsew_enc != CI_ANY &&
+            !(e->vsew_enc & (1u << info->vsew))) continue;
+
         /*
          * Build argument list dynamically for all 64 (funct7-type × funct3)
          * combinations:
@@ -173,6 +179,15 @@ static bool nice_handler(unsigned int vcpu_index,
             case 3: r = ((fn_d_d_d_d)e->fn)(ci_as_f64(args[0]), ci_as_f64(args[1]), ci_as_f64(args[2])); break;
             }
             result = ci_from_f64(r);
+        } else if (e->call_type == CI_CALL_VEC) {
+            /* Vector handler: void fn(qemu_plugin_nice_info_t *)
+             * Handler reads/writes vector data directly via rd_vreg/rs*_vreg.
+             * Set result_is_vec to suppress scalar GPR writeback in op_helper. */
+            info->result_is_vec = 1;
+            ((fn_vec_t)e->fn)(info);
+            // to do, rewrir rvv status
+#undef PAIR_JOIN
+            return true;
         } else { /* CI_CALL_INT */
             switch (n) {
             case 0: result = ((fn_i_v)e->fn)(); break;

@@ -839,54 +839,13 @@ uint64_t qemu_plugin_u64_sum(qemu_plugin_u64 entry);
 
 /* ===== Custom RISC-V Instruction Plugin API ===== */
 
-/**
- * qemu_plugin_nice_info_t - decoded context for a custom RISC-V insn
- *
- * Instruction encoding (32-bit):
- *   31       25 24    20 19    15 14 13 12 11     7 6       0
- *   |  funct7  |  rs2  |  rs1  |xd|xs1|xs2|  rd  | opcode  |
- *
- * funct7 type bits:
- *   funct7[6]=1  MAC  type: rd is also rs3 accumulator input
- *   funct7[5]=1  FPU  type: all register indices refer to FP registers
- *   funct7[4]=1  PAIR type: use 64-bit even/odd GPR pairs
- *
- * Supported opcodes: custom-0 (0x0b), custom-1 (0x2b), custom-2 (0x5b)
- *
- * Input fields (filled by QEMU before calling the plugin callback):
- *   rs1_val / rs2_val / rd_val   — GPR or FPR values (per type)
- *   rs1_val_hi / rs2_val_hi / rd_val_hi — high halves for PAIR type
- *
- * Output fields (plugin callback writes here before returning true):
- *   result      — value to write to rd (GPR or FPR)
- *   result_hi   — high half for PAIR type
+/*
+ * qemu_plugin_nice_info_t and the CI_CALL_* / NICE_VSEW_* constants are
+ * defined in nice_api.h, which is also the header user handler libraries
+ * include directly.  Include it here so that plugin authors and QEMU
+ * internals all share the single authoritative definition.
  */
-typedef struct {
-    uint32_t insn;           /* full 32-bit instruction word */
-    uint8_t  opcode_type;    /* custom-0/1/2/3 */
-    uint8_t  funct7;         /* instruction-specific function code */
-    uint8_t  rd;             /* destination register index */
-    uint8_t  rs1;            /* source register 1 index */
-    uint8_t  rs2;            /* source register 2 index */
-    uint8_t  xd;             /* 1: result written to rd */
-    uint8_t  xs1;            /* 1: rs1 used as source */
-    uint8_t  xs2;            /* 1: rs2 used as source */
-    /* instruction type flags decoded from funct7[6:4] */
-    uint8_t  is_mac;         /* funct7[6]: rd doubles as MAC accumulator */
-    uint8_t  is_fpu;         /* funct7[5]: registers are FP registers */
-    uint8_t  is_pair;        /* funct7[4]: 64-bit even/odd register pairs */
-    /* source register values (only valid when xs1/xs2/xd are set) */
-    uint64_t rs1_val;        /* GPR rs1 or FPR rs1 (is_fpu) */
-    uint64_t rs2_val;        /* GPR rs2 or FPR rs2 (is_fpu) */
-    uint64_t rd_val;         /* current rd value (MAC accumulator or FPR rd) */
-    /* high halves for PAIR type (even reg = lo, odd reg = hi) */
-    uint64_t rs1_val_hi;
-    uint64_t rs2_val_hi;
-    uint64_t rd_val_hi;
-    /* output: callback writes result here before returning true */
-    uint64_t result;
-    uint64_t result_hi;      /* high half for PAIR type */
-} qemu_plugin_nice_info_t;
+#include "nice_api.h"
 
 /**
  * typedef qemu_plugin_nice_cb_t - custom instruction execution callback
