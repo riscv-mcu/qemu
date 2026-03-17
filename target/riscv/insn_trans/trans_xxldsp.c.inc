@@ -364,7 +364,7 @@ static inline bool rvp_shifti_ool_d(DisasContext *ctx, arg_shift *a,
     tcg_gen_extrl_i64_i32(d0, dst);
     tcg_gen_extrh_i64_i32(d1, dst);
     gen_set_gpr(ctx, a->rd, d0);
-    gen_set_gpr(ctx, a->rd, d1);
+    gen_set_gpr(ctx, a->rd + 1, d1);
 
     return true;
 #endif
