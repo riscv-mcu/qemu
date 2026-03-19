@@ -908,6 +908,8 @@ typedef enum {
     rv_op_amocas_w = 875,
     rv_op_amocas_d = 876,
     rv_op_amocas_q = 877,
+    rv_op_beqi = 878,
+    rv_op_bnei = 879,
 } rv_op;
 
 /* register names */
@@ -2098,6 +2100,8 @@ const rv_opcode_data rvi_opcode_data[] = {
     { "amocas.w", rv_codec_r_a, rv_fmt_aqrl_rd_rs2_rs1, NULL, 0, 0, 0 },
     { "amocas.d", rv_codec_r_a, rv_fmt_aqrl_rd_rs2_rs1, NULL, 0, 0, 0 },
     { "amocas.q", rv_codec_r_a, rv_fmt_aqrl_rd_rs2_rs1, NULL, 0, 0, 0 },
+    { "beqi", rv_codec_bi, rv_fmt_rs1_imm_offset, NULL, 0, 0, 0 },
+    { "bnei", rv_codec_bi, rv_fmt_rs1_imm_offset, NULL, 0, 0, 0 },
 };
 
 /* CSR names */
@@ -3797,6 +3801,8 @@ static void decode_inst_opcode(rv_decode *dec, rv_isa isa)
             switch ((inst >> 12) & 0b111) {
             case 0: op = rv_op_beq; break;
             case 1: op = rv_op_bne; break;
+            case 2: op = rv_op_beqi; break;
+            case 3: op = rv_op_bnei; break;
             case 4: op = rv_op_blt; break;
             case 5: op = rv_op_bge; break;
             case 6: op = rv_op_bltu; break;
@@ -4887,8 +4893,8 @@ static void decode_inst_operands(rv_decode *dec, rv_isa isa)
         break;
     case rv_codec_xxlcz_brib:
         dec->rs1 = operand_rs1(inst);
-        dec->imm = sextract32(operand_rs2(inst), 0, 5);
-        dec->imm1 = operand_brib_offset(inst);
+        dec->imm1 = sextract32(operand_rs2(inst), 0, 5);
+        dec->imm = operand_brib_offset(inst);
         break;
     case rv_codec_xxlcz_bitrev:
         dec->rd = operand_rd(inst);
@@ -4901,6 +4907,11 @@ static void decode_inst_operands(rv_decode *dec, rv_isa isa)
         dec->rs1 = operand_rs1(inst);
         dec->imm = extract32(operand_addib_imm(inst), 9, 2);
         dec->imm1 = extract32(operand_addib_imm(inst), 0, 9) << 1;
+        break;
+    case rv_codec_bi:
+        dec->rs1 = operand_rs1(inst);
+        dec->imm1 = sextract32(operand_rs2(inst), 0, 5);
+        dec->imm = operand_sbimm12(inst);
         break;
     };
 }

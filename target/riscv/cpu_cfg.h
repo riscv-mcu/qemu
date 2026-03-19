@@ -72,6 +72,7 @@ struct RISCVCPUConfig {
     bool ext_zihintntl;
     bool ext_zihintpause;
     bool ext_zihpm;
+    bool ext_zibi;
     bool ext_zilsd;
     bool ext_ztso;
     bool ext_smstateen;

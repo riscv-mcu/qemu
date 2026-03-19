@@ -117,6 +117,7 @@ typedef enum {
     rv_codec_s8_sh2,
     rv_codec_s8_sh3,
     rv_codec_sb,
+    rv_codec_bi,
     rv_codec_r,
     rv_codec_r_m,
     rv_codec_r4,
@@ -278,7 +279,7 @@ enum {
 #define rv_fmt_rd_csr_zimm            "O\t0,c,7"
 #define rv_fmt_rs2_offset_rs1         "O\t2,i(1)"
 #define rv_fmt_frs2_offset_rs1        "O\t5,i(1)"
-#define rv_fmt_rs1_imm_offset         "O\t1,i,j"
+#define rv_fmt_rs1_imm_offset         "O\t1,j,o"
 #define rv_fmt_rs1_rs2_offset         "O\t1,2,o"
 #define rv_fmt_rs2_rs1_offset         "O\t2,1,o"
 #define rv_fmt_aqrl_rd_rs2_rs1        "OAR\t0,2,(1)"
