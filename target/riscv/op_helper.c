@@ -295,6 +295,8 @@ target_ulong helper_sret(CPURISCVState *env)
         env->mintstatus = set_field(env->mintstatus, MINTSTATUS_SIL, spil);
         env->scause = set_field(env->scause, SCAUSE_SPIE, 0);
         env->scause = set_field(env->scause, SCAUSE_SPP, PRV_S);
+        env->ssubm = set_field(env->ssubm, XSUBM_TYP,
+                        get_field(env->ssubm, XSUBM_PTYP));
     }
 
     mstatus = env->mstatus;
@@ -357,9 +359,12 @@ target_ulong helper_mret(CPURISCVState *env)
         target_ulong mpil = get_field(env->mcause, MCAUSE_MPIL);
         env->mintstatus = set_field(env->mintstatus, MINTSTATUS_MIL, mpil);
 
-        if(get_field(env->mcause, MCAUSE_INTERRUPT) == 1)
+        if (get_field(env->msubm, XSUBM_TYP) != SUBM_NOR) {
             env->mstatus = set_field(env->mstatus, MSTATUS_MPP,
                         get_field(env->mcause, MCAUSE_MPP));
+        }
+        env->msubm = set_field(env->msubm, XSUBM_TYP,
+                            get_field(env->msubm, XSUBM_PTYP));
     }
 
     uint64_t mstatus = env->mstatus;

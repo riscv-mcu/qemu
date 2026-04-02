@@ -2091,6 +2091,12 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         s = set_field(s, MSTATUS_SPP, env->priv);
         s = set_field(s, MSTATUS_SIE, 0);
         env->mstatus = s;
+        if (!async && riscv_intc_is_clic_mode(env)) {
+            env->ssubm = set_field(env->ssubm, XSUBM_PTYP,
+                                   get_field(env->ssubm, XSUBM_TYP));
+            env->ssubm = set_field(env->ssubm, XSUBM_TYP, SUBM_EXC);
+            cause = set_field(cause, SCAUSE_SPP, env->priv);
+        }
         env->scause = cause | ((target_ulong)(async | eclic_flag) <<
                                (TARGET_LONG_BITS - 1));
         env->sepc = env->pc;
@@ -2151,6 +2157,12 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         s = set_field(s, MSTATUS_MPP, env->priv);
         s = set_field(s, MSTATUS_MIE, 0);
         env->mstatus = s;
+        if (!async && riscv_intc_is_clic_mode(env)) {
+            env->msubm = set_field(env->msubm, XSUBM_PTYP,
+                                   get_field(env->msubm, XSUBM_TYP));
+            env->msubm = set_field(env->msubm, XSUBM_TYP, SUBM_EXC);
+            cause = set_field(cause, MCAUSE_MPP, env->priv);
+        }
         env->mcause = cause | ((target_ulong)(async | eclic_flag) <<
                                (TARGET_LONG_BITS - 1));
         env->mepc = env->pc;
