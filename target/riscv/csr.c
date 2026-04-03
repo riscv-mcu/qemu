@@ -1526,6 +1526,17 @@ static RISCVException write_mstatus(CPURISCVState *env, int csrno,
 
     env->mstatus = mstatus;
 
+    if (riscv_intc_is_clic_mode(env)) {
+        env->mcause = set_field(env->mcause, MCAUSE_MPP,
+                                get_field(mstatus, MSTATUS_MPP));
+        env->mcause = set_field(env->mcause, MCAUSE_MPIE,
+                                get_field(mstatus, MSTATUS_MPIE));
+        env->scause = set_field(env->scause, SCAUSE_SPP,
+                                get_field(mstatus, MSTATUS_SPP));
+        env->scause = set_field(env->scause, SCAUSE_SPIE,
+                                get_field(mstatus, MSTATUS_SPIE));
+    }
+
     /*
      * Except in debug mode, UXL/SXL can only be modified by higher
      * privilege mode. So xl will not be changed in normal mode.
