@@ -977,8 +977,8 @@ static void evalsoc_machine_init(MachineState *machine)
         s->soc.cpus.harts[i].env.mstack_base = EVALSOC_MSTACK_BASE;
         s->soc.cpus.harts[i].env.mcache_ctl = EVALSOC_MCACHE_CTL;
         s->soc.cpus.harts[i].env.mcfg_info |= EVALSOC_MCFG_INFO;
-        s->soc.cpus.harts[i].env.micfg_info = EVALSOC_MICFG_INFO;
-        s->soc.cpus.harts[i].env.mdcfg_info = EVALSOC_MDCFG_INFO;
+        s->soc.cpus.harts[i].env.micfg_info = EVALSOC_MICFG_INFO | (s->ilm.size << 16);
+        s->soc.cpus.harts[i].env.mdcfg_info = EVALSOC_MDCFG_INFO | (s->dlm.size << 16);
         s->soc.cpus.harts[i].env.mtlbcfg_info = EVALSOC_MTLBCFG_INFO;
         s->soc.cpus.harts[i].env.mppicfg_info = EVALSOC_MPPICFG_INFO;
         s->soc.cpus.harts[i].env.mfiocfg_info = EVALSOC_MFIOCFG_INFO;

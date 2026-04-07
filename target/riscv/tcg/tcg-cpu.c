@@ -822,6 +822,10 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         cpu->env.mcfg_info |= (1 << 26);
     }
 
+    if (cpu->cfg.ext_zilsd) {
+        cpu->env.mcfg_info |= (1 << 25);
+    }
+
     if (cpu->cfg.ext_xxlcz) {
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczpstinc), true);
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczbmrk), true);
@@ -832,6 +836,10 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczbri), true);
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczbitrev), true);
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczgp), true);
+        cpu->env.mcfg_info |= (1 << 24);
+    }
+
+    if (cpu->cfg.ext_zca) {
         cpu->env.mcfg_info |= (1 << 15);
     }
 
