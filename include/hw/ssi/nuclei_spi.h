@@ -71,6 +71,20 @@
 #define IP_TXWM         (1 << 0)
 #define IP_RXWM         (1 << 1)
 
+#define STATUS_BUSY     (1 << 0)
+#define STATUS_OVR      (1 << 2)
+#define STATUS_UDR      (1 << 3)
+#define STATUS_TXFULL   (1 << 4)
+#define STATUS_RXEMPTY  (1 << 5)
+#define STATUS_RXUDR    (1 << 9)
+#define STATUS_TXOVR    (1 << 10)
+#define STATUS_TXEMPTY  (1 << 11)
+#define STATUS_RXFULL   (1 << 12)
+#define STATUS_DONE     (1 << 13)
+#define STATUS_TXDONE   (1 << 17)
+#define STATUS_RXDONE   (1 << 18)
+#define STATUS_CFGERR   (1 << 20)
+
 #define FIFO_CAPACITY   8
 
 typedef struct NucleiSPIState {

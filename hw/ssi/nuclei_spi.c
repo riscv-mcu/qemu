@@ -26,20 +26,41 @@
 #include "qemu/module.h"
 #include "hw/ssi/nuclei_spi.h"
 
+static void nuclei_spi_update_status(NucleiSPIState *s)
+{
+    uint32_t busy = s->regs[NUCLEI_SPI_STATUS] & STATUS_BUSY;
+    uint32_t status = s->regs[NUCLEI_SPI_STATUS] &
+                      ~(STATUS_BUSY | STATUS_TXFULL | STATUS_RXEMPTY |
+                        STATUS_TXEMPTY | STATUS_RXFULL);
+
+    status |= busy;
+
+    if (fifo8_is_full(&s->tx_fifo)) {
+        status |= STATUS_TXFULL;
+    }
+    if (fifo8_is_empty(&s->tx_fifo)) {
+        status |= STATUS_TXEMPTY;
+    }
+    if (fifo8_is_empty(&s->rx_fifo)) {
+        status |= STATUS_RXEMPTY;
+    }
+    if (fifo8_is_full(&s->rx_fifo)) {
+        status |= STATUS_RXFULL;
+    }
+
+    s->regs[NUCLEI_SPI_STATUS] = status;
+    s->regs[NUCLEI_SPI_FIFO_NUM] = fifo8_num_used(&s->tx_fifo) |
+                                   (fifo8_num_used(&s->rx_fifo) << 16);
+}
+
 static void nuclei_spi_txfifo_reset(NucleiSPIState *s)
 {
     fifo8_reset(&s->tx_fifo);
-
-    s->regs[NUCLEI_SPI_TXDATA] &= ~TXDATA_FULL;
-    s->regs[NUCLEI_SPI_IP] &= ~IP_TXWM;
 }
 
 static void nuclei_spi_rxfifo_reset(NucleiSPIState *s)
 {
     fifo8_reset(&s->rx_fifo);
-
-    s->regs[NUCLEI_SPI_RXDATA] |= RXDATA_EMPTY;
-    s->regs[NUCLEI_SPI_IP] &= ~IP_RXWM;
 }
 
 static void nuclei_spi_update_cs(NucleiSPIState *s)
@@ -57,7 +78,9 @@ static void nuclei_spi_update_irq(NucleiSPIState *s)
 {
     int level;
 
-    if (fifo8_num_used(&s->tx_fifo) < s->regs[NUCLEI_SPI_TX_MARK]) {
+    nuclei_spi_update_status(s);
+
+    if (fifo8_num_used(&s->tx_fifo) <= s->regs[NUCLEI_SPI_TX_MARK]) {
         s->regs[NUCLEI_SPI_IP] |= IP_TXWM;
     } else {
         s->regs[NUCLEI_SPI_IP] &= ~IP_TXWM;
@@ -96,8 +119,8 @@ static void nuclei_spi_reset(DeviceState *d)
     s->regs[NUCLEI_SPI_FCTRL] = 0x01;
     s->regs[NUCLEI_SPI_FFMT] = 0x30007;
     s->regs[NUCLEI_SPI_FFMT1] = 0x02;
-    s->regs[NUCLEI_SPI_STATUS] = 0x2080;
-    s->regs[NUCLEI_SPI_CR] = 0x6011;
+    s->regs[NUCLEI_SPI_STATUS] = 0;
+    s->regs[NUCLEI_SPI_CR] = 0x2011;
 
     nuclei_spi_txfifo_reset(s);
     nuclei_spi_rxfifo_reset(s);
@@ -111,6 +134,8 @@ static void nuclei_spi_flush_txfifo(NucleiSPIState *s)
     uint8_t tx;
     uint8_t rx;
 
+    s->regs[NUCLEI_SPI_STATUS] |= STATUS_BUSY;
+
     while (!fifo8_is_empty(&s->tx_fifo)) {
         tx = fifo8_pop(&s->tx_fifo);
         rx = ssi_transfer(s->spi, tx);
@@ -121,6 +146,8 @@ static void nuclei_spi_flush_txfifo(NucleiSPIState *s)
             }
         }
     }
+
+    s->regs[NUCLEI_SPI_STATUS] &= ~STATUS_BUSY;
 }
 
 static bool nuclei_spi_is_bad_reg(hwaddr addr, bool allow_reserved)
@@ -216,6 +243,7 @@ static void nuclei_spi_write(void *opaque, hwaddr addr,
                           __func__, value);
         } else {
             s->regs[NUCLEI_SPI_CSDEF] = value;
+            nuclei_spi_update_cs(s);
         }
         break;
 
@@ -259,9 +287,15 @@ static void nuclei_spi_write(void *opaque, hwaddr addr,
 
     case NUCLEI_SPI_FCTRL:
     case NUCLEI_SPI_FFMT:
-        qemu_log_mask(LOG_UNIMP,
-                      "%s: direct-map flash interface unimplemented\n",
-                      __func__);
+        s->regs[addr] = value;
+        break;
+
+    case NUCLEI_SPI_STATUS:
+        s->regs[NUCLEI_SPI_STATUS] &= ~(value & (STATUS_OVR | STATUS_UDR |
+                                                 STATUS_RXUDR | STATUS_TXOVR |
+                                                 STATUS_DONE | STATUS_TXDONE |
+                                                 STATUS_RXDONE |
+                                                 STATUS_CFGERR));
         break;
 
     default:
