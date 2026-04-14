@@ -199,7 +199,7 @@ static bool gen_store_gp(DisasContext *ctx, arg_xl_sgp *a, int shift, MemOp memo
     TCGv t0 = get_address(ctx, 3, a->imm << shift);
     TCGv data = get_gpr(ctx, a->rs2, EXT_NONE);
 
-    tcg_gen_qemu_st_tl(data, t0, ctx->mem_idx, MO_SB);
+    tcg_gen_qemu_st_tl(data, t0, ctx->mem_idx, memop);
     return true;
 }
 
