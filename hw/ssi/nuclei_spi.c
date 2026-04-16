@@ -1,7 +1,9 @@
 /*
  * Nuclei QSPI Controller.
  *
- * Copyright (c) 2024 Nucleisys, Inc.
+ * Implement Nuclei spi spec V1.2.8.
+ *
+ * Copyright (c) 2026 Nucleisys, Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -53,6 +55,51 @@ static void nuclei_spi_update_status(NucleiSPIState *s)
                                    (fifo8_num_used(&s->rx_fifo) << 16);
 }
 
+static uint32_t nuclei_spi_status_irq_bits(NucleiSPIState *s)
+{
+    uint32_t ie = s->regs[NUCLEI_SPI_IE];
+    uint32_t status = s->regs[NUCLEI_SPI_STATUS];
+    uint32_t pending = 0;
+
+    if ((ie & IE_TXUDR) && (status & STATUS_UDR)) {
+        pending |= STATUS_UDR;
+    }
+    if ((ie & IE_RXOVR) && (status & STATUS_OVR)) {
+        pending |= STATUS_OVR;
+    }
+    if ((ie & IE_RXUDR) && (status & STATUS_RXUDR)) {
+        pending |= STATUS_RXUDR;
+    }
+    if ((ie & IE_TXOVR) && (status & STATUS_TXOVR)) {
+        pending |= STATUS_TXOVR;
+    }
+    if ((ie & IE_DONE) && (status & STATUS_DONE)) {
+        pending |= STATUS_DONE;
+    }
+    if ((ie & IE_TXDONE) && (status & STATUS_TXDONE)) {
+        pending |= STATUS_TXDONE;
+    }
+    if ((ie & IE_RXDONE) && (status & STATUS_RXDONE)) {
+        pending |= STATUS_RXDONE;
+    }
+    if ((ie & IE_CFGERR) && (status & STATUS_CFGERR)) {
+        pending |= STATUS_CFGERR;
+    }
+
+    return pending;
+}
+
+static int nuclei_spi_selected_cs(NucleiSPIState *s)
+{
+    uint32_t csid = s->regs[NUCLEI_SPI_CSID];
+
+    if (csid == 0 || csid > s->num_cs) {
+        return -1;
+    }
+
+    return csid - 1;
+}
+
 static void nuclei_spi_txfifo_reset(NucleiSPIState *s)
 {
     fifo8_reset(&s->tx_fifo);
@@ -65,13 +112,28 @@ static void nuclei_spi_rxfifo_reset(NucleiSPIState *s)
 
 static void nuclei_spi_update_cs(NucleiSPIState *s)
 {
+    int selected = nuclei_spi_selected_cs(s);
+    bool hw_enabled = (s->regs[NUCLEI_SPI_CR] & CR_CSOE) &&
+                      s->regs[NUCLEI_SPI_CSMODE] != CSMODE_OFF;
     int i;
 
     for (i = 0; i < s->num_cs; i++) {
-        if (s->regs[NUCLEI_SPI_CSDEF] & (1 << i)) {
-            qemu_set_irq(s->cs_lines[i], !(s->regs[NUCLEI_SPI_CSMODE]));
+        int idle = !!(s->regs[NUCLEI_SPI_CSDEF] & (1 << i));
+        int level = idle;
+
+        if (hw_enabled && s->cs_active && i == selected) {
+            level = !idle;
         }
+        qemu_set_irq(s->cs_lines[i], level);
     }
+}
+
+static void nuclei_spi_set_cs_active(NucleiSPIState *s, bool active)
+{
+    s->cs_active = active && nuclei_spi_selected_cs(s) >= 0 &&
+                   (s->regs[NUCLEI_SPI_CR] & CR_CSOE) &&
+                   s->regs[NUCLEI_SPI_CSMODE] != CSMODE_OFF;
+    nuclei_spi_update_cs(s);
 }
 
 static void nuclei_spi_update_irq(NucleiSPIState *s)
@@ -92,7 +154,8 @@ static void nuclei_spi_update_irq(NucleiSPIState *s)
         s->regs[NUCLEI_SPI_IP] &= ~IP_RXWM;
     }
 
-    level = s->regs[NUCLEI_SPI_IP] & s->regs[NUCLEI_SPI_IE] ? 1 : 0;
+    level = ((s->regs[NUCLEI_SPI_IP] & s->regs[NUCLEI_SPI_IE] & IP_MASK) ||
+             nuclei_spi_status_irq_bits(s)) ? 1 : 0;
     qemu_set_irq(s->irq, level);
 }
 
@@ -102,13 +165,14 @@ static void nuclei_spi_reset(DeviceState *d)
 
     memset(s->regs, 0, sizeof(s->regs));
 
-    /* The reset value is high for all implemented CS pins */
-    s->regs[NUCLEI_SPI_CSDEF] = (1 << s->num_cs) - 1;
+    /* The v1.2.8 spec defines reset values for up to four CS pins. */
+    s->regs[NUCLEI_SPI_CSDEF] = 0xf;
 
     /* Populate register with their default value */
     s->regs[NUCLEI_SPI_SCKDIV] = 0x04;
-    s->regs[NUCLEI_SPI_SCKSAMPLE] = 0x02;
-    s->regs[NUCLEI_SPI_FORCE] = 0x01;
+    s->regs[NUCLEI_SPI_DDR_SCKSAMPLE] = 0x0;
+    s->regs[NUCLEI_SPI_FORCE] = FORCE_EN;
+    s->regs[NUCLEI_SPI_CSID] = 0x01;
     s->regs[NUCLEI_SPI_VERSION] = 0x00010208;
     s->regs[NUCLEI_SPI_BOUNDARY_CFG] = 0x3ff;
     s->regs[NUCLEI_SPI_DELAY0] = 0x10001;
@@ -120,7 +184,8 @@ static void nuclei_spi_reset(DeviceState *d)
     s->regs[NUCLEI_SPI_FFMT] = 0x30007;
     s->regs[NUCLEI_SPI_FFMT1] = 0x02;
     s->regs[NUCLEI_SPI_STATUS] = 0;
-    s->regs[NUCLEI_SPI_CR] = 0x2011;
+    s->regs[NUCLEI_SPI_CR] = CR_MSTR | CR_CSOE | CR_RXFIFO_EN;
+    s->cs_active = false;
 
     nuclei_spi_txfifo_reset(s);
     nuclei_spi_rxfifo_reset(s);
@@ -133,21 +198,44 @@ static void nuclei_spi_flush_txfifo(NucleiSPIState *s)
 {
     uint8_t tx;
     uint8_t rx;
+    bool transferred = false;
+    bool received = false;
 
     s->regs[NUCLEI_SPI_STATUS] |= STATUS_BUSY;
+    nuclei_spi_set_cs_active(s, true);
 
     while (!fifo8_is_empty(&s->tx_fifo)) {
         tx = fifo8_pop(&s->tx_fifo);
         rx = ssi_transfer(s->spi, tx);
+        transferred = true;
 
-        if (!fifo8_is_full(&s->rx_fifo)) {
-            if (!(s->regs[NUCLEI_SPI_FMT] & FMT_DIR)) {
+        if (!(s->regs[NUCLEI_SPI_FMT] & FMT_DIR) &&
+            (s->regs[NUCLEI_SPI_CR] & CR_RXFIFO_EN)) {
+            if (!fifo8_is_full(&s->rx_fifo)) {
                 fifo8_push(&s->rx_fifo, rx);
+                received = true;
+            } else {
+                s->regs[NUCLEI_SPI_STATUS] |= STATUS_OVR;
             }
         }
     }
 
+    if (transferred) {
+        s->regs[NUCLEI_SPI_STATUS] |= STATUS_TXDONE;
+        if (fifo8_is_empty(&s->tx_fifo)) {
+            s->regs[NUCLEI_SPI_STATUS] |= STATUS_DONE;
+        }
+        if (received) {
+            s->regs[NUCLEI_SPI_STATUS] |= STATUS_RXDONE;
+        }
+    }
+
     s->regs[NUCLEI_SPI_STATUS] &= ~STATUS_BUSY;
+    if (s->regs[NUCLEI_SPI_CSMODE] == CSMODE_AUTO) {
+        nuclei_spi_set_cs_active(s, false);
+    } else {
+        nuclei_spi_update_cs(s);
+    }
 }
 
 static bool nuclei_spi_is_bad_reg(hwaddr addr, bool allow_reserved)
@@ -191,16 +279,19 @@ static uint64_t nuclei_spi_read(void *opaque, hwaddr addr, unsigned int size)
     switch (addr) {
     case NUCLEI_SPI_TXDATA:
         if (fifo8_is_full(&s->tx_fifo)) {
-            return TXDATA_FULL;
+            r = TXDATA_FULL;
+        } else {
+            r = 0;
         }
-        r = 0;
         break;
 
     case NUCLEI_SPI_RXDATA:
         if (fifo8_is_empty(&s->rx_fifo)) {
-            return RXDATA_EMPTY;
+            s->regs[NUCLEI_SPI_STATUS] |= STATUS_RXUDR;
+            r = RXDATA_EMPTY;
+        } else {
+            r = fifo8_pop(&s->rx_fifo);
         }
-        r = fifo8_pop(&s->rx_fifo);
         break;
 
     default:
@@ -227,33 +318,50 @@ static void nuclei_spi_write(void *opaque, hwaddr addr,
 
     addr >>= 2;
     switch (addr) {
+    case NUCLEI_SPI_SCKMODE:
+        s->regs[addr] = value & 0x3;
+        break;
+
+    case NUCLEI_SPI_DDR_SCKSAMPLE:
+    case NUCLEI_SPI_SDR_SCKSAMPLE:
+        s->regs[addr] = value & 0xfff;
+        break;
+
+    case NUCLEI_SPI_FORCE:
+        s->regs[addr] = value & (FORCE_EN | FORCE_WP);
+        break;
+
     case NUCLEI_SPI_CSID:
-        if (value >= s->num_cs) {
+        value &= 0x7;
+        if (value > s->num_cs) {
             qemu_log_mask(LOG_GUEST_ERROR, "%s: invalid csid %d\n",
                           __func__, value);
+            s->regs[NUCLEI_SPI_STATUS] |= STATUS_CFGERR;
         } else {
             s->regs[NUCLEI_SPI_CSID] = value;
+            nuclei_spi_set_cs_active(s, false);
             nuclei_spi_update_cs(s);
         }
         break;
 
     case NUCLEI_SPI_CSDEF:
-        if (value >= (1 << s->num_cs)) {
-            qemu_log_mask(LOG_GUEST_ERROR, "%s: invalid csdef %x\n",
-                          __func__, value);
-        } else {
-            s->regs[NUCLEI_SPI_CSDEF] = value;
-            nuclei_spi_update_cs(s);
-        }
+        s->regs[NUCLEI_SPI_CSDEF] = value & 0xf;
+        nuclei_spi_update_cs(s);
         break;
 
     case NUCLEI_SPI_CSMODE:
-        if (value > 3) {
+        value &= 0x3;
+        if (value == 1) {
             qemu_log_mask(LOG_GUEST_ERROR, "%s: invalid csmode %x\n",
                           __func__, value);
+            s->regs[NUCLEI_SPI_STATUS] |= STATUS_CFGERR;
         } else {
             s->regs[NUCLEI_SPI_CSMODE] = value;
-            nuclei_spi_update_cs(s);
+            if (value != CSMODE_HOLD) {
+                nuclei_spi_set_cs_active(s, false);
+            } else {
+                nuclei_spi_update_cs(s);
+            }
         }
         break;
 
@@ -261,6 +369,8 @@ static void nuclei_spi_write(void *opaque, hwaddr addr,
         if (!fifo8_is_full(&s->tx_fifo)) {
             fifo8_push(&s->tx_fifo, (uint8_t)value);
             nuclei_spi_flush_txfifo(s);
+        } else {
+            s->regs[NUCLEI_SPI_STATUS] |= STATUS_TXOVR;
         }
         break;
 
@@ -268,8 +378,6 @@ static void nuclei_spi_write(void *opaque, hwaddr addr,
     case NUCLEI_SPI_FIFO_NUM:
     case NUCLEI_SPI_RXDATA:
     case NUCLEI_SPI_IP:
-    case NUCLEI_SPI_CRC_TX_VALUE:
-    case NUCLEI_SPI_CRC_RX_VALUE:
         qemu_log_mask(LOG_GUEST_ERROR,
                       "%s: invalid write to read-only register 0x%"
                       HWADDR_PRIx " with 0x%x\n", __func__, addr << 2, value);
@@ -280,22 +388,48 @@ static void nuclei_spi_write(void *opaque, hwaddr addr,
         if (value >= FIFO_CAPACITY) {
             qemu_log_mask(LOG_GUEST_ERROR, "%s: invalid watermark %d\n",
                           __func__, value);
+            s->regs[NUCLEI_SPI_STATUS] |= STATUS_CFGERR;
         } else {
             s->regs[addr] = value;
         }
         break;
 
     case NUCLEI_SPI_FCTRL:
+        s->regs[addr] = value & FCTRL_MASK;
+        break;
+
     case NUCLEI_SPI_FFMT:
-        s->regs[addr] = value;
+        s->regs[addr] = value & FFMT_MASK;
+        break;
+
+    case NUCLEI_SPI_FFMT1:
+        s->regs[addr] = value & FFMT1_MASK;
+        break;
+
+    case NUCLEI_SPI_FMT:
+        s->regs[addr] = value & (FMT_PROTO_MASK | FMT_ENDIAN | FMT_DIR |
+                                 FMT_PROTO_HI | FMT_LEN_MASK);
+        break;
+
+    case NUCLEI_SPI_IE:
+        s->regs[addr] = value & IE_MASK;
+        break;
+
+    case NUCLEI_SPI_BOUNDARY_CFG:
+        s->regs[addr] = value & 0x3ff;
+        break;
+
+    case NUCLEI_SPI_CR:
+        s->regs[addr] = value & CR_MASK;
+        if (!(s->regs[addr] & CR_CSOE)) {
+            nuclei_spi_set_cs_active(s, false);
+        } else {
+            nuclei_spi_update_cs(s);
+        }
         break;
 
     case NUCLEI_SPI_STATUS:
-        s->regs[NUCLEI_SPI_STATUS] &= ~(value & (STATUS_OVR | STATUS_UDR |
-                                                 STATUS_RXUDR | STATUS_TXOVR |
-                                                 STATUS_DONE | STATUS_TXDONE |
-                                                 STATUS_RXDONE |
-                                                 STATUS_CFGERR));
+        s->regs[NUCLEI_SPI_STATUS] &= ~(value & STATUS_W1C_MASK);
         break;
 
     default:
