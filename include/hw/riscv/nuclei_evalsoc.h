@@ -106,6 +106,7 @@ typedef struct {
     uint64_t irq;
     uint64_t startup_addr;
     uint64_t enable;
+    uint64_t version;
 } evalsoc_device_info;
 
 typedef struct {

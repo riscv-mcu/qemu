@@ -693,18 +693,21 @@ static void parse_json_config(MachineState *machine)
         {"size",    &s->qspi0.size,     "qspi0.size"},
         {"irq",     &s->qspi0.irq,      "qspi0.irq"},
         {"enable",  &s->qspi0.enable,   "qspi0.enable"},
+        {"version", &s->qspi0.version,  "qspi0.version"},
     };
     const JsonFieldMapping qspi1_mappings[] = {
         {"base",    &s->qspi1.base,     "qspi1.base"},
         {"size",    &s->qspi1.size,     "qspi1.size"},
         {"irq",     &s->qspi1.irq,      "qspi1.irq"},
         {"enable",  &s->qspi1.enable,   "qspi1.enable"},
+        {"version", &s->qspi1.version,  "qspi1.version"},
     };
     const JsonFieldMapping qspi2_mappings[] = {
         {"base",    &s->qspi2.base,     "qspi2.base"},
         {"size",    &s->qspi2.size,     "qspi2.size"},
         {"irq",     &s->qspi2.irq,      "qspi2.irq"},
         {"enable",  &s->qspi2.enable,   "qspi2.enable"},
+        {"version", &s->qspi2.version,  "qspi2.version"},
     };
     const JsonFieldMapping aplic_m_mappings[] = {
         {"base",    &s->aplic_m.base,     "aplic_m.base"},
@@ -1017,6 +1020,10 @@ static void evalsoc_machine_init(MachineState *machine)
 
     object_property_set_str(OBJECT(&s->soc), "cpu-type", machine->cpu_type,
                             &error_abort);
+    object_property_set_uint(OBJECT(&s->soc.spi0), "version",
+                             s->qspi0.version, &error_abort);
+    object_property_set_uint(OBJECT(&s->soc.spi2), "version",
+                             s->qspi2.version, &error_abort);
     qdev_realize(DEVICE(&s->soc), NULL, &error_abort);
 
     //ilm
@@ -1132,7 +1139,10 @@ static void evalsoc_machine_init(MachineState *machine)
     DEBUGF("aplic_s : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->aplic_s.base, (long)s->aplic_s.size, (int)s->aplic_s.enable);
     DEBUGF("imsic_m : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->imsic_m.base, (long)s->imsic_m.size, (int)s->imsic_m.enable);
     DEBUGF("imsic_s : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->imsic_s.base, (long)s->imsic_s.size, (int)s->imsic_s.enable);
-    DEBUGF("iregion : base:0x%lx, size:0x%lx\n", (long)s->iregion.base,(long)s->iregion.size);
+    DEBUGF("qspi0   : base:0x%lx, size:0x%lx, irq:%d, version:0x%lx\n", (long)s->qspi0.base, (long)s->qspi0.size, (int)s->qspi0.irq, (long)s->qspi0.version);
+    DEBUGF("qspi1   : base:0x%lx, size:0x%lx, irq:%d, version:0x%lx\n", (long)s->qspi1.base, (long)s->qspi1.size, (int)s->qspi1.irq, (long)s->qspi1.version);
+    DEBUGF("qspi2   : base:0x%lx, size:0x%lx, irq:%d, version:0x%lx\n", (long)s->qspi2.base, (long)s->qspi2.size, (int)s->qspi2.irq, (long)s->qspi2.version);
+    DEBUGF("iregion : base:0x%lx, size:0x%lx\n", (long)s->iregion.base, (long)s->iregion.size);
     DEBUGF("irqmax  : %d\n", (int)s->irqmax);
     DEBUGF("timer_freq : %d\n", (int)s->timer_freq);
     DEBUGF("firmware startup addr:0x%lx\n", (long)start_addr);
@@ -1306,14 +1316,17 @@ static void evalsoc_machine_instance_init(Object *obj)
     s->qspi0.size = memmap[EVALSOC_QSPI0].size;
     s->qspi0.irq = EVALSOC_PLIC_SPI0_IRQ;
     s->qspi0.enable = 1;
+    s->qspi0.version = NUCLEI_SPI_DEFAULT_VERSION;
     s->qspi1.base = memmap[EVALSOC_QSPI1].base;
     s->qspi1.size = memmap[EVALSOC_QSPI1].size;
     s->qspi1.irq = EVALSOC_PLIC_SPI1_IRQ;
     s->qspi1.enable = 1;
+    s->qspi1.version = NUCLEI_SPI_DEFAULT_VERSION;
     s->qspi2.base = memmap[EVALSOC_QSPI2].base;
     s->qspi2.size = memmap[EVALSOC_QSPI2].size;
     s->qspi2.irq = EVALSOC_PLIC_SPI2_IRQ;
     s->qspi2.enable = 1;
+    s->qspi2.version = NUCLEI_SPI_DEFAULT_VERSION;
     s->aplic_m.base = memmap[EVALSOC_APLIC_M].base;
     s->aplic_m.size = memmap[EVALSOC_APLIC_M].size;
     s->aplic_m.enable = 0;

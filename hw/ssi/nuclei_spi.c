@@ -100,6 +100,15 @@ static int nuclei_spi_selected_cs(NucleiSPIState *s)
     return csid - 1;
 }
 
+static bool nuclei_spi_rx_enabled(NucleiSPIState *s)
+{
+    if (s->version > NUCLEI_SPI_VERSION_1_1_0) {
+        return s->regs[NUCLEI_SPI_CR] & CR_RXFIFO_EN;
+    }
+
+    return true;
+}
+
 static void nuclei_spi_txfifo_reset(NucleiSPIState *s)
 {
     fifo8_reset(&s->tx_fifo);
@@ -173,7 +182,7 @@ static void nuclei_spi_reset(DeviceState *d)
     s->regs[NUCLEI_SPI_DDR_SCKSAMPLE] = 0x0;
     s->regs[NUCLEI_SPI_FORCE] = FORCE_EN;
     s->regs[NUCLEI_SPI_CSID] = 0x01;
-    s->regs[NUCLEI_SPI_VERSION] = 0x00010208;
+    s->regs[NUCLEI_SPI_VERSION] = s->version;
     s->regs[NUCLEI_SPI_BOUNDARY_CFG] = 0x3ff;
     s->regs[NUCLEI_SPI_DELAY0] = 0x10001;
     s->regs[NUCLEI_SPI_DELAY1] = 0x03;
@@ -210,7 +219,7 @@ static void nuclei_spi_flush_txfifo(NucleiSPIState *s)
         transferred = true;
 
         if (!(s->regs[NUCLEI_SPI_FMT] & FMT_DIR) &&
-            (s->regs[NUCLEI_SPI_CR] & CR_RXFIFO_EN)) {
+            nuclei_spi_rx_enabled(s)) {
             if (!fifo8_is_full(&s->rx_fifo)) {
                 fifo8_push(&s->rx_fifo, rx);
                 received = true;
@@ -474,6 +483,8 @@ static void nuclei_spi_realize(DeviceState *dev, Error **errp)
 
 static Property nuclei_spi_properties[] = {
     DEFINE_PROP_UINT32("num-cs", NucleiSPIState, num_cs, 1),
+    DEFINE_PROP_UINT32("version", NucleiSPIState, version,
+                       NUCLEI_SPI_DEFAULT_VERSION),
     DEFINE_PROP_END_OF_LIST(),
 };
 

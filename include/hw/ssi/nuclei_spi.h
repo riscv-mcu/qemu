@@ -29,6 +29,9 @@
 
 #define NUCLEI_SPI_REG_NUM  (0x88 / 4)
 
+#define NUCLEI_SPI_VERSION_1_1_0     0x00010100
+#define NUCLEI_SPI_DEFAULT_VERSION   NUCLEI_SPI_VERSION_1_1_0
+
 /* Nuclei QSPI Regs */
 #define NUCLEI_SPI_SCKDIV        (0x00 / 4)
 #define NUCLEI_SPI_SCKMODE       (0x04 / 4)
@@ -174,6 +177,7 @@ typedef struct NucleiSPIState {
     qemu_irq irq;
 
     uint32_t num_cs;
+    uint32_t version;
     qemu_irq *cs_lines;
 
     SSIBus *spi;
