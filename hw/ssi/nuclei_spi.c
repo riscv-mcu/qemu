@@ -23,10 +23,340 @@
 #include "hw/qdev-properties.h"
 #include "hw/sysbus.h"
 #include "hw/ssi/ssi.h"
+#include "qemu/bitops.h"
 #include "qemu/fifo8.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
 #include "hw/ssi/nuclei_spi.h"
+
+#define XIP_READ_CMD              0x03
+#define XIP_FAST_READ_CMD         0x0b
+#define XIP_READ4_CMD             0x13
+#define XIP_FAST_READ4_CMD        0x0c
+#define XIP_QOR_CMD               0x6b
+#define XIP_QOR4_CMD              0x6c
+#define XIP_QIOR_CMD              0xeb
+#define XIP_QIOR4_CMD             0xec
+#define XIP_WREN_CMD              0x06
+#define XIP_PP_CMD                0x02
+#define XIP_PP4_CMD               0x12
+
+static int nuclei_spi_selected_cs(NucleiSPIState *s);
+static void nuclei_spi_set_cs_active(NucleiSPIState *s, bool active);
+static void nuclei_spi_update_irq(NucleiSPIState *s);
+
+static uint32_t nuclei_spi_mask_to_shift(uint32_t mask)
+{
+    return ctz32(mask);
+}
+
+static uint32_t nuclei_spi_field(uint32_t value, uint32_t mask)
+{
+    return (value & mask) >> nuclei_spi_mask_to_shift(mask);
+}
+
+static void nuclei_spi_set_cfgerr(NucleiSPIState *s)
+{
+    s->regs[NUCLEI_SPI_STATUS] |= STATUS_CFGERR;
+}
+
+static uint32_t nuclei_spi_xip_addr_len(NucleiSPIState *s)
+{
+    return nuclei_spi_field(s->regs[NUCLEI_SPI_FFMT], FFMT_ADDR_LEN_MASK);
+}
+
+static uint32_t nuclei_spi_xip_mode_cnt(NucleiSPIState *s)
+{
+    return nuclei_spi_field(s->regs[NUCLEI_SPI_FFMT1], FFMT1_MODE_CNT_MASK);
+}
+
+static uint8_t nuclei_spi_xip_mode_code(NucleiSPIState *s)
+{
+    return nuclei_spi_field(s->regs[NUCLEI_SPI_FFMT1], FFMT1_MODE_CODE_MASK);
+}
+
+static uint32_t nuclei_spi_xip_pad_cycles(NucleiSPIState *s)
+{
+    uint32_t cycles = nuclei_spi_field(s->regs[NUCLEI_SPI_FFMT],
+                                       FFMT_PAD_CNT_MASK);
+
+    if (s->regs[NUCLEI_SPI_FFMT1] & FFMT1_PAD_CNT_H) {
+        cycles |= 0x10;
+    }
+
+    return cycles;
+}
+
+static uint32_t nuclei_spi_xip_write_pad_cycles(NucleiSPIState *s)
+{
+    uint32_t cycles = nuclei_spi_field(s->regs[NUCLEI_SPI_FFMT1],
+                                       FFMT1_WPAD_CNT_MASK);
+
+    if (s->regs[NUCLEI_SPI_FFMT1] & FFMT1_PAD_CNT_H) {
+        cycles |= 0x20;
+    }
+
+    return cycles;
+}
+
+static uint32_t nuclei_spi_cycles_to_bytes(uint32_t cycles)
+{
+    return DIV_ROUND_UP(cycles, 8);
+}
+
+static uint32_t nuclei_spi_xip_dummy_bytes(NucleiSPIState *s, uint8_t cmd,
+                                           bool is_write)
+{
+    uint32_t bytes = nuclei_spi_cycles_to_bytes(is_write ?
+                                                nuclei_spi_xip_write_pad_cycles(s) :
+                                                nuclei_spi_xip_pad_cycles(s));
+
+    switch (cmd) {
+    case XIP_FAST_READ_CMD:
+    case XIP_FAST_READ4_CMD:
+    case XIP_QOR_CMD:
+    case XIP_QOR4_CMD:
+        bytes = MAX(bytes, 8u);
+        break;
+    case XIP_QIOR_CMD:
+    case XIP_QIOR4_CMD:
+        bytes = MAX(bytes, 4u);
+        break;
+    default:
+        break;
+    }
+
+    return bytes;
+}
+
+static uint32_t nuclei_spi_xip_boundary_size(NucleiSPIState *s)
+{
+    return s->regs[NUCLEI_SPI_BOUNDARY_CFG] + 1;
+}
+
+static uint32_t nuclei_spi_xip_chunk_len(NucleiSPIState *s, uint32_t flash_offset,
+                                         uint32_t remaining)
+{
+    uint32_t boundary;
+    uint32_t room;
+
+    if (!(s->regs[NUCLEI_SPI_FCTRL] & FCTRL_BURST_EN)) {
+        return remaining;
+    }
+
+    boundary = nuclei_spi_xip_boundary_size(s);
+    room = boundary - (flash_offset % boundary);
+
+    return MIN(remaining, room);
+}
+
+static bool nuclei_spi_xip_validate(NucleiSPIState *s, hwaddr addr,
+                                    unsigned int size, bool is_write,
+                                    uint32_t *flash_offset)
+{
+    uint64_t offset;
+
+    if (!(s->regs[NUCLEI_SPI_FCTRL] & FCTRL_FLASH_EN)) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    if (is_write && !(s->regs[NUCLEI_SPI_FCTRL] & FCTRL_FLASH_WEN)) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    if (!s->xip_size) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    if (nuclei_spi_selected_cs(s) < 0) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    offset = addr + s->regs[NUCLEI_SPI_ADDR_WRAP];
+    if (offset + size > s->xip_size) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    *flash_offset = offset;
+    return true;
+}
+
+static void nuclei_spi_xip_begin(NucleiSPIState *s)
+{
+    s->regs[NUCLEI_SPI_STATUS] |= STATUS_BUSY;
+    nuclei_spi_set_cs_active(s, true);
+}
+
+static void nuclei_spi_xip_end(NucleiSPIState *s)
+{
+    s->regs[NUCLEI_SPI_STATUS] &= ~STATUS_BUSY;
+    nuclei_spi_set_cs_active(s, false);
+}
+
+static uint8_t nuclei_spi_xip_shift_byte(NucleiSPIState *s, uint8_t value)
+{
+    return ssi_transfer(s->spi, value);
+}
+
+static bool nuclei_spi_xip_send_header(NucleiSPIState *s, uint8_t cmd,
+                                       uint32_t flash_offset, bool is_write)
+{
+    uint32_t addr_len = nuclei_spi_xip_addr_len(s);
+    uint32_t mode_cnt = nuclei_spi_xip_mode_cnt(s);
+    uint32_t dummy_bytes = nuclei_spi_xip_dummy_bytes(s, cmd, is_write);
+    uint8_t mode_code = nuclei_spi_xip_mode_code(s);
+    int shift;
+    uint32_t index;
+
+    if (!(s->regs[NUCLEI_SPI_FFMT] & FFMT_CMD_EN)) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    if (addr_len < 1 || addr_len > 4) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    nuclei_spi_xip_shift_byte(s, cmd);
+    for (shift = (addr_len - 1) * 8; shift >= 0; shift -= 8) {
+        nuclei_spi_xip_shift_byte(s, (flash_offset >> shift) & 0xff);
+    }
+
+    for (index = 0; index < mode_cnt; index++) {
+        nuclei_spi_xip_shift_byte(s, mode_code);
+    }
+
+    for (index = 0; index < dummy_bytes; index++) {
+        nuclei_spi_xip_shift_byte(s, 0);
+    }
+
+    return true;
+}
+
+static bool nuclei_spi_xip_read_chunk(NucleiSPIState *s, uint32_t flash_offset,
+                                      uint8_t *buffer, uint32_t len)
+{
+    uint8_t cmd = nuclei_spi_field(s->regs[NUCLEI_SPI_FFMT], FFMT_CMD_CODE_MASK);
+    uint32_t index;
+
+    nuclei_spi_xip_begin(s);
+    if (!nuclei_spi_xip_send_header(s, cmd, flash_offset, false)) {
+        nuclei_spi_xip_end(s);
+        return false;
+    }
+
+    for (index = 0; index < len; index++) {
+        buffer[index] = nuclei_spi_xip_shift_byte(s, 0);
+    }
+
+    nuclei_spi_xip_end(s);
+    return true;
+}
+
+static bool nuclei_spi_xip_write_chunk(NucleiSPIState *s, uint32_t flash_offset,
+                                       const uint8_t *buffer, uint32_t len)
+{
+    uint8_t cmd = nuclei_spi_field(s->regs[NUCLEI_SPI_FFMT1],
+                                   FFMT1_WCMD_CODE_MASK);
+    uint32_t index;
+
+    if (cmd == 0) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    nuclei_spi_xip_begin(s);
+    nuclei_spi_xip_shift_byte(s, XIP_WREN_CMD);
+    nuclei_spi_xip_end(s);
+
+    nuclei_spi_xip_begin(s);
+    if (!nuclei_spi_xip_send_header(s, cmd, flash_offset, true)) {
+        nuclei_spi_xip_end(s);
+        return false;
+    }
+
+    for (index = 0; index < len; index++) {
+        nuclei_spi_xip_shift_byte(s, buffer[index]);
+    }
+
+    nuclei_spi_xip_end(s);
+    return true;
+}
+
+static uint64_t nuclei_spi_xip_read(void *opaque, hwaddr addr, unsigned int size)
+{
+    NucleiSPIState *s = opaque;
+    uint32_t flash_offset;
+    uint32_t remaining = size;
+    uint32_t processed = 0;
+    uint8_t buffer[8] = { 0 };
+    uint64_t value = UINT64_MAX;
+    uint32_t chunk;
+    uint32_t index;
+
+    if (!nuclei_spi_xip_validate(s, addr, size, false, &flash_offset)) {
+        nuclei_spi_update_irq(s);
+        return value;
+    }
+
+    while (remaining) {
+        chunk = nuclei_spi_xip_chunk_len(s, flash_offset + processed, remaining);
+        if (!nuclei_spi_xip_read_chunk(s, flash_offset + processed,
+                                       &buffer[processed], chunk)) {
+            memset(buffer, 0xff, sizeof(buffer));
+            break;
+        }
+        processed += chunk;
+        remaining -= chunk;
+    }
+
+    value = 0;
+    for (index = 0; index < size; index++) {
+        value |= (uint64_t)buffer[index] << (index * 8);
+    }
+
+    nuclei_spi_update_irq(s);
+    return value;
+}
+
+static void nuclei_spi_xip_write(void *opaque, hwaddr addr,
+                                 uint64_t val64, unsigned int size)
+{
+    NucleiSPIState *s = opaque;
+    uint32_t flash_offset;
+    uint32_t remaining = size;
+    uint32_t processed = 0;
+    uint8_t buffer[8];
+    uint32_t chunk;
+    uint32_t index;
+
+    if (!nuclei_spi_xip_validate(s, addr, size, true, &flash_offset)) {
+        nuclei_spi_update_irq(s);
+        return;
+    }
+
+    for (index = 0; index < size; index++) {
+        buffer[index] = (val64 >> (index * 8)) & 0xff;
+    }
+
+    while (remaining) {
+        chunk = nuclei_spi_xip_chunk_len(s, flash_offset + processed, remaining);
+        if (!nuclei_spi_xip_write_chunk(s, flash_offset + processed,
+                                        &buffer[processed], chunk)) {
+            break;
+        }
+        processed += chunk;
+        remaining -= chunk;
+    }
+
+    nuclei_spi_update_irq(s);
+}
 
 static void nuclei_spi_update_status(NucleiSPIState *s)
 {
@@ -459,6 +789,16 @@ static const MemoryRegionOps nuclei_spi_ops = {
     }
 };
 
+static const MemoryRegionOps nuclei_spi_xip_ops = {
+    .read = nuclei_spi_xip_read,
+    .write = nuclei_spi_xip_write,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+    .valid = {
+        .min_access_size = 1,
+        .max_access_size = 8,
+    },
+};
+
 static void nuclei_spi_realize(DeviceState *dev, Error **errp)
 {
     SysBusDevice *sbd = SYS_BUS_DEVICE(dev);
@@ -476,6 +816,9 @@ static void nuclei_spi_realize(DeviceState *dev, Error **errp)
     memory_region_init_io(&s->mmio, OBJECT(s), &nuclei_spi_ops, s,
                           TYPE_NUCLEI_SPI, 0x1000);
     sysbus_init_mmio(sbd, &s->mmio);
+    memory_region_init_io(&s->xip_mmio, OBJECT(s), &nuclei_spi_xip_ops, s,
+                          TYPE_NUCLEI_SPI ".xip", s->xip_size);
+    sysbus_init_mmio(sbd, &s->xip_mmio);
 
     fifo8_create(&s->tx_fifo, FIFO_CAPACITY);
     fifo8_create(&s->rx_fifo, FIFO_CAPACITY);
@@ -485,6 +828,8 @@ static Property nuclei_spi_properties[] = {
     DEFINE_PROP_UINT32("num-cs", NucleiSPIState, num_cs, 1),
     DEFINE_PROP_UINT32("version", NucleiSPIState, version,
                        NUCLEI_SPI_DEFAULT_VERSION),
+    DEFINE_PROP_UINT64("xip-size", NucleiSPIState, xip_size,
+                       NUCLEI_SPI_DEFAULT_XIP_SIZE),
     DEFINE_PROP_END_OF_LIST(),
 };
 

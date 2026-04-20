@@ -142,6 +142,7 @@ typedef struct
     evalsoc_device_info uart0;
     evalsoc_device_info uart1;
     evalsoc_device_info qspi0;
+    evalsoc_device_info qspi0_xip;
     evalsoc_device_info qspi1;
     evalsoc_device_info qspi2;
     evalsoc_device_info aplic_m;
@@ -293,6 +294,8 @@ enum
 
 #define EVALSOC_XIP_BASE            (0x20000000)
 #define EVALSOC_XIP_SIZE            (0x04000000)//64MB
+#define EVALSOC_QSPI0_XIP_BASE      (EVALSOC_XIP_BASE + EVALSOC_XIP_SIZE)
+#define EVALSOC_QSPI0_XIP_SIZE      (EVALSOC_XIP_SIZE)
 #define EVALSOC_DDR_BASE            (0x80000000)
 #define EVALSOC_DDR_SIZE            (0x04000000)//64MB
 #define EVALSOC_ILM_BASE            (0x80000000)
