@@ -103,6 +103,30 @@ static const struct MemmapEntry
     [EVALSOC_CLINT]   = { IREGION_TIMER_OFS + 0x1000,     0xF000 },//MTIME in CLINT mode
 };
 
+static bool evalsoc_has_eclic(const EvalSoCState *s)
+{
+    return s->iregion.eclic_en;
+}
+
+static bool evalsoc_has_plic(const EvalSoCState *s)
+{
+    return (s->aia_type == EVALSOC_AIA_TYPE_NONE) && s->iregion.plic_en;
+}
+
+static target_ulong evalsoc_compose_mcfg_info(const EvalSoCState *s,
+                                              target_ulong mcfg_info)
+{
+    mcfg_info |= EVALSOC_MCFG_INFO;
+    if (evalsoc_has_eclic(s)) {
+        mcfg_info |= EVALSOC_MCFG_INFO_ECLIC;
+    }
+    if (evalsoc_has_plic(s)) {
+        mcfg_info |= EVALSOC_MCFG_INFO_PLIC;
+    }
+
+    return mcfg_info;
+}
+
 static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
                        uint64_t mem_size, const char *cmdline)
 {
@@ -976,7 +1000,8 @@ static void evalsoc_machine_init(MachineState *machine)
         s->soc.cpus.harts[i].env.mstack_bound = EVALSOC_MSTACK_BOUND;
         s->soc.cpus.harts[i].env.mstack_base = EVALSOC_MSTACK_BASE;
         s->soc.cpus.harts[i].env.mcache_ctl = EVALSOC_MCACHE_CTL;
-        s->soc.cpus.harts[i].env.mcfg_info |= EVALSOC_MCFG_INFO;
+        s->soc.cpus.harts[i].env.mcfg_info =
+            evalsoc_compose_mcfg_info(s, s->soc.cpus.harts[i].env.mcfg_info);
         s->soc.cpus.harts[i].env.micfg_info = EVALSOC_MICFG_INFO | (s->ilm.size << 16);
         s->soc.cpus.harts[i].env.mdcfg_info = EVALSOC_MDCFG_INFO | (s->dlm.size << 16);
         s->soc.cpus.harts[i].env.mtlbcfg_info = EVALSOC_MTLBCFG_INFO;
@@ -1565,7 +1590,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     }
     else
     {
-        if (mst->uart0.enable && s->irqchip) {
+        if (mst->uart0.enable) {
             nuclei_uart_create(sys_mem,
                             mst->uart0.base,
                             memmap[EVALSOC_UART0].size,
@@ -1573,10 +1598,12 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                             0,
                             NULL,
                             NULL,
-                            qdev_get_gpio_in(DEVICE(s->irqchip), mst->uart0.irq));
+                            s->irqchip ?
+                            qdev_get_gpio_in(DEVICE(s->irqchip), mst->uart0.irq) :
+                            NULL);
         }
 
-        if (mst->uart1.enable && s->irqchip) {
+        if (mst->uart1.enable) {
             nuclei_uart_create(sys_mem,
                             mst->uart1.base,
                             memmap[EVALSOC_UART1].size,
@@ -1584,7 +1611,9 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                             0,
                             NULL,
                             NULL,
-                            qdev_get_gpio_in(DEVICE(s->irqchip), mst->uart1.irq));
+                            s->irqchip ?
+                            qdev_get_gpio_in(DEVICE(s->irqchip), mst->uart1.irq) :
+                            NULL);
         }
 
         nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion.base,

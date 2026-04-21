@@ -322,7 +322,7 @@ enum
 #define EVALSOC_MSTACK_BOUND        0xffffffff
 #define EVALSOC_MSTACK_BASE         0xffffffff
 #define EVALSOC_MCACHE_CTL          0x20004
-#define EVALSOC_MCFG_INFO           0x810fcd
+#define EVALSOC_MCFG_INFO           0x810fc1
 #define EVALSOC_MICFG_INFO          0xd0137
 #define EVALSOC_MDCFG_INFO          0xd0137
 #define EVALSOC_MTLBCFG_INFO        0x2d02b4
@@ -333,6 +333,9 @@ enum
 #define EVALSOC_MTLB_CTL            0
 #define EVALSOC_MMISC_CTL1          0
 #define EVALSOC_IMSIC_DEFAULT_HARTS 16
+
+#define EVALSOC_MCFG_INFO_ECLIC    (1ULL << 2)
+#define EVALSOC_MCFG_INFO_PLIC     (1ULL << 3)
 
 #if defined(TARGET_RISCV32)
 #define EVALSOC_CPU TYPE_RISCV_CPU_NUCLEI_N300FD
