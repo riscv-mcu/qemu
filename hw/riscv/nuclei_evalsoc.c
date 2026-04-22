@@ -663,17 +663,17 @@ static void parse_json_config(MachineState *machine)
         {"plic",  &s->iregion.plic_en,  "iregion.plic"},
     };
     const JsonFieldMapping mrom_mappings[] = {
-        {"base",    &s->mrom.base,     "test.base"},
-        {"size",    &s->mrom.irq,      "test.irq"},
+        {"base",    &s->mrom.base,     "mrom.base"},
+        {"size",    &s->mrom.size,     "mrom.size"},
     };
     const JsonFieldMapping test_mappings[] = {
         {"base",    &s->test.base,     "test.base"},
-        {"size",    &s->test.irq,      "test.irq"},
+        {"size",    &s->test.size,     "test.size"},
         {"enable",  &s->test.enable,   "test.enable"},
     };
     const JsonFieldMapping gpio_mappings[] = {
         {"base",    &s->gpio.base,     "gpio.base"},
-        {"size",    &s->gpio.irq,      "gpio.irq"},
+        {"size",    &s->gpio.size,     "gpio.size"},
         {"enable",  &s->gpio.enable,   "gpio.enable"},
     };
     const JsonFieldMapping uart0_mappings[] = {
