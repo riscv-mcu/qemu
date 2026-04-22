@@ -143,8 +143,10 @@ typedef struct
     evalsoc_device_info qspi0;
     evalsoc_device_info qspi1;
     evalsoc_device_info qspi2;
-    evalsoc_device_info aplic;
-    evalsoc_device_info imsic;
+    evalsoc_device_info aplic_m;
+    evalsoc_device_info aplic_s;
+    evalsoc_device_info imsic_m;
+    evalsoc_device_info imsic_s;
     uint64_t cpu_freq;
     uint64_t timer_freq;
     uint64_t irqmax;

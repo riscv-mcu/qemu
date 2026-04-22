@@ -706,6 +706,26 @@ static void parse_json_config(MachineState *machine)
         {"irq",     &s->qspi2.irq,      "qspi2.irq"},
         {"enable",  &s->qspi2.enable,   "qspi2.enable"},
     };
+    const JsonFieldMapping aplic_m_mappings[] = {
+        {"base",    &s->aplic_m.base,     "aplic_m.base"},
+        {"size",    &s->aplic_m.size,     "aplic_m.size"},
+        {"enable",  &s->aplic_m.enable,   "aplic_m.enable"},
+    };
+    const JsonFieldMapping aplic_s_mappings[] = {
+        {"base",    &s->aplic_s.base,   "aplic_s.base"},
+        {"size",    &s->aplic_s.size,   "aplic_s.size"},
+        {"enable",  &s->aplic_s.enable, "aplic_s.enable"},
+    };
+    const JsonFieldMapping imsic_m_mappings[] = {
+        {"base",    &s->imsic_m.base,     "imsic_m.base"},
+        {"size",    &s->imsic_m.size,     "imsic_m.size"},
+        {"enable",  &s->imsic_m.enable,   "imsic_m.enable"},
+    };
+    const JsonFieldMapping imsic_s_mappings[] = {
+        {"base",    &s->imsic_s.base,   "imsic_s.base"},
+        {"size",    &s->imsic_s.size,   "imsic_s.size"},
+        {"enable",  &s->imsic_s.enable, "imsic_s.enable"},
+    };
 
     // Download mapping
     const JsonFieldMapping ilm_download_mappings[] = {
@@ -787,6 +807,14 @@ static void parse_json_config(MachineState *machine)
                                 parse_json_keys_and_values(options_page2, qspi1_mappings, ARRAY_SIZE(qspi1_mappings));
                             } else if (!strcmp(page1->key, "qspi2")) {
                                 parse_json_keys_and_values(options_page2, qspi2_mappings, ARRAY_SIZE(qspi2_mappings));
+                            } else if (!strcmp(page1->key, "aplic_m")) {
+                                parse_json_keys_and_values(options_page2, aplic_m_mappings, ARRAY_SIZE(aplic_m_mappings));
+                            } else if (!strcmp(page1->key, "aplic_s")) {
+                                parse_json_keys_and_values(options_page2, aplic_s_mappings, ARRAY_SIZE(aplic_s_mappings));
+                            } else if (!strcmp(page1->key, "imsic_m")) {
+                                parse_json_keys_and_values(options_page2, imsic_m_mappings, ARRAY_SIZE(imsic_m_mappings));
+                            } else if (!strcmp(page1->key, "imsic_s")) {
+                                parse_json_keys_and_values(options_page2, imsic_s_mappings, ARRAY_SIZE(imsic_s_mappings));
                             }
                         }
                     }
@@ -819,7 +847,7 @@ static void parse_json_config(MachineState *machine)
     }
 }
 
-static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCState *s)
+static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCState *s, uint32_t smp_cpus)
 {
     struct MemmapEntry *memoryRegion = g_new0(struct MemmapEntry, EVALSOC_DEV_END);
     memcpy(memoryRegion, evalsoc_memmap, sizeof(struct MemmapEntry) * EVALSOC_DEV_END);
@@ -850,6 +878,29 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
     memoryRegion[EVALSOC_QSPI1].size = s->qspi1.size;
     memoryRegion[EVALSOC_QSPI2].base = s->qspi2.base;
     memoryRegion[EVALSOC_QSPI2].size = s->qspi2.size;
+    //IMSIC actual size depends on smp cpus
+    uint32_t imsic_hart_count = (smp_cpus < EVALSOC_IMSIC_DEFAULT_HARTS) ? smp_cpus : EVALSOC_IMSIC_DEFAULT_HARTS;
+    uint32_t guest_bits = imsic_num_bits(s->aia_guests + 1);
+    bool imsic_m_enable = (s->aia_type == EVALSOC_AIA_TYPE_APLIC_IMSIC) || s->imsic_m.enable;
+    bool imsic_s_enable = (s->aia_type == EVALSOC_AIA_TYPE_APLIC_IMSIC) || s->imsic_s.enable;
+    bool aplic_m_enable = (s->aia_type != EVALSOC_AIA_TYPE_NONE) || s->aplic_m.enable;
+    bool aplic_s_enable = (s->aia_type != EVALSOC_AIA_TYPE_NONE) || s->aplic_s.enable;
+    if (imsic_m_enable) {
+        memoryRegion[EVALSOC_IMSIC_M].base = s->imsic_m.base;
+        memoryRegion[EVALSOC_IMSIC_M].size = s->imsic_m.size * imsic_hart_count;
+    }
+    if (imsic_s_enable) {
+        memoryRegion[EVALSOC_IMSIC_S].base = s->imsic_s.base;
+        memoryRegion[EVALSOC_IMSIC_S].size = IMSIC_HART_SIZE(guest_bits) * imsic_hart_count;
+    }
+    if (aplic_m_enable) {
+        memoryRegion[EVALSOC_APLIC_M].base = s->aplic_m.base;
+        memoryRegion[EVALSOC_APLIC_M].size = s->aplic_m.size;
+    }
+    if (aplic_s_enable) {
+        memoryRegion[EVALSOC_APLIC_S].base = s->aplic_s.base;
+        memoryRegion[EVALSOC_APLIC_S].size = s->aplic_s.size;
+    }
     //iregion offset
     memoryRegion[EVALSOC_IINFO].base = memmap[EVALSOC_IINFO].base + s->iregion.base;
     memoryRegion[EVALSOC_DEBUG].base = memmap[EVALSOC_DEBUG].base + s->iregion.base;
@@ -872,13 +923,17 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
             || (i == EVALSOC_UART1 && !s->uart1.enable)
             || (i == EVALSOC_QSPI0 && !s->qspi0.enable)
             || (i == EVALSOC_QSPI1 && !s->qspi1.enable)
-            || (i == EVALSOC_QSPI2 && !s->qspi2.enable))
+            || (i == EVALSOC_QSPI2 && !s->qspi2.enable)
+            || (i == EVALSOC_APLIC_M && !aplic_m_enable)
+            || (i == EVALSOC_APLIC_S && !aplic_s_enable)
+            || (i == EVALSOC_IMSIC_M && !imsic_m_enable)
+            || (i == EVALSOC_IMSIC_S && !imsic_s_enable))
             continue;
         hwaddr start1 = memoryRegion[i].base;
         hwaddr end1 = start1 + memoryRegion[i].size;
 
-        for (size_t j = 0; j < EVALSOC_DEV_END; ++j) {
-            if (i == j || j == EVALSOC_CLINT || j == EVALSOC_ILM || j == EVALSOC_DLM || j == EVALSOC_SRAM) continue; // Skip comparing with itself
+        for (size_t j = i + 1; j < EVALSOC_DEV_END; ++j) {
+            if (j == EVALSOC_CLINT || j == EVALSOC_ILM || j == EVALSOC_DLM || j == EVALSOC_SRAM) continue;
             if (j == EVALSOC_DEBUG
                 || (j == EVALSOC_ECLIC && !s->iregion.eclic_en)
                 || (j == EVALSOC_SMP && !s->iregion.smpcc_en)
@@ -890,7 +945,11 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
                 || (j == EVALSOC_UART1 && !s->uart1.enable)
                 || (j == EVALSOC_QSPI0 && !s->qspi0.enable)
                 || (j == EVALSOC_QSPI1 && !s->qspi1.enable)
-                || (j == EVALSOC_QSPI2 && !s->qspi2.enable))
+                || (j == EVALSOC_QSPI2 && !s->qspi2.enable)
+                || (j == EVALSOC_APLIC_M && !aplic_m_enable)
+                || (j == EVALSOC_APLIC_S && !aplic_s_enable)
+                || (j == EVALSOC_IMSIC_M && !imsic_m_enable)
+                || (j == EVALSOC_IMSIC_S && !imsic_s_enable))
                 continue;
 
             hwaddr start2 = memoryRegion[j].base;
@@ -945,7 +1004,7 @@ static void evalsoc_machine_init(MachineState *machine)
     /*if flash startup_addr not set, use flashxip startup_addr*/
     s->flash.startup_addr = (s->flash.startup_addr == -1) ? s->norflash.startup_addr: s->flash.startup_addr;
 
-    if(is_iregion_addr_overlap(memmap, s) == true)
+    if(is_iregion_addr_overlap(memmap, s, machine->smp.cpus) == true)
     {
         error_report("is_iregion_addr_overlap() failed");
         exit(1);
@@ -1069,6 +1128,10 @@ static void evalsoc_machine_init(MachineState *machine)
     DEBUGF("qspi0   : base:0x%lx, size:0x%lx, irq:%d\n", (long)s->qspi0.base, (long)s->qspi0.size, (int)s->qspi0.irq);
     DEBUGF("qspi1   : base:0x%lx, size:0x%lx, irq:%d\n", (long)s->qspi1.base, (long)s->qspi1.size, (int)s->qspi1.irq);
     DEBUGF("qspi2   : base:0x%lx, size:0x%lx, irq:%d\n", (long)s->qspi2.base, (long)s->qspi2.size, (int)s->qspi2.irq);
+    DEBUGF("aplic_m : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->aplic_m.base, (long)s->aplic_m.size, (int)s->aplic_m.enable);
+    DEBUGF("aplic_s : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->aplic_s.base, (long)s->aplic_s.size, (int)s->aplic_s.enable);
+    DEBUGF("imsic_m : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->imsic_m.base, (long)s->imsic_m.size, (int)s->imsic_m.enable);
+    DEBUGF("imsic_s : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->imsic_s.base, (long)s->imsic_s.size, (int)s->imsic_s.enable);
     DEBUGF("iregion : base:0x%lx, size:0x%lx\n", (long)s->iregion.base,(long)s->iregion.size);
     DEBUGF("irqmax  : %d\n", (int)s->irqmax);
     DEBUGF("timer_freq : %d\n", (int)s->timer_freq);
@@ -1251,6 +1314,18 @@ static void evalsoc_machine_instance_init(Object *obj)
     s->qspi2.size = memmap[EVALSOC_QSPI2].size;
     s->qspi2.irq = EVALSOC_PLIC_SPI2_IRQ;
     s->qspi2.enable = 1;
+    s->aplic_m.base = memmap[EVALSOC_APLIC_M].base;
+    s->aplic_m.size = memmap[EVALSOC_APLIC_M].size;
+    s->aplic_m.enable = 0;
+    s->aplic_s.base = memmap[EVALSOC_APLIC_S].base;
+    s->aplic_s.size = memmap[EVALSOC_APLIC_S].size;
+    s->aplic_s.enable = 0;
+    s->imsic_m.base = memmap[EVALSOC_IMSIC_M].base;
+    s->imsic_m.size = memmap[EVALSOC_IMSIC_M].size;
+    s->imsic_m.enable = 0;
+    s->imsic_s.base = memmap[EVALSOC_IMSIC_S].base;
+    s->imsic_s.size = memmap[EVALSOC_IMSIC_S].size;
+    s->imsic_s.enable = 0;
 
     object_property_add_uint64_ptr(obj, "iregion", &s->iregion.base,
                                    OBJ_PROP_FLAG_READWRITE);
@@ -1477,7 +1552,8 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     }
     /* MMIO */
 
-    if (mst->aia_type == EVALSOC_AIA_TYPE_NONE) {
+    if ((mst->aia_type == EVALSOC_AIA_TYPE_NONE) &&
+        !(mst->aplic_m.enable | mst->aplic_s.enable)) {
         if (mst->iregion.plic_en) {
             s->irqchip = sifive_plic_create(memmap[EVALSOC_PLIC].base + mst->iregion.base,
                                         plic_hart_config, ms->smp.cpus, 0,
@@ -1493,25 +1569,26 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
             g_free(plic_hart_config);
         }
     } else {
-        msimode = (mst->aia_type == EVALSOC_AIA_TYPE_APLIC_IMSIC) ? true : false;
+        msimode = ((mst->aia_type == EVALSOC_AIA_TYPE_APLIC_IMSIC) ||
+                    (mst->imsic_m.enable & mst->imsic_s.enable)) ? true : false;
         if (msimode) {
             /* M-level IMSICs */
-            msi_addr = memmap[EVALSOC_IMSIC_M].base;
+            msi_addr = mst->imsic_m.base;
             for (i = 0; i < EVALSOC_IMSIC_DEFAULT_HARTS; i++) {
                 if (i < ms->smp.cpus) {
-                    riscv_imsic_create(msi_addr + i * memmap[EVALSOC_IMSIC_M].size,
+                    riscv_imsic_create(msi_addr + i * mst->imsic_m.size,
                                         i, true, 1, EVALSOC_IRQCHIP_NUM_MSIS);
                 } else {
                     MemoryRegion *mr = g_new(MemoryRegion, 1);
                     char *ram_block_name = g_strdup_printf("imsic-M-reserved-ram-hart%d", i);
                     memory_region_init_io(mr, NULL, &riscv_imsic_dummy_ops, NULL,
-                                        ram_block_name, memmap[EVALSOC_IMSIC_M].size);
-                    memory_region_add_subregion(get_system_memory(), msi_addr + i * memmap[EVALSOC_IMSIC_M].size, mr);
+                                        ram_block_name, mst->imsic_m.size);
+                    memory_region_add_subregion(get_system_memory(), msi_addr + i * mst->imsic_m.size, mr);
                 }
             }
             /* S-level IMSICs */
             guest_bits = imsic_num_bits(mst->aia_guests + 1);
-            msi_addr = memmap[EVALSOC_IMSIC_S].base;
+            msi_addr = mst->imsic_s.base;
             for (i = 0; i < EVALSOC_IMSIC_DEFAULT_HARTS; i++) {
                 if (i < ms->smp.cpus) {
                     riscv_imsic_create(msi_addr + i * IMSIC_HART_SIZE(guest_bits),
@@ -1529,9 +1606,9 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         
         /* M-level APLIC */
         s->irqchip = riscv_aplic_create(
-            memmap[EVALSOC_APLIC_M].base,
-            memmap[EVALSOC_APLIC_M].size,
-            0, 
+            mst->aplic_m.base,
+            mst->aplic_m.size,
+            0,
             (msimode) ? 0 : ms->smp.cpus,
             mst->irqmax > EVALSOC_PLIC_NUM_SOURCES ? EVALSOC_PLIC_NUM_SOURCES : mst->irqmax,
             VIRT_IRQCHIP_NUM_PRIO_BITS,
@@ -1540,9 +1617,9 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         if (s->irqchip) {
             /* S-level APLIC */
             riscv_aplic_create(
-                memmap[EVALSOC_APLIC_S].base,
-                memmap[EVALSOC_APLIC_S].size,
-                0, 
+                mst->aplic_s.base,
+                mst->aplic_s.size,
+                0,
                 (msimode) ? 0 : ms->smp.cpus,
                 mst->irqmax > EVALSOC_PLIC_NUM_SOURCES ? EVALSOC_PLIC_NUM_SOURCES : mst->irqmax,
                 VIRT_IRQCHIP_NUM_PRIO_BITS,
