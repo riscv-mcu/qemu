@@ -144,7 +144,6 @@ typedef struct
     evalsoc_device_info test;
     evalsoc_device_info gpio;
     evalsoc_device_info uart0;
-    evalsoc_device_info uart1;
     evalsoc_device_info qspi0;
     evalsoc_device_info qspi0_xip;
     evalsoc_device_info qspi1;
@@ -186,7 +185,6 @@ enum {
     EVALSOC_GPIO,
     EVALSOC_UART0,
     EVALSOC_QSPI0,
-    EVALSOC_UART1,
     EVALSOC_QSPI1,
     EVALSOC_QSPI2,
     EVALSOC_XEC0,
@@ -234,7 +232,7 @@ enum
     EVALSOC_PLIC_GPIO_IRQ30 = 31,
     EVALSOC_PLIC_GPIO_IRQ31 = 32,
     EVALSOC_PLIC_UART0_IRQ = 33,
-    EVALSOC_PLIC_UART1_IRQ = 34,
+    EVALSOC_PLIC_GPIO_IRQ33 = 34,
     EVALSOC_PLIC_SPI0_IRQ = 35,
     EVALSOC_PLIC_SPI1_IRQ = 36,
     EVALSOC_PLIC_SPI2_IRQ = 37,
@@ -283,8 +281,6 @@ enum
 #define EVALSOC_GPIO_SIZE           (0x1000)
 #define EVALSOC_UART0_BASE          (0x10013000)
 #define EVALSOC_UART0_SIZE          (0x1000)
-#define EVALSOC_UART1_BASE          (0x10023000)
-#define EVALSOC_UART1_SIZE          (0x1000)
 #define EVALSOC_QSPI0_BASE          (0x10014000)
 #define EVALSOC_QSPI0_SIZE          (0x1000)
 #define EVALSOC_QSPI1_BASE          (0x10024000)
@@ -358,4 +354,3 @@ enum
 #endif
 
 #endif
-

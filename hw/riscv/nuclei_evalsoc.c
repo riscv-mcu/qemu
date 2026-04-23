@@ -82,7 +82,6 @@ static const struct MemmapEntry
     [EVALSOC_TEST]    = { EVALSOC_TEST_BASE,              EVALSOC_TEST_SIZE,    "TEST" },
     [EVALSOC_GPIO]    = { EVALSOC_GPIO_BASE,              EVALSOC_GPIO_SIZE,    "GPIO" },
     [EVALSOC_UART0]   = { EVALSOC_UART0_BASE,             EVALSOC_UART0_SIZE,   "UART0"},
-    [EVALSOC_UART1]   = { EVALSOC_UART1_BASE,             EVALSOC_UART1_SIZE,   "UART1"},
     [EVALSOC_QSPI0]   = { EVALSOC_QSPI0_BASE,             EVALSOC_QSPI0_SIZE,   "QSPI0"},
     [EVALSOC_QSPI1]   = { EVALSOC_QSPI1_BASE,             EVALSOC_QSPI1_SIZE,   "QSPI1"},
     [EVALSOC_QSPI2]   = { EVALSOC_QSPI2_BASE,             EVALSOC_QSPI2_SIZE,   "QSPI2"},
@@ -532,25 +531,9 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     qemu_fdt_setprop_string(fdt, "/aliases", "serial0", nodename);
     g_free(nodename);
 
-    uart_phandle = phandle++;
-    nodename = g_strdup_printf("/soc/serial@%lx",
-                               (long)memmap[EVALSOC_UART1].base);
-    qemu_fdt_add_subnode(fdt, nodename);
-    qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,uart0");
-    qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           0x0, memmap[EVALSOC_UART1].base,
-                           0x0, memmap[EVALSOC_UART1].size);
-    qemu_fdt_setprop_cell(fdt, nodename, "clocks", hfclk_phandle);
-    qemu_fdt_setprop_cell(fdt, nodename, "interrupt-parent", plic_phandle);
-    qemu_fdt_setprop_cell(fdt, nodename, "interrupts", s->uart1.irq);
-    qemu_fdt_setprop_cell(fdt, nodename, "phandle", uart_phandle);
-    qemu_fdt_setprop_string(fdt, nodename, "status", "okay");
-    qemu_fdt_setprop_string(fdt, "/aliases", "serial1", nodename);
-
     qemu_fdt_add_subnode(fdt, "/chosen");
     // set stdout-path for opensbi
     qemu_fdt_setprop_string(fdt, "/chosen", "stdout-path", "serial0");
-    g_free(nodename);
 
 update_bootargs:
     if (cmdline)
@@ -711,12 +694,6 @@ static void parse_json_config(MachineState *machine)
         {"irq",     &s->uart0.irq,      "uart0.irq"},
         {"enable",  &s->uart0.enable,   "uart0.enable"},
     };
-    const JsonFieldMapping uart1_mappings[] = {
-        {"base",    &s->uart1.base,     "uart1.base"},
-        {"size",    &s->uart1.size,     "uart1.size"},
-        {"irq",     &s->uart1.irq,      "uart1.irq"},
-        {"enable",  &s->uart1.enable,   "uart1.enable"},
-    };
     const JsonFieldMapping qspi0_mappings[] = {
         {"base",    &s->qspi0.base,     "qspi0.base"},
         {"size",    &s->qspi0.size,     "qspi0.size"},
@@ -840,8 +817,6 @@ static void parse_json_config(MachineState *machine)
                                 parse_json_keys_and_values(options_page2, gpio_mappings, ARRAY_SIZE(gpio_mappings));
                             } else if (!strcmp(page1->key, "uart0")) {
                                 parse_json_keys_and_values(options_page2, uart0_mappings, ARRAY_SIZE(uart0_mappings));
-                            } else if (!strcmp(page1->key, "uart1")) {
-                                parse_json_keys_and_values(options_page2, uart1_mappings, ARRAY_SIZE(uart1_mappings));
                             } else if (!strcmp(page1->key, "qspi0")) {
                                 parse_json_keys_and_values(options_page2, qspi0_mappings, ARRAY_SIZE(qspi0_mappings));
                             } else if (!strcmp(page1->key, "qspi1")) {
@@ -913,8 +888,6 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
     memoryRegion[EVALSOC_GPIO].size = s->gpio.size;
     memoryRegion[EVALSOC_UART0].base = s->uart0.base;
     memoryRegion[EVALSOC_UART0].size = s->uart0.size;
-    memoryRegion[EVALSOC_UART1].base = s->uart1.base;
-    memoryRegion[EVALSOC_UART1].size = s->uart1.size;
     memoryRegion[EVALSOC_QSPI0].base = s->qspi0.base;
     memoryRegion[EVALSOC_QSPI0].size = s->qspi0.size;
     memoryRegion[EVALSOC_QSPI1].base = s->qspi1.base;
@@ -965,7 +938,6 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
             || (i == EVALSOC_TEST && !s->test.enable)
             || (i == EVALSOC_GPIO && !s->gpio.enable)
             || (i == EVALSOC_UART0 && !s->uart0.enable)
-            || (i == EVALSOC_UART1 && !s->uart1.enable)
             || (i == EVALSOC_QSPI0 && !s->qspi0.enable)
             || (i == EVALSOC_QSPI1 && !s->qspi1.enable)
             || (i == EVALSOC_QSPI2 && !s->qspi2.enable)
@@ -987,7 +959,6 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
                 || (j == EVALSOC_TEST && !s->test.enable)
                 || (j == EVALSOC_GPIO && !s->gpio.enable)
                 || (j == EVALSOC_UART0 && !s->uart0.enable)
-                || (j == EVALSOC_UART1 && !s->uart1.enable)
                 || (j == EVALSOC_QSPI0 && !s->qspi0.enable)
                 || (j == EVALSOC_QSPI1 && !s->qspi1.enable)
                 || (j == EVALSOC_QSPI2 && !s->qspi2.enable)
@@ -1175,7 +1146,6 @@ static void evalsoc_machine_init(MachineState *machine)
     DEBUGF("test    : base:0x%lx, size:0x%lx\n", (long)s->test.base,(long)s->test.size);
     DEBUGF("gpio    : base:0x%lx, size:0x%lx\n", (long)s->gpio.base,(long)s->gpio.size);
     DEBUGF("uart0   : base:0x%lx, size:0x%lx, irq:%d\n", (long)s->uart0.base, (long)s->uart0.size, (int)s->uart0.irq);
-    DEBUGF("uart1   : base:0x%lx, size:0x%lx, irq:%d\n", (long)s->uart1.base, (long)s->uart1.size, (int)s->uart1.irq);
     DEBUGF("aplic_m : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->aplic_m.base, (long)s->aplic_m.size, (int)s->aplic_m.enable);
     DEBUGF("aplic_s : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->aplic_s.base, (long)s->aplic_s.size, (int)s->aplic_s.enable);
     DEBUGF("imsic_m : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->imsic_m.base, (long)s->imsic_m.size, (int)s->imsic_m.enable);
@@ -1351,10 +1321,6 @@ static void evalsoc_machine_instance_init(Object *obj)
     s->uart0.size = memmap[EVALSOC_UART0].size;
     s->uart0.irq = EVALSOC_PLIC_UART0_IRQ;
     s->uart0.enable = 1;
-    s->uart1.base = memmap[EVALSOC_UART1].base;
-    s->uart1.size = memmap[EVALSOC_UART1].size;
-    s->uart1.irq = EVALSOC_PLIC_UART1_IRQ;
-    s->uart1.enable = 1;
     s->qspi0.base = memmap[EVALSOC_QSPI0].base;
     s->qspi0.size = memmap[EVALSOC_QSPI0].size;
     s->qspi0.irq = EVALSOC_PLIC_SPI0_IRQ;
@@ -1741,19 +1707,6 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                             NULL,
                             s->irqchip ?
                             qdev_get_gpio_in(DEVICE(s->irqchip), mst->uart0.irq) :
-                            NULL);
-        }
-
-        if (mst->uart1.enable) {
-            nuclei_uart_create(sys_mem,
-                            mst->uart1.base,
-                            memmap[EVALSOC_UART1].size,
-                            serial_hd(1),
-                            0,
-                            NULL,
-                            NULL,
-                            s->irqchip ?
-                            qdev_get_gpio_in(DEVICE(s->irqchip), mst->uart1.irq) :
                             NULL);
         }
 
