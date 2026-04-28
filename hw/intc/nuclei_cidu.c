@@ -30,6 +30,47 @@ static bool addr_in_range(uint32_t addr, uint32_t base, uint32_t num)
     return addr >= base && addr - base < num;
 }
 
+static uint32_t nuclei_cidu_hart_mask(NucleiCIDUState *cidu)
+{
+    if (cidu->num_harts >= 32) {
+        return UINT32_MAX;
+    }
+
+    return (1U << cidu->num_harts) - 1;
+}
+
+static void nuclei_cidu_update_external_source(NucleiCIDUState *cidu, uint32_t irq)
+{
+    uint32_t desired_mask;
+    uint32_t changed_mask;
+    uint32_t hartid;
+
+    if (!cidu->eclic || irq >= cidu->num_sources) {
+        return;
+    }
+
+    desired_mask = cidu->ext_level[irq] ?
+                   (cidu->intn_indicator[irq] & nuclei_cidu_hart_mask(cidu)) : 0;
+    changed_mask = cidu->delivered_mask[irq] ^ desired_mask;
+
+    if (!changed_mask) {
+        return;
+    }
+
+    for (hartid = 0; hartid < cidu->num_harts; hartid++) {
+        uint32_t bit = 1U << hartid;
+
+        if (changed_mask & bit) {
+            qemu_set_irq(nuclei_eclic_get_irq(cidu->eclic,
+                                              irq + CIDU_EXT_INT_OFST,
+                                              hartid),
+                         (desired_mask & bit) ? 1 : 0);
+        }
+    }
+
+    cidu->delivered_mask[irq] = desired_mask;
+}
+
 static uint64_t nuclei_cidu_read(void *opaque, hwaddr addr, unsigned size)
 {
     NucleiCIDUState *cidu = opaque;
@@ -69,8 +110,23 @@ static uint64_t nuclei_cidu_read(void *opaque, hwaddr addr, unsigned size)
     return 0;
 }
 
-uint32_t coren_int_16 = 0;
-uint32_t cidu_int_indicator = 0;
+static void nuclei_cidu_external_irq_handler(void *opaque, int irq, int level)
+{
+    NucleiCIDUState *cidu = opaque;
+
+    if (!cidu->eclic || irq < 0 || irq >= cidu->num_sources) {
+        return;
+    }
+
+    /*
+     * External interrupt routing is level-sensitive. Keep the source level in
+     * CIDU so that INTn_INDICATOR / INTn_MASK updates can immediately
+     * re-distribute or withdraw a live interrupt without waiting for another
+     * device edge.
+     */
+    cidu->ext_level[irq] = !!level;
+    nuclei_cidu_update_external_source(cidu, irq);
+}
 
 static void nuclei_cidu_write(void *opaque, hwaddr addr, uint64_t value,
                                unsigned size)
@@ -96,7 +152,6 @@ static void nuclei_cidu_write(void *opaque, hwaddr addr, uint64_t value,
         cidu->ici_shadow_reg = value;
         send_core = (value >> 16) & 0xffff;
         recv_core = value & 0xffff;
-        coren_int_16 = recv_core;
 
         qemu_set_irq(cidu->soft_irq[recv_core], 1);
 
@@ -105,8 +160,8 @@ static void nuclei_cidu_write(void *opaque, hwaddr addr, uint64_t value,
     else if (addr_in_range(addr, CIDU_REG_INTN_INDICATOR_BASE, CIDU_MAX_EXTERNAL_INT_NUM << 2))
     {
         uint32_t irq = (addr - CIDU_REG_INTN_INDICATOR_BASE) >> 2;
-        cidu->intn_indicator[irq] = value;
-        cidu_int_indicator = value;
+        cidu->intn_indicator[irq] = (uint32_t)value & nuclei_cidu_hart_mask(cidu);
+        nuclei_cidu_update_external_source(cidu, irq);
     }
     else if (addr_in_range(addr, CIDU_REG_INTN_MASK_BASE, CIDU_MAX_EXTERNAL_INT_NUM << 2))
     {
@@ -147,19 +202,39 @@ static Property nuclei_cidu_properties[] = {
 static void nuclei_cidu_realize(DeviceState *dev, Error **errp)
 {
     NucleiCIDUState *cidu = NUCLEI_CIDU(dev);
+    uint32_t irq;
+    int i;
+
+    if (cidu->num_harts > CIDU_MAX_SUPPORT_CORE_NUM) {
+        error_setg(errp, "%s supports at most %u harts", TYPE_NUCLEI_CIDU,
+                   CIDU_MAX_SUPPORT_CORE_NUM);
+        return;
+    }
 
     memory_region_init_io(&cidu->mmio, OBJECT(dev), &nuclei_cidu_ops, cidu,
                           TYPE_NUCLEI_CIDU, cidu->aperture_size);
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &cidu->mmio);
-    for (int i = 0; i < 32; i++)
-    {
+
+    /*
+     * CIDU receives one GPIO input per cluster-level external interrupt
+     * source, and redistributes it to one or more per-hart ECLIC instances
+     * according to INTn_INDICATOR.
+     */
+    qdev_init_gpio_in(dev, nuclei_cidu_external_irq_handler, cidu->num_sources);
+
+    cidu->core_num = cidu->num_harts;
+    cidu->int_num = cidu->num_sources;
+
+    for (i = 0; i < CIDU_MAX_SEMAPHORE_NUM; i++) {
         cidu->semaphore[i] = 0xffffffff;
     }
-    for (int i = 0; i < 4096; i++)
-    {
-        cidu->intn_mask[i] = 0xffffffff;
-    }
 
+    for (irq = 0; irq < cidu->num_sources; irq++) {
+        cidu->intn_indicator[irq] = 0x1;
+        cidu->intn_mask[irq] = 0xffffffff;
+        cidu->delivered_mask[irq] = 0;
+        cidu->ext_level[irq] = 0;
+    }
 }
 
 static void nuclei_cidu_class_init(ObjectClass *klass, void *data)
@@ -192,24 +267,21 @@ DeviceState *nuclei_cidu_create(hwaddr addr, uint32_t aperture_size,
                                 uint32_t num_harts, uint32_t num_sources, DeviceState *eclic)
 {
     DeviceState *dev = qdev_new(TYPE_NUCLEI_CIDU);
+    NucleiCIDUState *s = NUCLEI_CIDU(dev);
+    int i;
 
     assert(num_sources <= CIDU_MAX_EXTERNAL_INT_NUM);
-    // assert(num_harts <= CIDU_MAX_SUPPORT_CORE_NUM);
+    assert(num_harts <= CIDU_MAX_SUPPORT_CORE_NUM);
 
     qdev_prop_set_uint32(dev, "num-harts", num_harts);
     qdev_prop_set_uint32(dev, "num-sources", num_sources);
     qdev_prop_set_uint64(dev, "mcidubase", addr);
     qdev_prop_set_uint32(dev, "aperture-size", aperture_size);
-    NucleiCIDUState *s = NUCLEI_CIDU(dev);
+    s->eclic = eclic;
 
-    if(eclic != NULL)
-    {
-        for (int i = 0; i < num_harts; i++) {
-            s->soft_irq[i] = NUCLEI_ECLIC(eclic)->irqs[i][Internal_Reserved14_IRQn];
-
-            for(int j = 0; j < num_sources; j++) {
-                s->external_irq[j] = NUCLEI_ECLIC(eclic)->irqs[i][j + CIDU_EXT_INT_OFST];
-            }
+    if (eclic != NULL) {
+        for (i = 0; i < num_harts; i++) {
+            s->soft_irq[i] = nuclei_eclic_get_irq(eclic, Internal_Reserved14_IRQn, i);
         }
     }
 

@@ -51,7 +51,6 @@ typedef struct NucleiCIDUState
     /*< public >*/
     MemoryRegion mmio;
     qemu_irq soft_irq[32];
-    qemu_irq external_irq[4096];
 
     DeviceState *eclic;
 
@@ -63,6 +62,8 @@ typedef struct NucleiCIDUState
     uint32_t coren_int_status[32];
     uint32_t intn_indicator[4096];
     uint32_t intn_mask[4096];
+    uint32_t delivered_mask[4096];
+    uint8_t ext_level[4096];
     uint32_t semaphore[32];
     uint32_t ici_shadow_reg;
     uint32_t core_num;

@@ -111,10 +111,6 @@ typedef struct NucleiECLICState
     QLIST_HEAD(, ECLICPendingInterrupt)
     pending_list_s[ECLIC_MAX_HARTS];
     size_t active_count_s;
-
-    /* ECLIC IRQ handlers */
-    qemu_irq irqs[ECLIC_MAX_HARTS][4096];
-
 } NucleiECLICState;
 
 enum
@@ -145,6 +141,8 @@ DeviceState *nuclei_eclic_create(hwaddr addr, uint32_t aperture_size, bool prv_s
                                uint32_t num_harts, uint32_t num_sources,
                                uint8_t clicintctlbits, uint32_t shadow_gpr_num);
 qemu_irq nuclei_eclic_get_irq(DeviceState *dev, int irq, int hartid);
+qemu_irq nuclei_eclic_get_external_irq(DeviceState *dev, int irq);
+bool nuclei_eclic_irq_enabled(DeviceState *dev, uint32_t irq, int hartid);
 void nuclei_eclic_systimer_cb(void *opaque);
 void riscv_cpu_eclic_int_handler_start(void *eclic_ptr, int mode, int irq, int hartid);
 void riscv_cpu_eclic_int_handler_start_s(void *eclic_ptr, int mode, int irq, int hartid);
@@ -162,4 +160,3 @@ void nuclei_eclic_clean_pending(void *opaque, int mode, int hartid, int irq);
 void nuclei_eclic_irq_request(void *opaque, int id, int new_intip);
 
 #endif
-

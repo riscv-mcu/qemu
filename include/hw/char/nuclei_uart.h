@@ -23,7 +23,6 @@
 #include "chardev/char-fe.h"
 #include "hw/sysbus.h"
 #include "hw/irq.h"
-#include "hw/intc/nuclei_cidu.h"
 
 #define TYPE_NUCLEI_UART "riscv.nuclei.uart"
 OBJECT_DECLARE_SIMPLE_TYPE(NucleiUARTState, NUCLEI_UART)
@@ -74,7 +73,7 @@ typedef struct NucleiUARTState
     uint32_t setup;
 } NucleiUARTState;
 
-NucleiUARTState *nuclei_uart_create(MemoryRegion *address_space, hwaddr base, uint64_t size,
-                    Chardev *chr, uint32_t id, DeviceState *cidu, DeviceState *eclic, qemu_irq irq);
+NucleiUARTState *nuclei_uart_create(hwaddr base, uint64_t size,
+                    Chardev *chr, qemu_irq irq);
 
 #endif

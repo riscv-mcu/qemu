@@ -241,7 +241,14 @@ enum
     EVALSOC_PLIC_INT_MAX
 };
 
+#define EVALSOC_UART0_IRQ_BASE                    1
+#define EVALSOC_QSPI0_IRQ_BASE                    3
+#define EVALSOC_QSPI1_IRQ_BASE                    4
+#define EVALSOC_QSPI2_IRQ_BASE                    5
+#define EVALSOC_XEC0_IRQ_BASE                     8
+
 #define PLIC_IRQ_TO_ECLIC_IRQ(n)                  (n + 18)
+#define EVALSOC_DEFAULT_IRQMAX                    40
 
 enum
 {

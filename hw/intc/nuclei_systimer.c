@@ -381,9 +381,13 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
         if (riscv_intc_is_clic_mode(env)) {
             s->ssip = value;
             if ((s->ssip & 0x1) == 1) {
-                qemu_set_irq(NUCLEI_ECLIC(env->eclic)->irqs[hartid][Internal_SysTimerSW_S_IRQn], 1);
+                qemu_set_irq(nuclei_eclic_get_irq(DEVICE(env->eclic),
+                                                  Internal_SysTimerSW_S_IRQn,
+                                                  hartid), 1);
             } else {
-                qemu_set_irq(NUCLEI_ECLIC(env->eclic)->irqs[hartid][Internal_SysTimerSW_S_IRQn], 0);
+                qemu_set_irq(nuclei_eclic_get_irq(DEVICE(env->eclic),
+                                                  Internal_SysTimerSW_S_IRQn,
+                                                  hartid), 0);
             }
         } else {
             riscv_cpu_update_mip(env, MIP_SSIP, BOOL_TO_MASK(value));
@@ -528,8 +532,12 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_ba
         env->mtimecmp = 0;
         if (eclic != NULL) {
             s->eclic = eclic;
-            s->soft_irq[i] =&(NUCLEI_ECLIC(eclic)->irqs[i][Internal_SysTimerSW_IRQn]);
-            s->timer_irq[i] = &(NUCLEI_ECLIC(eclic)->irqs[i][Internal_SysTimer_IRQn]);
+            s->soft_irq[i] = g_new(qemu_irq, 1);
+            s->timer_irq[i] = g_new(qemu_irq, 1);
+            *s->soft_irq[i] = nuclei_eclic_get_irq(eclic,
+                                                   Internal_SysTimerSW_IRQn, i);
+            *s->timer_irq[i] = nuclei_eclic_get_irq(eclic,
+                                                    Internal_SysTimer_IRQn, i);
             riscv_cpu_set_rdtime_fn(env, nuclei_cpu_riscv_read_rtc, &(s->timebase_freq));
             env->mtimer = timer_new_ns(QEMU_CLOCK_VIRTUAL, &nuclei_mtimecmp_cb, cpu);
         } else {

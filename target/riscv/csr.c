@@ -2707,6 +2707,13 @@ static int rmw_mnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
             if (edge) {
                 nuclei_eclic_clean_pending(env->eclic, clic_priv,
                                          cs->cpu_index, clic_irq);
+                /*
+                 * mnxti consumes the currently selected edge-triggered source
+                 * in place. Advance the ECLIC state here so env->exccode does
+                 * not keep pointing at the just-removed pending entry.
+                 */
+                nuclei_eclic_next_interrupt(env->eclic, clic_priv,
+                                            cs->cpu_index);
             }
             env->mintstatus = set_field(env->mintstatus,
                                         MINTSTATUS_MIL, clic_il);
@@ -3315,6 +3322,13 @@ static int rmw_snxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
             if (edge) {
                 nuclei_eclic_clean_pending(env->eclic, clic_priv,
                                          cs->cpu_index, clic_irq);
+                /*
+                 * snxti has the same in-place consume semantics as mnxti for
+                 * edge-triggered sources, so refresh the next deliverable
+                 * interrupt only on this CSR path.
+                 */
+                nuclei_eclic_next_interrupt(env->eclic, clic_priv,
+                                            cs->cpu_index);
             }
             env->mintstatus = set_field(env->mintstatus,
                                         MINTSTATUS_SIL, clic_il);

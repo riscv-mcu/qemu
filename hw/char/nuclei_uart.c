@@ -247,8 +247,8 @@ type_init(nuclei_uart_register_types);
 /*
  * Create UART device.
  */
-NucleiUARTState *nuclei_uart_create(MemoryRegion *address_space, hwaddr base, uint64_t size,
-                    Chardev *chr, uint32_t id, DeviceState *cidu, DeviceState *eclic, qemu_irq irq)
+NucleiUARTState *nuclei_uart_create(hwaddr base, uint64_t size,
+                    Chardev *chr, qemu_irq irq)
 {
     DeviceState *dev;
     NucleiUARTState *s;
@@ -258,25 +258,16 @@ NucleiUARTState *nuclei_uart_create(MemoryRegion *address_space, hwaddr base, ui
     sbd = SYS_BUS_DEVICE(dev);
     s = NUCLEI_UART(dev);
 
-    if (eclic) {
-        if (cidu != NULL) {
-            s->irq = NUCLEI_CIDU(cidu)->external_irq[id - CIDU_EXT_INT_OFST];
-        } else {
-            s->irq = NUCLEI_ECLIC(eclic)->irqs[0][id];
-        }
-    } else {
-        sysbus_init_mmio(sbd, &s->mmio);
-        sysbus_init_irq(sbd, &s->irq);
-        sysbus_realize_and_unref(sbd, &error_fatal);
-        sysbus_connect_irq(sbd, 0, irq);
-    }
-
     qemu_chr_fe_init(&s->chr, chr, &error_abort);
     qemu_chr_fe_set_handlers(&s->chr, uart_can_rx, uart_rx, uart_event,
                              uart_be_change, s, NULL, true);
     memory_region_init_io(&s->mmio, NULL, &uart_ops, s,
                           TYPE_NUCLEI_UART, size);
-    memory_region_add_subregion(address_space, base, &s->mmio);
+    sysbus_init_mmio(sbd, &s->mmio);
+    sysbus_init_irq(sbd, &s->irq);
+    sysbus_realize_and_unref(sbd, &error_fatal);
+    sysbus_mmio_map(sbd, 0, base);
+    sysbus_connect_irq(sbd, 0, irq);
 
     return s;
 }

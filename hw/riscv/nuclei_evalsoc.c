@@ -26,6 +26,7 @@
 #include "hw/boards.h"
 #include "hw/loader.h"
 #include "hw/sysbus.h"
+#include "hw/irq.h"
 #include "hw/qdev-properties.h"
 #include "hw/char/serial.h"
 #include "target/riscv/cpu.h"
@@ -111,6 +112,156 @@ static bool evalsoc_has_eclic(const EvalSoCState *s)
 static bool evalsoc_has_plic(const EvalSoCState *s)
 {
     return (s->aia_type == EVALSOC_AIA_TYPE_NONE) && s->iregion.plic_en;
+}
+
+static uint32_t get_irq_number_alignment(uint64_t n);
+
+#define EVALSOC_DUAL_IRQ_DELTA   32
+
+typedef struct EvalSoCIrqFanout {
+    qemu_irq targets[4];
+    int count;
+} EvalSoCIrqFanout;
+
+static inline uint32_t evalsoc_irqchip_num_sources(const EvalSoCState *s)
+{
+    uint32_t max_id = s->irqmax ? (s->irqmax - 1 + EVALSOC_DUAL_IRQ_DELTA) : 0;
+
+    return MIN(max_id + 1, EVALSOC_PLIC_NUM_SOURCES);
+}
+
+static inline uint32_t evalsoc_eclic_num_sources(const EvalSoCState *s)
+{
+    uint32_t max_irq = s->irqmax ? (s->irqmax - 1 + EVALSOC_DUAL_IRQ_DELTA) : 0;
+    uint32_t max_eclic_irq = PLIC_IRQ_TO_ECLIC_IRQ(max_irq);
+
+    return get_irq_number_alignment(max_eclic_irq + 1);
+}
+
+static inline uint32_t evalsoc_cidu_num_sources(const EvalSoCState *s)
+{
+    return evalsoc_eclic_num_sources(s) - CIDU_EXT_INT_OFST;
+}
+
+static void evalsoc_validate_irq_layout(const EvalSoCState *s)
+{
+    struct {
+        const char *name;
+        const evalsoc_device_info *dev;
+    } devices[] = {
+        { "uart0", &s->uart0 },
+        { "qspi0", &s->qspi0 },
+        { "qspi2", &s->qspi2 },
+        { "xec0",  &s->xec0  },
+    };
+    uint64_t max_base_irq;
+    uint64_t max_irq;
+    size_t i;
+
+    if (s->irqmax < EVALSOC_DEFAULT_IRQMAX) {
+        error_report("irqmax=%" PRIu64 " is less than the minimum supported value %d",
+                     s->irqmax, EVALSOC_DEFAULT_IRQMAX);
+        exit(1);
+    }
+
+    if (s->irqmax > EVALSOC_PLIC_NUM_SOURCES - EVALSOC_DUAL_IRQ_DELTA) {
+        error_report("irqmax=%" PRIu64
+                     " is too large for dual-IRQ fanout; max supported value is %u",
+                     s->irqmax, EVALSOC_PLIC_NUM_SOURCES - EVALSOC_DUAL_IRQ_DELTA);
+        exit(1);
+    }
+
+    max_base_irq = s->irqmax - 1;
+    max_irq = max_base_irq + EVALSOC_DUAL_IRQ_DELTA;
+
+    for (i = 0; i < ARRAY_SIZE(devices); i++) {
+        const evalsoc_device_info *dev = devices[i].dev;
+        uint64_t companion_irq = dev->irq + EVALSOC_DUAL_IRQ_DELTA;
+
+        if (!dev->enable) {
+            continue;
+        }
+
+        if (dev->irq == 0) {
+            error_report("%s.irq must be a non-zero external source ID",
+                         devices[i].name);
+            exit(1);
+        }
+
+        if (dev->irq > max_base_irq) {
+            error_report("%s.irq=%" PRIu64
+                         " exceeds irqmax-visible range [1, %" PRIu64 "]",
+                         devices[i].name, dev->irq, max_base_irq);
+            exit(1);
+        }
+
+        if (companion_irq > max_irq) {
+            error_report("%s companion IRQ=%" PRIu64
+                         " exceeds fanned-out irq range [0, %" PRIu64 "]",
+                         devices[i].name, companion_irq, max_irq);
+            exit(1);
+        }
+    }
+}
+
+static qemu_irq evalsoc_get_eclic_external_sink(EvalSoCSoCState *soc,
+                                                uint64_t irq)
+{
+    uint64_t eclic_irq = PLIC_IRQ_TO_ECLIC_IRQ(irq);
+
+    if (soc->cidu) {
+        if (eclic_irq < CIDU_EXT_INT_OFST) {
+            error_report("eclic external irq %" PRIu64
+                         " is below CIDU external interrupt offset %d",
+                         eclic_irq, CIDU_EXT_INT_OFST);
+            exit(1);
+        }
+        return qdev_get_gpio_in(DEVICE(soc->cidu),
+                                eclic_irq - CIDU_EXT_INT_OFST);
+    }
+
+    return nuclei_eclic_get_external_irq(soc->eclic, eclic_irq);
+}
+
+static void evalsoc_irq_fanout_handler(void *opaque, int n, int level)
+{
+    EvalSoCIrqFanout *fanout = opaque;
+    int index;
+
+    (void)n;
+
+    for (index = 0; index < fanout->count; index++) {
+        qemu_set_irq(fanout->targets[index], level);
+    }
+}
+
+static qemu_irq evalsoc_create_irq_fanout(EvalSoCSoCState *soc,
+                                          const evalsoc_device_info *dev)
+{
+    EvalSoCIrqFanout *fanout;
+    uint64_t companion_irq = dev->irq + EVALSOC_DUAL_IRQ_DELTA;
+
+    fanout = g_new0(EvalSoCIrqFanout, 1);
+
+    if (!soc->irqchip && !soc->eclic) {
+        g_free(fanout);
+        return NULL;
+    }
+
+    if (soc->irqchip) {
+        fanout->targets[fanout->count++] =
+            qdev_get_gpio_in(DEVICE(soc->irqchip), dev->irq);
+        fanout->targets[fanout->count++] =
+            qdev_get_gpio_in(DEVICE(soc->irqchip), companion_irq);
+    }
+    if (soc->eclic) {
+        fanout->targets[fanout->count++] =
+            evalsoc_get_eclic_external_sink(soc, dev->irq);
+        fanout->targets[fanout->count++] =
+            evalsoc_get_eclic_external_sink(soc, companion_irq);
+    }
+
+    return qemu_allocate_irq(evalsoc_irq_fanout_handler, fanout, 0);
 }
 
 static target_ulong evalsoc_compose_mcfg_info(const EvalSoCState *s,
@@ -787,8 +938,8 @@ static void parse_json_config(MachineState *machine)
                             } else if(!strcmp(page1->key, "irqmax")) {
                                 const char *val = qstring_get_str(qobject_to(QString, page1->value));
                                 if (g_strcmp0(val, "")) {
-                                    if (string_to_uint64(val) < EVALSOC_PLIC_INT_MAX) {
-                                        error_report("irqmax is less than the default supported irq number: %d!", EVALSOC_PLIC_INT_MAX);
+                                    if (string_to_uint64(val) < EVALSOC_DEFAULT_IRQMAX) {
+                                        error_report("irqmax is less than the default supported irq number: %d!", EVALSOC_DEFAULT_IRQMAX);
                                         exit(1);
                                     }
                                     s->irqmax = string_to_uint64(val);
@@ -1002,6 +1153,7 @@ static void evalsoc_machine_init(MachineState *machine)
     qemu_irq flash_cs, sd_cs;
 
     parse_json_config(machine);
+    evalsoc_validate_irq_layout(s);
 
     if(s->ddr.base == -1)
     {
@@ -1145,16 +1297,24 @@ static void evalsoc_machine_init(MachineState *machine)
     DEBUGF("mrom    : base:0x%lx, size:0x%lx\n", (long)s->mrom.base,(long)s->mrom.size);
     DEBUGF("test    : base:0x%lx, size:0x%lx\n", (long)s->test.base,(long)s->test.size);
     DEBUGF("gpio    : base:0x%lx, size:0x%lx\n", (long)s->gpio.base,(long)s->gpio.size);
-    DEBUGF("uart0   : base:0x%lx, size:0x%lx, irq:%d\n", (long)s->uart0.base, (long)s->uart0.size, (int)s->uart0.irq);
+    DEBUGF("uart0   : base:0x%lx, size:0x%lx, irq:%d/+32\n",
+           (long)s->uart0.base, (long)s->uart0.size, (int)s->uart0.irq);
     DEBUGF("aplic_m : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->aplic_m.base, (long)s->aplic_m.size, (int)s->aplic_m.enable);
     DEBUGF("aplic_s : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->aplic_s.base, (long)s->aplic_s.size, (int)s->aplic_s.enable);
     DEBUGF("imsic_m : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->imsic_m.base, (long)s->imsic_m.size, (int)s->imsic_m.enable);
     DEBUGF("imsic_s : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->imsic_s.base, (long)s->imsic_s.size, (int)s->imsic_s.enable);
-    DEBUGF("qspi0   : base:0x%lx, size:0x%lx, irq:%d, version:0x%lx\n", (long)s->qspi0.base, (long)s->qspi0.size, (int)s->qspi0.irq, (long)s->qspi0.version);
+    DEBUGF("qspi0   : base:0x%lx, size:0x%lx, irq:%d/+32, version:0x%lx\n",
+           (long)s->qspi0.base, (long)s->qspi0.size, (int)s->qspi0.irq,
+           (long)s->qspi0.version);
     DEBUGF("qspi0_xip: base:0x%lx, size:0x%lx, enable:%ld\n", (long)s->qspi0_xip.base, (long)s->qspi0_xip.size, (long)s->qspi0_xip.enable);
-    DEBUGF("qspi1   : base:0x%lx, size:0x%lx, irq:%d, version:0x%lx\n", (long)s->qspi1.base, (long)s->qspi1.size, (int)s->qspi1.irq, (long)s->qspi1.version);
-    DEBUGF("qspi2   : base:0x%lx, size:0x%lx, irq:%d, version:0x%lx\n", (long)s->qspi2.base, (long)s->qspi2.size, (int)s->qspi2.irq, (long)s->qspi2.version);
-    DEBUGF("xec0    : base:0x%lx, size:0x%lx, irq:%d\n", (long)s->xec0.base, (long)s->xec0.size, (int)s->xec0.irq);
+    DEBUGF("qspi1   : base:0x%lx, size:0x%lx, irq:%d/+32, version:0x%lx\n",
+           (long)s->qspi1.base, (long)s->qspi1.size, (int)s->qspi1.irq,
+           (long)s->qspi1.version);
+    DEBUGF("qspi2   : base:0x%lx, size:0x%lx, irq:%d/+32, version:0x%lx\n",
+           (long)s->qspi2.base, (long)s->qspi2.size, (int)s->qspi2.irq,
+           (long)s->qspi2.version);
+    DEBUGF("xec0    : base:0x%lx, size:0x%lx, irq:%d/+32\n",
+           (long)s->xec0.base, (long)s->xec0.size, (int)s->xec0.irq);
     DEBUGF("iregion : base:0x%lx, size:0x%lx\n", (long)s->iregion.base, (long)s->iregion.size);
     DEBUGF("irqmax  : %d\n", (int)s->irqmax);
     DEBUGF("timer_freq : %d\n", (int)s->timer_freq);
@@ -1283,7 +1443,7 @@ static void evalsoc_machine_instance_init(Object *obj)
             1.eclic core irq:irq[0~18] external irq:irq[19...4095]
             2.plic  irq 0: wire 0 external irq:irq[1...1023]
     */
-    s->irqmax = EVALSOC_PLIC_INT_MAX;
+    s->irqmax = EVALSOC_DEFAULT_IRQMAX;
     s->iregion.base = IREGION_BASE_ADDR;
     s->iregion.size = IREGION_MAX_SIZE;
     s->iregion.debug_en = 1;
@@ -1319,11 +1479,11 @@ static void evalsoc_machine_instance_init(Object *obj)
     s->gpio.enable = 1;
     s->uart0.base = memmap[EVALSOC_UART0].base;
     s->uart0.size = memmap[EVALSOC_UART0].size;
-    s->uart0.irq = EVALSOC_PLIC_UART0_IRQ;
+    s->uart0.irq = EVALSOC_UART0_IRQ_BASE;
     s->uart0.enable = 1;
     s->qspi0.base = memmap[EVALSOC_QSPI0].base;
     s->qspi0.size = memmap[EVALSOC_QSPI0].size;
-    s->qspi0.irq = EVALSOC_PLIC_SPI0_IRQ;
+    s->qspi0.irq = EVALSOC_QSPI0_IRQ_BASE;
     s->qspi0.enable = 1;
     s->qspi0.version = NUCLEI_SPI_DEFAULT_VERSION;
     s->qspi0_xip.base = EVALSOC_QSPI0_XIP_BASE;
@@ -1331,17 +1491,17 @@ static void evalsoc_machine_instance_init(Object *obj)
     s->qspi0_xip.enable = 1;
     s->qspi1.base = memmap[EVALSOC_QSPI1].base;
     s->qspi1.size = memmap[EVALSOC_QSPI1].size;
-    s->qspi1.irq = EVALSOC_PLIC_SPI1_IRQ;
+    s->qspi1.irq = EVALSOC_QSPI1_IRQ_BASE;
     s->qspi1.enable = 1;
     s->qspi1.version = NUCLEI_SPI_DEFAULT_VERSION;
     s->qspi2.base = memmap[EVALSOC_QSPI2].base;
     s->qspi2.size = memmap[EVALSOC_QSPI2].size;
-    s->qspi2.irq = EVALSOC_PLIC_SPI2_IRQ;
+    s->qspi2.irq = EVALSOC_QSPI2_IRQ_BASE;
     s->qspi2.enable = 1;
     s->qspi2.version = NUCLEI_SPI_DEFAULT_VERSION;
     s->xec0.base = memmap[EVALSOC_XEC0].base;
     s->xec0.size = memmap[EVALSOC_XEC0].size;
-    s->xec0.irq = EVALSOC_PLIC_ETHERNET_IRQ;
+    s->xec0.irq = EVALSOC_XEC0_IRQ_BASE;
     s->xec0.enable = 1;
     s->aplic_m.base = memmap[EVALSOC_APLIC_M].base;
     s->aplic_m.size = memmap[EVALSOC_APLIC_M].size;
@@ -1541,9 +1701,18 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     int i = 0;
     char *plic_hart_config;
     size_t plic_hart_config_len;
+    bool use_legacy_plic_path;
     bool msimode;
     hwaddr msi_addr;
     uint32_t guest_bits;
+    uint32_t irqchip_num_sources = evalsoc_irqchip_num_sources(mst);
+    uint32_t eclic_num_sources = evalsoc_eclic_num_sources(mst);
+    uint32_t cidu_num_sources = evalsoc_cidu_num_sources(mst);
+    qemu_irq uart0_irq = NULL;
+    qemu_irq qspi0_irq = NULL;
+    qemu_irq qspi2_irq = NULL;
+    qemu_irq xec0_irq = NULL;
+    DeviceState *timer_eclic = NULL;
 
     qdev_prop_set_uint32(DEVICE(&s->cpus), "num-harts", ms->smp.cpus);
     qdev_prop_set_uint32(DEVICE(&s->cpus), "hartid-base", 0);
@@ -1582,21 +1751,23 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     }
     /* MMIO */
 
-    if ((mst->aia_type == EVALSOC_AIA_TYPE_NONE) &&
-        !(mst->aplic_m.enable | mst->aplic_s.enable)) {
+    use_legacy_plic_path = (mst->aia_type == EVALSOC_AIA_TYPE_NONE) &&
+                           !(mst->aplic_m.enable | mst->aplic_s.enable);
+
+    if (use_legacy_plic_path) {
         if (mst->iregion.plic_en) {
-            s->irqchip = sifive_plic_create(memmap[EVALSOC_PLIC].base + mst->iregion.base,
-                                        plic_hart_config, ms->smp.cpus, 0,
-                                        mst->irqmax > EVALSOC_PLIC_NUM_SOURCES ? EVALSOC_PLIC_NUM_SOURCES : mst->irqmax,
-                                        EVALSOC_PLIC_NUM_PRIORITIES,
-                                        EVALSOC_PLIC_PRIORITY_BASE,
-                                        EVALSOC_PLIC_PENDING_BASE,
-                                        EVALSOC_PLIC_ENABLE_BASE,
-                                        EVALSOC_PLIC_ENABLE_STRIDE,
-                                        EVALSOC_PLIC_CONTEXT_BASE,
-                                        EVALSOC_PLIC_CONTEXT_STRIDE,
-                                        memmap[EVALSOC_PLIC].size);
-            g_free(plic_hart_config);
+            s->irqchip = sifive_plic_create(
+                memmap[EVALSOC_PLIC].base + mst->iregion.base,
+                plic_hart_config, ms->smp.cpus, 0,
+                irqchip_num_sources,
+                EVALSOC_PLIC_NUM_PRIORITIES,
+                EVALSOC_PLIC_PRIORITY_BASE,
+                EVALSOC_PLIC_PENDING_BASE,
+                EVALSOC_PLIC_ENABLE_BASE,
+                EVALSOC_PLIC_ENABLE_STRIDE,
+                EVALSOC_PLIC_CONTEXT_BASE,
+                EVALSOC_PLIC_CONTEXT_STRIDE,
+                memmap[EVALSOC_PLIC].size);
         }
     } else {
         msimode = ((mst->aia_type == EVALSOC_AIA_TYPE_APLIC_IMSIC) ||
@@ -1640,7 +1811,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
             mst->aplic_m.size,
             0,
             (msimode) ? 0 : ms->smp.cpus,
-            mst->irqmax > EVALSOC_PLIC_NUM_SOURCES ? EVALSOC_PLIC_NUM_SOURCES : mst->irqmax,
+            irqchip_num_sources,
             VIRT_IRQCHIP_NUM_PRIO_BITS,
             msimode, true, NULL);
 
@@ -1651,18 +1822,19 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                 mst->aplic_s.size,
                 0,
                 (msimode) ? 0 : ms->smp.cpus,
-                mst->irqmax > EVALSOC_PLIC_NUM_SOURCES ? EVALSOC_PLIC_NUM_SOURCES : mst->irqmax,
+                irqchip_num_sources,
                 VIRT_IRQCHIP_NUM_PRIO_BITS,
                 msimode, false, s->irqchip);
         }
     }
+    g_free(plic_hart_config);
 
     s->eclic = (mst->iregion.eclic_en) ?
                 nuclei_eclic_create(memmap[EVALSOC_ECLIC].base + mst->iregion.base,
                     memmap[EVALSOC_ECLIC].size,
                     false, false, true,
                     ms->smp.cpus,
-                    get_irq_number_alignment(PLIC_IRQ_TO_ECLIC_IRQ(mst->irqmax)),
+                    eclic_num_sources,
                     EVALSOC_CLIC_INTCTLBITS,
                     SHADOW_GPR_GROUPS) : NULL;
 
@@ -1675,62 +1847,38 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                 nuclei_cidu_create(memmap[EVALSOC_CIDU].base + mst->iregion.base,
                     memmap[EVALSOC_CIDU].size,
                     ms->smp.cpus,
-                    EVALSOC_ECLIC_NUM_SOURCES - CIDU_EXT_INT_OFST,
+                    cidu_num_sources,
                     s->eclic) : NULL;
 
-    if (ms->firmware == NULL)
-    {
-        if (mst->uart0.enable) {
-            /* Create and connect UART interrupts to the ECLIC */
-            nuclei_uart_create(sys_mem,
-                            mst->uart0.base,
-                            memmap[EVALSOC_UART0].size,
-                            serial_hd(0),
-                            PLIC_IRQ_TO_ECLIC_IRQ(mst->uart0.irq),
-                            s->cidu,
-                            s->eclic,
-                            NULL);
-        }
-
-        nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion.base,
-                memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, s->eclic, mst->timer_freq);
+    if (mst->uart0.enable) {
+        uart0_irq = evalsoc_create_irq_fanout(s, &mst->uart0);
+        nuclei_uart_create(mst->uart0.base,
+                           memmap[EVALSOC_UART0].size,
+                           serial_hd(0),
+                           uart0_irq);
     }
-    else
-    {
-        if (mst->uart0.enable) {
-            nuclei_uart_create(sys_mem,
-                            mst->uart0.base,
-                            memmap[EVALSOC_UART0].size,
-                            serial_hd(0),
-                            0,
-                            NULL,
-                            NULL,
-                            s->irqchip ?
-                            qdev_get_gpio_in(DEVICE(s->irqchip), mst->uart0.irq) :
-                            NULL);
-        }
 
-        nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion.base,
-                memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus, NULL, mst->timer_freq);
-    }
+    timer_eclic = (ms->firmware == NULL) ? s->eclic : NULL;
+    nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion.base,
+                           memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus,
+                           timer_eclic, mst->timer_freq);
 
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->timer), errp))
     {
         return;
     }
 
-
-        qdev_prop_set_uint32(DEVICE(&s->gpio), "ngpio", 32);
-        if (!sysbus_realize(SYS_BUS_DEVICE(&s->gpio), errp))
-        {
-            return;
-        }
+    qdev_prop_set_uint32(DEVICE(&s->gpio), "ngpio", 32);
+    if (!sysbus_realize(SYS_BUS_DEVICE(&s->gpio), errp))
+    {
+        return;
+    }
     if (mst->gpio.enable) {
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->gpio), 0, memmap[EVALSOC_GPIO].base);
 
         /* Pass all GPIOs to the SOC layer so they are available to the board */
         qdev_pass_gpios(DEVICE(&s->gpio), dev, NULL);
-        /* Connect GPIO interrupts to the PLIC */
+        /* GPIO still exposes one irqchip source per pin. */
         if (s->irqchip) {
             for (i = 0; i < 32; i++)
             {
@@ -1743,24 +1891,22 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
 
     sysbus_realize(SYS_BUS_DEVICE(&s->spi0), errp);
     if (mst->qspi0.enable) {
+        qspi0_irq = evalsoc_create_irq_fanout(s, &mst->qspi0);
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi0), 0,
                         mst->qspi0.base);
         if (mst->qspi0_xip.enable) {
             sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi0), 1,
                             mst->qspi0_xip.base);
         }
-        if (s->irqchip)
-            sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi0), 0,
-                        qdev_get_gpio_in(DEVICE(s->irqchip), mst->qspi0.irq));
+        sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi0), 0, qspi0_irq);
     }
 
     sysbus_realize(SYS_BUS_DEVICE(&s->spi2), errp);
     if (mst->qspi2.enable) {
+        qspi2_irq = evalsoc_create_irq_fanout(s, &mst->qspi2);
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi2), 0,
                         mst->qspi2.base);
-        if (s->irqchip)
-            sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi2), 0,
-                            qdev_get_gpio_in(DEVICE(s->irqchip), mst->qspi2.irq));
+        sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi2), 0, qspi2_irq);
     }
 
     object_property_set_int(OBJECT(&s->xec0), "revision", XEC_REVISION,
@@ -1769,11 +1915,10 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         return;
     }
     if (mst->xec0.enable) {
+        xec0_irq = evalsoc_create_irq_fanout(s, &mst->xec0);
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->xec0), 0,
                         mst->xec0.base);
-        if (s->irqchip)
-            sysbus_connect_irq(SYS_BUS_DEVICE(&s->xec0), 0,
-                            qdev_get_gpio_in(DEVICE(s->irqchip), mst->xec0.irq));
+        sysbus_connect_irq(SYS_BUS_DEVICE(&s->xec0), 0, xec0_irq);
     }
 
     /* Nuclei Test MMIO device */
