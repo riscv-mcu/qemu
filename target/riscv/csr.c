@@ -4892,12 +4892,6 @@ static int write_mtvt(CPURISCVState *env, int csrno, target_ulong val)
     return RISCV_EXCP_NONE;
 }
 
-static int read_mnxti(CPURISCVState *env, int csrno, target_ulong *val)
-{
-    *val = env->mnxti;
-    return RISCV_EXCP_NONE;
-}
-
 static int read_stvt(CPURISCVState *env, int csrno, target_ulong *val)
 {
     *val = env->stvt;
@@ -4950,18 +4944,6 @@ static int read_mintstatus(CPURISCVState *env, int csrno, target_ulong *val)
     return RISCV_EXCP_NONE;
 }
 
-static int read_mscratchcsw(CPURISCVState *env, int csrno, target_ulong *val)
-{
-    *val = env->mscratchcsw;
-    return RISCV_EXCP_NONE;
-}
-
-static int write_mscratchcsw(CPURISCVState *env, int csrno, target_ulong val)
-{
-    env->mscratchcsw = val;
-    return RISCV_EXCP_NONE;
-}
-
 static int rmw_mscratchcsw(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
@@ -4978,18 +4960,6 @@ static int rmw_mscratchcsw(CPURISCVState *env, int csrno, target_ulong *ret_valu
             *ret_value = new_value;
         }
     }
-    return RISCV_EXCP_NONE;
-}
-
-static int read_mscratchcswl(CPURISCVState *env, int csrno, target_ulong *val)
-{
-    *val = env->mscratchcswl;
-    return RISCV_EXCP_NONE;
-}
-
-static int write_mscratchcswl(CPURISCVState *env, int csrno, target_ulong val)
-{
-    env->mscratchcswl = val;
     return RISCV_EXCP_NONE;
 }
 
@@ -5013,18 +4983,6 @@ static int rmw_mscratchcswl(CPURISCVState *env, int csrno, target_ulong *ret_val
     return RISCV_EXCP_NONE;
 }
 
-static int read_sscratchcsw(CPURISCVState *env, int csrno, target_ulong *val)
-{
-    *val = env->sscratchcsw;
-    return RISCV_EXCP_NONE;
-}
-
-static int write_sscratchcsw(CPURISCVState *env, int csrno, target_ulong val)
-{
-    env->sscratchcsw = val;
-    return RISCV_EXCP_NONE;
-}
-
 static int rmw_sscratchcsw(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
@@ -5041,18 +4999,6 @@ static int rmw_sscratchcsw(CPURISCVState *env, int csrno, target_ulong *ret_valu
             *ret_value = new_value;
         }
     }
-    return RISCV_EXCP_NONE;
-}
-
-static int read_sscratchcswl(CPURISCVState *env, int csrno, target_ulong *val)
-{
-    *val = env->sscratchcswl;
-    return RISCV_EXCP_NONE;
-}
-
-static int write_sscratchcswl(CPURISCVState *env, int csrno, target_ulong val)
-{
-    env->sscratchcswl = val;
     return RISCV_EXCP_NONE;
 }
 
@@ -5781,12 +5727,6 @@ static int read_sintstatus(CPURISCVState *env, int csrno, target_ulong *val)
 {
     target_ulong mask = SINTSTATUS_SIL | SINTSTATUS_UIL;
     *val = env->mintstatus & mask;
-    return RISCV_EXCP_NONE;
-}
-
-static int write_mnxti(CPURISCVState *env, int csrno, target_ulong val)
-{
-    env->mnxti = val;
     return RISCV_EXCP_NONE;
 }
 
@@ -6793,10 +6733,10 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_MATTRI7_MASK]   = { "mattri7_mask",   any, read_zero, write_ignore },
 
     [CSR_NUCLEI_MTVT]           = { "mtvt",           any, read_mtvt, write_mtvt },
-    [CSR_NUCLEI_MNXTI]          = { "mnxti",          any, read_mnxti, write_mnxti, rmw_mnxti },
+    [CSR_NUCLEI_MNXTI]          = { "mnxti",          any, NULL, NULL, rmw_mnxti },
     [CSR_NUCLEI_MINTSTATUS]     = { "mintstatus",     any, read_mintstatus, write_ignore },
-    [CSR_NUCLEI_MSCRATCHCSW]    = { "mscratchcsw",    any, read_mscratchcsw, write_mscratchcsw, rmw_mscratchcsw },
-    [CSR_NUCLEI_MSCRATCHCSWL]   = { "mscratchcswl",   any, read_mscratchcswl, write_mscratchcswl, rmw_mscratchcswl },
+    [CSR_NUCLEI_MSCRATCHCSW]    = { "mscratchcsw",    any, NULL, NULL, rmw_mscratchcsw },
+    [CSR_NUCLEI_MSCRATCHCSWL]   = { "mscratchcswl",   any, NULL, NULL, rmw_mscratchcswl },
     [CSR_NUCLEI_MNVEC]          = { "mnvec",          any, read_mnvec, write_ignore },
     [CSR_NUCLEI_MSUBM]          = { "msubm",          any, read_msubm, write_msubm },
     [CSR_NUCLEI_MSTACK_CTL]     = { "mstack_ctrl",    any, read_mstack_ctl, write_mstack_ctl },
@@ -6859,8 +6799,8 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_MINTSTATUS]            = {"mintstatus",      any, read_mintstatus, write_mintthresh },
     /* Supervisor Mode Core Level Interrupt Controller */
     [CSR_SINTSTATUS]            = {"sintstatus",      smode, read_sintstatus, write_sintthresh },
-    [CSR_SSCRATCHCSW]           = {"sscratchcsw",     any, read_sscratchcsw, write_sscratchcsw, rmw_sscratchcsw },
-    [CSR_SSCRATCHCSWL]          = {"sscratchcswl",    any, read_sscratchcswl, write_sscratchcswl, rmw_sscratchcswl },
+    [CSR_SSCRATCHCSW]           = {"sscratchcsw",     any, NULL, NULL, rmw_sscratchcsw },
+    [CSR_SSCRATCHCSWL]          = {"sscratchcswl",    any, NULL, NULL, rmw_sscratchcswl },
     /* Supervisor Mode Core Level Interrupt Controller */
     [CSR_STVT]                  = { "stvt",           smode, read_stvt, write_stvt },
     [CSR_SNXTI]                 = { "snxti",          smode, NULL, NULL, rmw_snxti },
