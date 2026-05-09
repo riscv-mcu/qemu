@@ -2283,18 +2283,18 @@ static RISCVException write_mtvec(CPURISCVState *env, int csrno,
     /* bits [1:0] encode mode; 0 = direct, 1 = vectored, 2 >= reserved */
     if (mode1 < 2) {
         env->mtvec = val;
-        env->mnvec = val;
     } else {
          /* bits [5:0] encode extended modes currently used by the ECLIC */
         switch (mode2) {
         case 0b000011: /* ECLIC  mode */
             env->mtvec = val;
-            env->mnvec = val;
             break;
         default:
                 qemu_log_mask(LOG_UNIMP, "CSR_MTVEC: reserved mode not supported\n");
         }
     }
+
+    env->mnvec = riscv_cpu_nuclei_mnvec(env);
 
     return RISCV_EXCP_NONE;
 }
@@ -5314,7 +5314,8 @@ static int rmw_sscratchcswl(CPURISCVState *env, int csrno, target_ulong *ret_val
 
 static int read_mnvec(CPURISCVState *env, int csrno, target_ulong *val)
 {
-    *val = env->mnvec;
+    /* MNVEC is a derived view controlled by MMISC_CTL[9] in this model. */
+    *val = riscv_cpu_nuclei_mnvec(env);
     return RISCV_EXCP_NONE;
 }
 
@@ -5363,6 +5364,8 @@ static int read_mmisc_ctl(CPURISCVState *env, int csrno, target_ulong *val)
 static int write_mmisc_ctl(CPURISCVState *env, int csrno, target_ulong val)
 {
     env->mmisc_ctl = val;
+    /* Keep the derived NMI entry view coherent for CSR reads and reset code. */
+    env->mnvec = riscv_cpu_nuclei_mnvec(env);
     return RISCV_EXCP_NONE;
 }
 

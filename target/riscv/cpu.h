@@ -36,8 +36,12 @@
 typedef struct CPUArchState CPURISCVState;
 
 #define CPU_INTERRUPT_ECLIC CPU_INTERRUPT_TGT_EXT_0
+#define CPU_INTERRUPT_NUCLEI_NMI CPU_INTERRUPT_TGT_EXT_1
 #define CPU_RESOLVING_TYPE TYPE_RISCV_CPU
 #define CPU_INTERRUPT_CLIC CPU_INTERRUPT_TGT_EXT_0
+
+/* Internal exception tag used to enter the Nuclei-specific NMI trap path. */
+#define RISCV_EXCP_NUCLEI_NMI 0xfff
 
 #if defined(TARGET_RISCV32)
 # define TYPE_RISCV_CPU_BASE            TYPE_RISCV_CPU_BASE32
@@ -590,6 +594,9 @@ struct CPUArchState {
     target_ulong wfe;
     target_ulong sleepvalue;
     target_ulong txevt;
+    /* Board-level NMI input driven from EvalSoC MISC. */
+    bool nuclei_nmi_level;
+    bool nuclei_nmi_pending;
     target_ulong msmpcfg_info;
     target_ulong mirgb_info;
     target_ulong mcfg_info;
@@ -733,6 +740,21 @@ char *riscv_isa_string(RISCVCPU *cpu);
 int riscv_cpu_max_xlen(RISCVCPUClass *mcc);
 bool riscv_cpu_option_set(const char *optname);
 
+/*
+ * Nuclei ISA chapter 10 ties both the NMI entry point and EXCCODE to
+ * mmisc_ctl[9]: resetvec/0x1 when clear, mtvec/0xfff when set.
+ */
+static inline target_ulong riscv_cpu_nuclei_mnvec(CPURISCVState *env)
+{
+    return (env->mmisc_ctl & MMISC_CTL_NMI_CAUSE_FFF) ?
+           env->mtvec : env->resetvec;
+}
+
+static inline target_ulong riscv_cpu_nuclei_nmi_cause(CPURISCVState *env)
+{
+    return (env->mmisc_ctl & MMISC_CTL_NMI_CAUSE_FFF) ? 0xfff : 0x1;
+}
+
 #ifndef CONFIG_USER_ONLY
 void riscv_isa_write_fdt(RISCVCPU *cpu, void *fdt, char *nodename);
 void riscv_cpu_do_transaction_failed(CPUState *cs, hwaddr physaddr,
@@ -747,6 +769,7 @@ int riscv_cpu_claim_interrupts(RISCVCPU *cpu, uint64_t interrupts);
 uint64_t riscv_cpu_update_mip(CPURISCVState *env, uint64_t mask,
                               uint64_t value);
 void riscv_cpu_interrupt(CPURISCVState *env);
+void riscv_cpu_nuclei_nmi_interrupt(RISCVCPU *cpu, int level);
 #define BOOL_TO_MASK(x) (-!!(x)) /* helper for riscv_cpu_update_mip value */
 void riscv_cpu_set_rdtime_fn(CPURISCVState *env, uint64_t (*fn)(void *),
                              void *arg);

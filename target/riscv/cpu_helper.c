@@ -540,6 +540,25 @@ static int riscv_cpu_local_irq_pending(CPURISCVState *env)
 
 bool riscv_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
 {
+    if (interrupt_request & CPU_INTERRUPT_NUCLEI_NMI) {
+        RISCVCPU *cpu = RISCV_CPU(cs);
+        CPURISCVState *env = &cpu->env;
+
+        if (env->nuclei_nmi_pending) {
+            /*
+             * Deliver the latched NMI as a one-shot trap entry. The source
+             * itself may remain level-high until guest software clears MISC.
+             */
+            env->nuclei_nmi_pending = false;
+            cpu_reset_interrupt(cs, CPU_INTERRUPT_NUCLEI_NMI);
+            cs->exception_index = RISCV_EXCP_NUCLEI_NMI;
+            riscv_cpu_do_interrupt(cs);
+            return true;
+        }
+
+        cpu_reset_interrupt(cs, CPU_INTERRUPT_NUCLEI_NMI);
+    }
+
     if (interrupt_request & CPU_INTERRUPT_HARD) {
         RISCVCPU *cpu = RISCV_CPU(cs);
         CPURISCVState *env = &cpu->env;
@@ -723,6 +742,37 @@ void riscv_cpu_eclic_interrupt(RISCVCPU *cpu, int exccode)
     } else {
         env->irq_pending = false;
         cpu_reset_interrupt(CPU(cpu), CPU_INTERRUPT_ECLIC);
+    }
+
+    if (locked) {
+        bql_unlock();
+    }
+}
+
+void riscv_cpu_nuclei_nmi_interrupt(RISCVCPU *cpu, int level)
+{
+    CPURISCVState *env = &cpu->env;
+    bool locked = false;
+
+    if (!bql_locked()) {
+        locked = true;
+        bql_lock();
+    }
+
+    /*
+     * Latch a rising edge so a level-held source does not recursively
+     * retrigger before guest software gets a chance to clear it.
+     */
+    if (level && !env->nuclei_nmi_level) {
+        env->nuclei_nmi_pending = true;
+    }
+
+    env->nuclei_nmi_level = level;
+
+    if (env->nuclei_nmi_pending) {
+        cpu_interrupt(CPU(cpu), CPU_INTERRUPT_NUCLEI_NMI);
+    } else if (!level) {
+        cpu_reset_interrupt(CPU(cpu), CPU_INTERRUPT_NUCLEI_NMI);
     }
 
     if (locked) {
@@ -2107,11 +2157,19 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     bool eclic_flag = !!(cs->exception_index & RISCV_EXCP_INT_ECLIC);
     bool is_interrupt = async || eclic_flag;
     target_ulong cause = cs->exception_index & RISCV_EXCP_INT_MASK;
+    /*
+     * Nuclei MISC NMI reuses the common trap machinery, but it has its own
+     * entry selection and must never be delegated into S-mode.
+     */
+    bool nuclei_nmi = !async && !eclic_flag && cause == RISCV_EXCP_NUCLEI_NMI;
     uint64_t deleg = is_interrupt ? env->mideleg : env->medeleg;
-    bool s_injected = env->mvip & (1 << cause) & env->mvien &&
-        !(env->mip & (1 << cause));
-    bool vs_injected = env->hvip & (1 << cause) & env->hvien &&
-        !(env->mip & (1 << cause));
+    bool s_injected = cause < 64 &&
+        (env->mvip & (1ULL << cause) & env->mvien) &&
+        !(env->mip & (1ULL << cause));
+    bool vs_injected = cause < 64 &&
+        (env->hvip & (1ULL << cause) & env->hvien) &&
+        !(env->mip & (1ULL << cause));
+    const char *trap_name;
     target_ulong tval = 0;
     target_ulong tinst = 0;
     target_ulong htval = 0;
@@ -2213,20 +2271,29 @@ void riscv_cpu_do_interrupt(CPUState *cs)
             env->msubm = set_field(env->msubm, XSUBM_PGPRIDX, get_field(env->msubm, XSUBM_GPRIDX));
             env->msubm = set_field(env->msubm, XSUBM_PFGPRIDX, get_field(env->msubm, XSUBM_FGPRIDX));
         }
+    } else if (nuclei_nmi) {
+        /* Keep NMI cause selection in sync with mnvec selection. */
+        cause = riscv_cpu_nuclei_nmi_cause(env);
+        env->mdcause = 0;
+        env->msubm = set_field(env->msubm, XSUBM_PTYP,
+                               get_field(env->msubm, XSUBM_TYP));
+        env->msubm = set_field(env->msubm, XSUBM_TYP, SUBM_NMI);
+        env->msubm = set_field(env->msubm, XSUBM_PGPRIDX,
+                               get_field(env->msubm, XSUBM_GPRIDX));
     }else{
         cause = set_field(cause, MCAUSE_INTERRUPT, 0);
     }
 
-    trace_riscv_trap(env->mhartid, is_interrupt, cause, env->pc, tval,
-                     riscv_cpu_get_trap_name(cause, is_interrupt));
+    trap_name = nuclei_nmi ? "Nuclei NMI" : riscv_cpu_get_trap_name(cause, is_interrupt);
+    trace_riscv_trap(env->mhartid, is_interrupt, cause, env->pc, tval, trap_name);
 
     qemu_log_mask(CPU_LOG_INT,
                   "%s: hart:"TARGET_FMT_ld", async:%d, cause:"TARGET_FMT_lx", "
                   "epc:0x"TARGET_FMT_lx", tval:0x"TARGET_FMT_lx", desc=%s\n",
                   __func__, env->mhartid, is_interrupt, cause, env->pc, tval,
-                  riscv_cpu_get_trap_name(cause, is_interrupt));
+                  trap_name);
 
-    if (env->priv <= PRV_S && ((cause < 64 &&
+    if (!nuclei_nmi && env->priv <= PRV_S && ((cause < 64 &&
         (((deleg >> cause) & 1) || s_injected || vs_injected))
         || (eclic_flag && mode == (PRV_S)))) {
         /* handle the trap in S-mode */
@@ -2342,6 +2409,9 @@ void riscv_cpu_do_interrupt(CPUState *cs)
                     newpc = env->mtvt2 & ~((target_ulong)0x3);
                 }
             }
+        } else if (nuclei_nmi) {
+            /* mnvec is a derived view controlled by mmisc_ctl[9]. */
+            newpc = riscv_cpu_nuclei_mnvec(env) & ~(target_ulong)0x3;
         } else {
             newpc = (env->mtvec >> 2 << 2) +
                 ((async && (env->mtvec & 3) == 1) ? cause * 4 : 0);

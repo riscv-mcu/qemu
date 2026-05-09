@@ -1300,7 +1300,8 @@ static bool riscv_cpu_has_work(CPUState *cs)
     return riscv_cpu_all_pending(env) != 0 ||
         riscv_cpu_sirq_pending(env) != RISCV_EXCP_NONE ||
         riscv_cpu_vsirq_pending(env) != RISCV_EXCP_NONE ||
-        eclic_irq_panding;
+        eclic_irq_panding ||
+        env->nuclei_nmi_pending;
 #else
     return true;
 #endif
@@ -1357,6 +1358,12 @@ static void riscv_cpu_reset_hold(Object *obj)
     env->mcause = 0;
     env->miclaim = MIP_SGEIP;
     env->pc = env->resetvec;
+    env->mdcause = 0;
+    env->mmisc_ctl = 0;
+    env->msubm = 0;
+    env->mnvec = riscv_cpu_nuclei_mnvec(env);
+    env->nuclei_nmi_level = false;
+    env->nuclei_nmi_pending = false;
     env->bins = 0;
     env->two_stage_lookup = false;
 

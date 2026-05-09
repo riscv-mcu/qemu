@@ -1059,6 +1059,9 @@ typedef enum RISCVException {
 #define SUBM_EXC 2      /* Exception Handing Mode */
 #define SUBM_NMI 3      /* NMI Handing Mode */
 
+/* mmisc_ctl */
+#define MMISC_CTL_NMI_CAUSE_FFF          0x00000200
+
 /* msubm */
 #define XSUBM_PFGPRIDX                     0x3e000000 /* pfgpridx[4:0], previous floating caller-saved bank index */
 #define XSUBM_FGPRIDX                      0x01f00000 /* fgpridx[4:0], current floating caller-saved bank index */
