@@ -176,6 +176,9 @@ config SIFIVE_TEST
 config NUCLEI_IREGION
     bool
 
+config NUCLEI_MISC
+    bool
+
 config SIFIVE_E_PRCI
     bool
 
