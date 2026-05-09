@@ -4969,10 +4969,14 @@ static int rmw_mscratchcsw(CPURISCVState *env, int csrno, target_ulong *ret_valu
     if(get_field(env->mcause, MCAUSE_MPP)  !=  PRV_M)
     {
         t = new_value;
-        *ret_value = env->mscratch;
+        if (ret_value) {
+            *ret_value = env->mscratch;
+        }
         env->mscratch = t;
     }else{
-        *ret_value =  new_value;
+        if (ret_value) {
+            *ret_value = new_value;
+        }
     }
     return RISCV_EXCP_NONE;
 }
@@ -4997,10 +5001,14 @@ static int rmw_mscratchcswl(CPURISCVState *env, int csrno, target_ulong *ret_val
         != (get_field(env->mintstatus, MINTSTATUS_MIL) == 0))
     {
         t = new_value;
-        *ret_value = env->mscratch;
+        if (ret_value) {
+            *ret_value = env->mscratch;
+        }
         env->mscratch = t;
     }else{
-        *ret_value =  new_value;
+        if (ret_value) {
+            *ret_value = new_value;
+        }
     }
     return RISCV_EXCP_NONE;
 }
@@ -5024,10 +5032,14 @@ static int rmw_sscratchcsw(CPURISCVState *env, int csrno, target_ulong *ret_valu
     if(get_field(env->scause, SCAUSE_SPP) != PRV_S)
     {
         t = new_value;
-        *ret_value = env->sscratch;
+        if (ret_value) {
+            *ret_value = env->sscratch;
+        }
         env->sscratch = t;
     }else{
-        *ret_value = new_value;
+        if (ret_value) {
+            *ret_value = new_value;
+        }
     }
     return RISCV_EXCP_NONE;
 }
@@ -5052,10 +5064,14 @@ static int rmw_sscratchcswl(CPURISCVState *env, int csrno, target_ulong *ret_val
         != (get_field(env->mintstatus, MINTSTATUS_SIL) == 0))
     {
         t = new_value;
-        *ret_value = env->sscratch;
+        if (ret_value) {
+            *ret_value = env->sscratch;
+        }
         env->sscratch = t;
     }else{
-        *ret_value =  new_value;
+        if (ret_value) {
+            *ret_value = new_value;
+        }
     }
     return RISCV_EXCP_NONE;
 }
@@ -5278,11 +5294,14 @@ static int rmw_jalmnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
         uint64_t vec_addr = (env->mcause & 0x3FF) *riscv_addr_size + env->mtvt;
         cpu_physical_memory_rw(vec_addr, &addr,  riscv_addr_size, 0);
         env->gpr[1] = env->pc;  //ret use
-        *ret_value = addr;
+        if (ret_value) {
+            *ret_value = addr;
+        }
         env->mstatus = set_field(env->mstatus, MSTATUS_MIE, 1);
         riscv_cpu_eclic_int_handler_start(env->eclic, env->priv, env->mcause & 0x3ff, env->mhartid);
-    } else
+    } else if (ret_value) {
         *ret_value = env->pc;
+    }
 #endif
     return RISCV_EXCP_NONE;
 }
@@ -5359,11 +5378,14 @@ static int rmw_jalsnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
         uint64_t vec_addr = (env->scause & 0x3FF) *riscv_addr_size + env->stvt;
         cpu_physical_memory_rw(vec_addr, &addr,  riscv_addr_size, 0);
         env->gpr[1] = env->pc;
-        *ret_value = addr;
+        if (ret_value) {
+            *ret_value = addr;
+        }
         env->mstatus = set_field(env->mstatus, MSTATUS_SIE, 1);
         riscv_cpu_eclic_int_handler_start_s(env->eclic, env->priv, env->scause & 0x3ff, env->mhartid);
-    } else
+    } else if (ret_value) {
         *ret_value = env->pc + riscv_addr_size;
+    }
 #endif
     return RISCV_EXCP_NONE;
 }
@@ -5425,11 +5447,15 @@ static int rmw_mtspcsw(CPURISCVState *env, int csrno, target_ulong *ret_value,
             && (get_field(env->msubm, XSUBM_TYP) == SUBM_INT))
             || ((env->priv != get_field(env->mstatus, MSTATUS_MPP)) && (get_field(env->msubm, XSUBM_TYP) > SUBM_INT))) {
             t = new_value;
-            *ret_value = env->mtsp;
+            if (ret_value) {
+                *ret_value = env->mtsp;
+            }
             env->mtsp = t;
         }
     } else {
-        *ret_value =  new_value;
+        if (ret_value) {
+            *ret_value = new_value;
+        }
     }
     return RISCV_EXCP_NONE;
 }
@@ -5443,11 +5469,15 @@ static int rmw_stspcsw(CPURISCVState *env, int csrno, target_ulong *ret_value,
             && (get_field(env->ssubm, XSUBM_TYP) == SUBM_INT))
             || ((env->priv != get_field(env->mstatus, MSTATUS_SPP)) && (get_field(env->ssubm, XSUBM_TYP) > SUBM_INT))) {
             t = new_value;
-            *ret_value = env->stsp;
-            env->mtsp = t;
+            if (ret_value) {
+                *ret_value = env->stsp;
+            }
+            env->stsp = t;
         }
     } else {
-        *ret_value =  new_value;
+        if (ret_value) {
+            *ret_value = new_value;
+        }
     }
     return RISCV_EXCP_NONE;
 }
