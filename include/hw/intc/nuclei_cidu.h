@@ -40,6 +40,7 @@ DECLARE_INSTANCE_CHECKER(NucleiCIDUState, NUCLEI_CIDU,
 #define CIDU_REG_INTN_MASK_BASE          0x8000
 #define CIDU_REG_CORE_NUM                0xc084
 #define CIDU_REG_INT_NUM                 0xc090
+#define CIDU_REG_SRW_CTRL                0xc09c
 
 #define CIDU_EXT_INT_OFST                (19)
 
@@ -50,24 +51,25 @@ typedef struct NucleiCIDUState
 
     /*< public >*/
     MemoryRegion mmio;
-    qemu_irq soft_irq[32];
+    qemu_irq soft_irq[32]; /* Per-hart ICI output into the local ECLIC. */
 
-    DeviceState *eclic;
+    DeviceState *eclic;    /* Destination ECLIC used for external/ICI delivery. */
 
     uint32_t num_harts;
     uint32_t num_sources;
     uint64_t mcidubase;
     uint32_t aperture_size;
 
-    uint32_t coren_int_status[32];
-    uint32_t intn_indicator[4096];
-    uint32_t intn_mask[4096];
-    uint32_t delivered_mask[4096];
-    uint8_t ext_level[4096];
-    uint32_t semaphore[32];
-    uint32_t ici_shadow_reg;
-    uint32_t core_num;
-    uint32_t int_num;
+    uint32_t coren_int_status[32]; /* Per-core pending ICI bits, W1C on write. */
+    uint32_t intn_indicator[4096]; /* Software-selected destination hart bitmap. */
+    uint32_t intn_mask[4096];      /* Writable delivery mask constrained by spec. */
+    uint32_t delivered_mask[4096]; /* Last hart bitmap currently asserted to ECLIC. */
+    uint8_t ext_level[4096];       /* Latched incoming external source level. */
+    uint32_t semaphore[32];        /* CIDU semaphore state, 0x3ff means free. */
+    uint32_t ici_shadow_reg;       /* Last ICI_SHADOW write (send_core/recv_core). */
+    uint32_t core_num;             /* CORE_NUM readback for implemented harts. */
+    uint32_t int_num;              /* INT_NUM readback for implemented sources. */
+    uint32_t srw_ctrl;             /* S-mode read/write gate from spec 16.6. */
 
 } NucleiCIDUState;
 

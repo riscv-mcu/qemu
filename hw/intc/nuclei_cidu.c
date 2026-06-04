@@ -25,6 +25,8 @@
 #include "hw/intc/nuclei_cidu.h"
 #include "qemu/main-loop.h"
 
+#define CIDU_SEMAPHORE_VALID_MASK 0x3ff
+
 static bool addr_in_range(uint32_t addr, uint32_t base, uint32_t num)
 {
     return addr >= base && addr - base < num;
@@ -32,11 +34,71 @@ static bool addr_in_range(uint32_t addr, uint32_t base, uint32_t num)
 
 static uint32_t nuclei_cidu_hart_mask(NucleiCIDUState *cidu)
 {
+    /* CIDU register bitmaps are always 32 bits wide even when fewer harts are
+     * implemented, so clamp them to the actual instantiated hart window.
+     */
     if (cidu->num_harts >= 32) {
         return UINT32_MAX;
     }
 
     return (1U << cidu->num_harts) - 1;
+}
+
+static inline uint32_t nuclei_cidu_read_semaphore(uint32_t semaphore)
+{
+    return semaphore & CIDU_SEMAPHORE_VALID_MASK;
+}
+
+static void nuclei_cidu_write_semaphore(NucleiCIDUState *cidu,
+                                        uint32_t semaphore_id,
+                                        uint32_t value)
+{
+    uint32_t current = nuclei_cidu_read_semaphore(cidu->semaphore[semaphore_id]);
+    uint32_t new_value = nuclei_cidu_read_semaphore(value);
+
+    /* A semaphore can only be claimed from the reset/free state, and is
+     * released by writing all ones back. */
+    if (new_value == CIDU_SEMAPHORE_VALID_MASK) {
+        cidu->semaphore[semaphore_id] = CIDU_SEMAPHORE_VALID_MASK;
+        return;
+    }
+
+    if (current == CIDU_SEMAPHORE_VALID_MASK || current == new_value) {
+        cidu->semaphore[semaphore_id] = new_value;
+    }
+}
+
+static int nuclei_cidu_current_priv(void)
+{
+    RISCVCPU *cpu;
+
+    if (!current_cpu) {
+        return PRV_M;
+    }
+
+    cpu = RISCV_CPU(current_cpu);
+    return cpu->env.priv;
+}
+
+static bool nuclei_cidu_access_allowed(NucleiCIDUState *cidu, hwaddr addr)
+{
+    int priv = nuclei_cidu_current_priv();
+
+    if (priv == PRV_M) {
+        return true;
+    }
+
+    if (addr == CIDU_REG_SRW_CTRL) {
+        return false;
+    }
+
+    if (priv == PRV_S) {
+        /* Spec 16.6: SRW=0 allows S-mode CIDU accesses; SRW=1 reads zero and
+         * ignores writes. */
+        return (cidu->srw_ctrl & 0x1) == 0;
+    }
+
+    return false;
 }
 
 static void nuclei_cidu_update_external_source(NucleiCIDUState *cidu, uint32_t irq)
@@ -49,8 +111,14 @@ static void nuclei_cidu_update_external_source(NucleiCIDUState *cidu, uint32_t i
         return;
     }
 
+    /* A live external source fans out as:
+     *   desired_harts = ext_level ? (indicator & mask & implemented_harts) : 0
+     * The delivered_mask cache lets CIDU withdraw or retarget a level source
+     * immediately when software rewrites INTn_INDICATOR/INTn_MASK.
+     */
     desired_mask = cidu->ext_level[irq] ?
-                   (cidu->intn_indicator[irq] & nuclei_cidu_hart_mask(cidu)) : 0;
+                   ((cidu->intn_indicator[irq] & cidu->intn_mask[irq]) &
+                    nuclei_cidu_hart_mask(cidu)) : 0;
     changed_mask = cidu->delivered_mask[irq] ^ desired_mask;
 
     if (!changed_mask) {
@@ -75,6 +143,10 @@ static uint64_t nuclei_cidu_read(void *opaque, hwaddr addr, unsigned size)
 {
     NucleiCIDUState *cidu = opaque;
 
+    if (!nuclei_cidu_access_allowed(cidu, addr)) {
+        return 0;
+    }
+
     if (addr_in_range(addr, CIDU_REG_COREN_INT_STATUS_BASE, CIDU_MAX_SUPPORT_CORE_NUM << 2))
     {
         uint32_t core_id = (addr - CIDU_REG_COREN_INT_STATUS_BASE) >> 2;
@@ -83,7 +155,7 @@ static uint64_t nuclei_cidu_read(void *opaque, hwaddr addr, unsigned size)
     else if (addr_in_range(addr, CIDU_REG_SEMAPHORE_BASE, CIDU_MAX_SEMAPHORE_NUM << 2))
     {
         uint32_t semaphore_id = (addr - CIDU_REG_SEMAPHORE_BASE) >> 2;
-        return cidu->semaphore[semaphore_id];
+        return nuclei_cidu_read_semaphore(cidu->semaphore[semaphore_id]);
     }
     else if (addr_in_range(addr, CIDU_REG_INTN_INDICATOR_BASE, CIDU_MAX_EXTERNAL_INT_NUM << 2))
     {
@@ -102,6 +174,10 @@ static uint64_t nuclei_cidu_read(void *opaque, hwaddr addr, unsigned size)
     else if (addr == CIDU_REG_INT_NUM)
     {
         return cidu->int_num;
+    }
+    else if (addr == CIDU_REG_SRW_CTRL)
+    {
+        return cidu->srw_ctrl;
     }
 
     qemu_log_mask(LOG_GUEST_ERROR,
@@ -135,27 +211,39 @@ static void nuclei_cidu_write(void *opaque, hwaddr addr, uint64_t value,
     uint32_t send_core = 0;
     uint32_t recv_core = 0;
 
+    if (!nuclei_cidu_access_allowed(cidu, addr)) {
+        return;
+    }
+
     if (addr_in_range(addr, CIDU_REG_COREN_INT_STATUS_BASE, CIDU_MAX_SUPPORT_CORE_NUM << 2))
     {
         uint32_t core_id = (addr - CIDU_REG_COREN_INT_STATUS_BASE) >> 2;
+        /* COREn_INT_STATUS is write-one-to-clear. */
         cidu->coren_int_status[core_id] &= ~((uint32_t)value);
-
-        qemu_set_irq(cidu->soft_irq[core_id], 0);
+        qemu_set_irq(cidu->soft_irq[core_id], cidu->coren_int_status[core_id] != 0);
     }
     else if (addr_in_range(addr, CIDU_REG_SEMAPHORE_BASE, CIDU_MAX_SEMAPHORE_NUM << 2))
     {
         uint32_t semaphore_id = (addr - CIDU_REG_SEMAPHORE_BASE) >> 2;
-        cidu->semaphore[semaphore_id] = value;
+        nuclei_cidu_write_semaphore(cidu, semaphore_id, value);
     }
     else if (addr == CIDU_REG_ICI_SHADOW)
     {
+        /* ICI_SHADOW packs sender in [31:16] and receiver in [15:0]. */
         cidu->ici_shadow_reg = value;
         send_core = (value >> 16) & 0xffff;
         recv_core = value & 0xffff;
 
-        qemu_set_irq(cidu->soft_irq[recv_core], 1);
+        if (send_core >= cidu->num_harts || recv_core >= cidu->num_harts) {
+            qemu_log_mask(LOG_GUEST_ERROR,
+                          "%s: ICI core id out of range send=%" PRIu32
+                          " recv=%" PRIu32 " num_harts=%" PRIu32 "\n",
+                          __func__, send_core, recv_core, cidu->num_harts);
+            return;
+        }
 
-        cidu->coren_int_status[recv_core] = 1 << send_core;
+        cidu->coren_int_status[recv_core] |= 1U << send_core;
+        qemu_set_irq(cidu->soft_irq[recv_core], cidu->coren_int_status[recv_core] != 0);
     }
     else if (addr_in_range(addr, CIDU_REG_INTN_INDICATOR_BASE, CIDU_MAX_EXTERNAL_INT_NUM << 2))
     {
@@ -166,11 +254,20 @@ static void nuclei_cidu_write(void *opaque, hwaddr addr, uint64_t value,
     else if (addr_in_range(addr, CIDU_REG_INTN_MASK_BASE, CIDU_MAX_EXTERNAL_INT_NUM << 2))
     {
         uint32_t irq = (addr - CIDU_REG_INTN_MASK_BASE) >> 2;
-        if(((cidu->intn_mask[irq] & 0xffffffff) == 0xffffffff)
-            || (value & 0xffffffff) == 0xffffffff)
-        {
-            cidu->intn_mask[irq] = value;
+        uint32_t reset_mask = nuclei_cidu_hart_mask(cidu);
+        uint32_t new_mask = (uint32_t)value & reset_mask;
+
+        /* Spec 16 only allows software to move from the reset all-harts mask
+         * to a programmed mask, or back to that reset mask.
+         */
+        if (cidu->intn_mask[irq] == reset_mask || new_mask == reset_mask) {
+            cidu->intn_mask[irq] = new_mask;
+            nuclei_cidu_update_external_source(cidu, irq);
         }
+    }
+    else if (addr == CIDU_REG_SRW_CTRL)
+    {
+        cidu->srw_ctrl = (uint32_t)value & 0x1;
     }
     else
     {
@@ -226,15 +323,20 @@ static void nuclei_cidu_realize(DeviceState *dev, Error **errp)
     cidu->int_num = cidu->num_sources;
 
     for (i = 0; i < CIDU_MAX_SEMAPHORE_NUM; i++) {
-        cidu->semaphore[i] = 0xffffffff;
+        cidu->semaphore[i] = CIDU_SEMAPHORE_VALID_MASK;
     }
 
     for (irq = 0; irq < cidu->num_sources; irq++) {
+        /* Reset routes cluster external interrupts to hart 0, with all harts
+         * still allowed by INTn_MASK until software narrows the delivery set.
+         */
         cidu->intn_indicator[irq] = 0x1;
-        cidu->intn_mask[irq] = 0xffffffff;
+        cidu->intn_mask[irq] = nuclei_cidu_hart_mask(cidu);
         cidu->delivered_mask[irq] = 0;
         cidu->ext_level[irq] = 0;
     }
+
+    cidu->srw_ctrl = 0x0;
 }
 
 static void nuclei_cidu_class_init(ObjectClass *klass, void *data)
@@ -281,6 +383,9 @@ DeviceState *nuclei_cidu_create(hwaddr addr, uint32_t aperture_size,
 
     if (eclic != NULL) {
         for (i = 0; i < num_harts; i++) {
+            /* Internal_Reserved14_IRQn is the local ICI interrupt consumed by
+             * the hart when CIDU sets COREn_INT_STATUS bits.
+             */
             s->soft_irq[i] = nuclei_eclic_get_irq(eclic, Internal_Reserved14_IRQn, i);
         }
     }
