@@ -293,8 +293,15 @@ target_ulong helper_sret(CPURISCVState *env)
     if (riscv_intc_is_clic_mode(env)) {
         target_ulong spil = get_field(env->scause, SCAUSE_SPIL);
         env->mintstatus = set_field(env->mintstatus, MINTSTATUS_SIL, spil);
-        env->scause = set_field(env->scause, SCAUSE_SPIE, 0);
-        env->scause = set_field(env->scause, SCAUSE_SPP, PRV_S);
+
+        /*
+         * In Nuclei ECLIC v2 flow, popxret restores the saved scause frame
+         * before helper_sret() runs, but mstatus still reflects the inner
+         * nesting level until we re-synchronize it. Restore SPP/SPIE from the
+         * recovered scause frame first so an outer S-mode interrupt that
+         * preempted U-mode returns to the correct privilege.
+         */
+        riscv_nuclei_sync_sstatus_from_scause(env);
         env->ssubm = set_field(env->ssubm, XSUBM_TYP,
                         get_field(env->ssubm, XSUBM_PTYP));
     }
@@ -313,6 +320,10 @@ target_ulong helper_sret(CPURISCVState *env)
         mstatus = set_field(mstatus, MSTATUS_MPRV, 0);
     }
     env->mstatus = mstatus;
+
+    if (riscv_intc_is_clic_mode(env)) {
+        riscv_nuclei_sync_scause_from_sstatus(env);
+    }
 
     if (riscv_has_ext(env, RVH) && !env->virt_enabled) {
         /* We support Hypervisor extensions and virtulisation is disabled */
@@ -336,7 +347,7 @@ target_ulong helper_sret(CPURISCVState *env)
     if (riscv_intc_is_clic_mode(env)) {
         CPUState *cs = env_cpu(env);
         bql_lock();
-        nuclei_eclic_next_interrupt(env->eclic, PRV_S, cs->cpu_index);
+        nuclei_eclic_next_interrupt(env->eclic, cs->cpu_index);
         bql_unlock();
     }
 
@@ -359,10 +370,14 @@ target_ulong helper_mret(CPURISCVState *env)
         target_ulong mpil = get_field(env->mcause, MCAUSE_MPIL);
         env->mintstatus = set_field(env->mintstatus, MINTSTATUS_MIL, mpil);
 
-        if (get_field(env->msubm, XSUBM_TYP) != SUBM_NOR) {
-            env->mstatus = set_field(env->mstatus, MSTATUS_MPP,
-                        get_field(env->mcause, MCAUSE_MPP));
-        }
+        /*
+         * In Nuclei ECLIC v2 flow, popxret restores the saved mcause frame
+         * before helper_mret() runs, but mstatus still reflects the inner
+         * nesting level until we re-synchronize it. Restore MPP/MPIE from the
+         * recovered mcause frame first so nested returns observe the correct
+         * privilege and interrupt-enable state.
+         */
+        riscv_nuclei_sync_mstatus_from_mcause(env);
         env->msubm = set_field(env->msubm, XSUBM_TYP,
                             get_field(env->msubm, XSUBM_PTYP));
     }
@@ -387,6 +402,10 @@ target_ulong helper_mret(CPURISCVState *env)
         mstatus = set_field(mstatus, MSTATUS_MPRV, 0);
     }
     env->mstatus = mstatus;
+
+    if (riscv_intc_is_clic_mode(env)) {
+        riscv_nuclei_sync_mcause_from_mstatus(env);
+    }
     riscv_cpu_set_mode(env, prev_priv);
 
     if (riscv_has_ext(env, RVH)) {
@@ -400,7 +419,7 @@ target_ulong helper_mret(CPURISCVState *env)
     if (riscv_intc_is_clic_mode(env)) {
         CPUState *cs = env_cpu(env);
         bql_lock();
-        nuclei_eclic_next_interrupt(env->eclic, prev_priv, cs->cpu_index);
+        nuclei_eclic_next_interrupt(env->eclic, cs->cpu_index);
         bql_unlock();
     }
 
