@@ -1,8 +1,5 @@
 /*
- *  NUCLEI TIMER (Timer Unit) interface
- *
- * Copyright (c) 2020 Gao ZhiYuan <alapha23@gmail.com>
- * Copyright (c) 2020-2021 PLCT Lab.All rights reserved.
+ *  NUCLEI SYSTIMER interface
  *
  * This provides a parameterizable timer controller based on Nuclei's Systimer.
  *
@@ -22,396 +19,528 @@
 #include "qemu/osdep.h"
 #include "qemu/log.h"
 #include "qapi/error.h"
-#include "qemu/error-report.h"
 #include "qemu/timer.h"
 #include "target/riscv/cpu.h"
 #include "hw/intc/nuclei_systimer.h"
 #include "hw/intc/nuclei_eclic.h"
-#include "hw/registerfields.h"
 #include "hw/qdev-properties.h"
-#include "migration/vmstate.h"
 #include "sysemu/runstate.h"
-#include "trace.h"
 
-int hart_numbers = 0;
-
-static inline int nuclei_systimer_get_current_cpu(NucleiSYSTIMERState *s)
+static inline uint32_t current_hartid(NucleiSYSTIMERState *s)
 {
-    if (s->num_harts > 1) {
-        return current_cpu ? current_cpu->cpu_index : 0;
+    if (s->num_harts > 1 && current_cpu) {
+        uint32_t idx = current_cpu->cpu_index - s->hartid_base;
+
+        if (idx < s->num_harts) {
+            return idx;
+        }
     }
+
     return 0;
+}
+
+static inline CPURISCVState *get_env_by_hartid(NucleiSYSTIMERState *s,
+                                               uint32_t hart_idx)
+{
+    CPUState *cpu = qemu_get_cpu(s->hartid_base + hart_idx);
+
+    return cpu ? cpu_env(cpu) : NULL;
+}
+
+static uint64_t nuclei_cpu_riscv_read_rtc_raw(uint32_t timebase_freq)
+{
+    return muldiv64(qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL),
+                    timebase_freq, NANOSECONDS_PER_SECOND);
 }
 
 static uint64_t nuclei_cpu_riscv_read_rtc(void *opaque)
 {
-    uint64_t timebase_freq = *(uint64_t*)opaque;
-    return muldiv64(qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL),
-        timebase_freq, NANOSECONDS_PER_SECOND);
+    NucleiSYSTIMERState *s = opaque;
+
+    return nuclei_cpu_riscv_read_rtc_raw(s->timebase_freq) + s->time_delta;
 }
 
-static void nuclei_timer_update_compare(NucleiSYSTIMERState *s)
+static void nuclei_systimer_set_mtime(NucleiSYSTIMERState *s, uint64_t value)
 {
-    size_t hartid = nuclei_systimer_get_current_cpu(s);
-    CPUState *cpu = qemu_get_cpu(hartid);
-    CPURISCVState *env = cpu ? cpu_env(cpu) : NULL;
-    uint64_t cmp, real_time;
-    int64_t diff;
+    uint64_t rtc_r = nuclei_cpu_riscv_read_rtc_raw(s->timebase_freq);
 
-    real_time = s->mtime_lo | ((uint64_t)s->mtime_hi << 32);
-
-    cmp = (uint64_t)s->mtimecmp_lo | ((uint64_t)s->mtimecmp_hi <<32);
-    env->mtimecmp =  cmp;
-    env->timecmp =  cmp;
-
-    diff = cmp - real_time;
-
-    if ( real_time >= cmp) {
-        qemu_set_irq(*(s->timer_irq[hartid]), 1);
-        if (s->mtimectl & 0x2) {
-            s->mtime_lo = 0;
-            s->mtime_hi = 0;
-        }
-    } else {
-        qemu_set_irq(*(s->timer_irq[hartid]), 0);
-
-        if (s->mtimecmp_hi != 0xffffffff) {
-            // set up future timer interrupt
-            uint64_t next_ns = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) +
-                muldiv64(diff, NANOSECONDS_PER_SECOND, s->timebase_freq);
-            timer_mod(env->mtimer, next_ns);
-        }
+    s->time_delta = value - rtc_r;
+    if (s->mtimectl & MTIMECTL_TIMESTOP) {
+        s->time_stop = value;
     }
 }
 
-/*
- * Called when timecmp is written to update the QEMU timer or immediately
- * trigger timer interrupt if mtimecmp <= current timer value.
- */
-static void nuclei_clint_write_timecmp(RISCVCPU *cpu, uint64_t value,
-                                       uint32_t timebase_freq)
+static uint64_t nuclei_systimer_get_mtime(NucleiSYSTIMERState *s)
 {
+    /*
+     * TIMESTOP freezes the visible MTIME value. Otherwise MTIME follows the
+     * ACLINT-style raw_rtc + time_delta model while the counter is running.
+     */
+    if (s->mtimectl & MTIMECTL_TIMESTOP) {
+        return s->time_stop;
+    }
+
+    return nuclei_cpu_riscv_read_rtc_raw(s->timebase_freq) + s->time_delta;
+}
+
+static void nuclei_systimer_set_timer_irq(NucleiSYSTIMERState *s,
+                                          uint32_t hart_idx, bool level)
+{
+    CPURISCVState *env = get_env_by_hartid(s, hart_idx);
+
+    if (!env) {
+        return;
+    }
+
+    if (riscv_intc_is_clic_mode(env)) {
+        qemu_set_irq(s->timer_irq[hart_idx], level);
+    } else {
+        riscv_cpu_update_mip(env, MIP_MTIP, BOOL_TO_MASK(level));
+    }
+}
+
+static void set_mtimecmp(NucleiSYSTIMERState *s, uint32_t hart_idx,
+                         uint64_t value)
+{
+    CPURISCVState *env = get_env_by_hartid(s, hart_idx);
+    uint32_t timebase_freq = s->timebase_freq;
     uint64_t next;
     uint64_t diff;
-    uint64_t w_timebase_freq = timebase_freq;
-    uint64_t rtc_r = nuclei_cpu_riscv_read_rtc(&w_timebase_freq);
-    CPUState *cs = env_cpu(&cpu->env);
-    NucleiSYSTIMERState *clint = (NucleiSYSTIMERState *)cpu->env.systimer;
 
-    cpu->env.timecmp = value;
-    if (cpu->env.timecmp <= rtc_r) {
-        /* if we're setting an MTIMECMP value in the "past",
-           immediately raise the timer interrupt */
-        if (riscv_intc_is_clic_mode(&cpu->env)) {
-            qemu_set_irq(*(clint->timer_irq[cs->cpu_index]), 1);
-        } else {
-            riscv_cpu_update_mip(&cpu->env, MIP_MTIP, BOOL_TO_MASK(1));
-        }
+    if (!env) {
+        return;
+    }
+
+    uint64_t rtc = nuclei_cpu_riscv_read_rtc(s);
+
+    env->mtimecmp = value;
+    if (env->mtimecmp <= rtc) {
+        /*
+         * If we're setting an MTIMECMP value in the "past",
+         * immediately raise the timer interrupt
+         */
+        nuclei_systimer_set_timer_irq(s, hart_idx, true);
         return;
     }
 
     /* otherwise, set up the future timer interrupt */
-    if (riscv_intc_is_clic_mode(&cpu->env)) {
-        qemu_set_irq(*(clint->timer_irq[cs->cpu_index]), 0);
-    } else {
-        riscv_cpu_update_mip(&cpu->env, MIP_MTIP, BOOL_TO_MASK(0));
-    }
-    diff = cpu->env.timecmp - rtc_r;
+    nuclei_systimer_set_timer_irq(s, hart_idx, false);
+    diff = env->mtimecmp - rtc;
     /* back to ns (note args switched in muldiv64) */
-    next = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) +
-        muldiv64(diff, NANOSECONDS_PER_SECOND, timebase_freq);
-    next = MIN(next, INT64_MAX);
-    timer_mod(cpu->env.mtimer, next);
-}
+    uint64_t ns_diff = muldiv64(diff, NANOSECONDS_PER_SECOND, timebase_freq);
 
-/*
- * Callback used when the timer set using timer_mod expires.
- * Should raise the timer interrupt line
- */
-static void nuclei_clint_timer_cb(void *opaque)
-{
-    RISCVCPU *cpu = opaque;
-    riscv_cpu_update_mip(&cpu->env, MIP_MTIP, BOOL_TO_MASK(1));
-}
-
-/* CPU wants to read rtc or timecmp register */
-static uint64_t nuclei_clint_read(void *opaque, hwaddr addr, unsigned size)
-{
-    uint32_t timebase_f = 0;
-    NucleiSYSTIMERState *clint = NUCLEI_SYSTIMER(opaque);
-
-    if (addr >= clint->msip_base &&
-        addr < clint->msip_base + (clint->num_harts << 2)) {
-        size_t hartid = clint->hartid_base + ((addr - clint->msip_base) >> 2);
-        CPUState *cpu = qemu_get_cpu(hartid);
-        CPURISCVState *env = cpu ? cpu_env(cpu) : NULL;
-        if (!env) {
-            error_report("clint: invalid timecmp hartid: %zu", hartid);
-        } else if ((addr & 0x3) == 0) {
-            return (env->mip & MIP_MSIP) > 0;
-        } else {
-            error_report("clint: invalid read: %08x", (uint32_t)addr);
-            return 0;
-        }
-    } else if (addr >= clint->mtimecmp_base &&
-        addr < clint->mtimecmp_base + (clint->num_harts << 3)) {
-        size_t hartid = clint->hartid_base +
-            ((addr - clint->mtimecmp_base) >> 3);
-        CPUState *cpu = qemu_get_cpu(hartid);
-        CPURISCVState *env = cpu ? cpu_env(cpu) : NULL;
-        if (!env) {
-            error_report("clint: invalid timecmp hartid: %zu", hartid);
-        } else if ((addr & 0x7) == 0) {
-            /* timecmp_lo */
-            uint64_t timecmp = env->timecmp;
-            return timecmp & 0xFFFFFFFF;
-        } else if ((addr & 0x7) == 4) {
-            /* timecmp_hi */
-            uint64_t timecmp = env->timecmp;
-            return (timecmp >> 32) & 0xFFFFFFFF;
-        } else {
-            error_report("clint: invalid read: %08x", (uint32_t)addr);
-            return 0;
-        }
-    } else if (addr == clint->mtime_base) {
-        /* time_lo */
-        timebase_f = clint->timebase_freq;
-        return nuclei_cpu_riscv_read_rtc(&timebase_f) & 0xFFFFFFFF;
-    } else if (addr == clint->mtime_base + 4) {
-        /* time_hi */
-        timebase_f = (clint->timebase_freq);
-        return (nuclei_cpu_riscv_read_rtc(&(timebase_f))>> 32) & 0xFFFFFFFF;
+    /*
+     * check if ns_diff overflowed and check if the addition would potentially
+     * overflow
+     */
+    if ((NANOSECONDS_PER_SECOND > timebase_freq && ns_diff < diff) ||
+        ns_diff > INT64_MAX) {
+        next = INT64_MAX;
+    } else {
+        /*
+         * as it is very unlikely qemu_clock_get_ns will return a value
+         * greater than INT64_MAX, no additional check is needed for an
+         * unsigned integer overflow.
+         */
+        next = qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) + ns_diff;
+        /*
+         * if ns_diff is INT64_MAX next may still be outside the range
+         * of a signed integer.
+         */
+        next = MIN(next, INT64_MAX);
     }
 
-    error_report("clint: invalid read: %08x", (uint32_t)addr);
-    return 0;
+    timer_mod(env->mtimer, next);
 }
 
-/* CPU wrote to rtc or timecmp register */
-static void nuclei_clint_write(void *opaque, hwaddr addr, uint64_t value,
-        unsigned size)
+static void nuclei_systimer_update_all_timers(NucleiSYSTIMERState *s)
 {
-    NucleiSYSTIMERState *clint = NUCLEI_SYSTIMER(opaque);
+    uint64_t mtime = nuclei_systimer_get_mtime(s);
+    bool cmpclren_hit = false;
 
-    if (addr >= clint->msip_base &&
-        addr < clint->msip_base + (clint->num_harts << 2)) {
-        size_t hartid = clint->hartid_base + ((addr - clint->msip_base) >> 2);
-        CPUState *cpu = qemu_get_cpu(hartid);
-        CPURISCVState *env = cpu ? cpu_env(cpu) : NULL;
+    /*
+     * Re-check every hart against one shared MTIME snapshot whenever software
+     * rewrites the shared timer state.
+     */
+    for (uint32_t i = 0; i < s->num_harts; i++) {
+        CPURISCVState *env = get_env_by_hartid(s, i);
+
         if (!env) {
-            error_report("clint: invalid timecmp hartid: %zu", hartid);
-        } else if ((addr & 0x3) == 0) {
-            if (clint->eclic != NULL) {
-                clint->msip = value;
-                if ((clint->msip & 0x1) == 1) {
-                    qemu_set_irq(*(clint->soft_irq[hartid]), 1);
-                }else{
-                    qemu_set_irq(*(clint->soft_irq[hartid]), 0);
-                }
-            } else {
-                riscv_cpu_update_mip(env, MIP_MSIP, BOOL_TO_MASK(value));
+            continue;
+        }
+
+        if (env->mtimer) {
+            timer_del(env->mtimer);
+        }
+
+        if (env->mtimecmp == UINT64_MAX) {
+            nuclei_systimer_set_timer_irq(s, i, false);
+            continue;
+        }
+
+        if (mtime >= env->mtimecmp) {
+            nuclei_systimer_set_timer_irq(s, i, true);
+            if (s->mtimectl & MTIMECTL_CMPCLREN) {
+                cmpclren_hit = true;
             }
         } else {
-            error_report("clint: invalid sip write: %08x", (uint32_t)addr);
+            nuclei_systimer_set_timer_irq(s, i, false);
         }
-        return;
-    } else if (addr >= clint->mtimecmp_base &&
-        addr < clint->mtimecmp_base + (clint->num_harts << 3)) {
-        size_t hartid = clint->hartid_base +
-            ((addr - clint->mtimecmp_base) >> 3);
-        CPUState *cpu = qemu_get_cpu(hartid);
-        CPURISCVState *env = cpu ? cpu_env(cpu) : NULL;
-       if (!env) {
-            error_report("clint: invalid timecmp hartid: %zu", hartid);
-        } else if ((addr & 0x7) == 0) {
-            /* timecmp_lo */
-            uint64_t timecmp_hi = env->timecmp >> 32;
-            nuclei_clint_write_timecmp(RISCV_CPU(cpu),
-                timecmp_hi << 32 | (value & 0xFFFFFFFF), clint->timebase_freq);
-            return;
-        } else if ((addr & 0x7) == 4) {
-            /* timecmp_hi */
-            uint64_t timecmp_lo = env->timecmp;
-            nuclei_clint_write_timecmp(RISCV_CPU(cpu),
-                value << 32 | (timecmp_lo & 0xFFFFFFFF), clint->timebase_freq);
-        } else {
-            error_report("clint: invalid timecmp write: %08x", (uint32_t)addr);
-        }
-        return;
-    } else if (addr == clint->mtime_base) {
-        /* time_lo */
-        error_report("clint: time_lo write not implemented");
-        return;
-    } else if (addr == clint->mtime_base + 4) {
-        /* time_hi */
-        error_report("clint: time_hi write not implemented");
+    }
+
+    if (cmpclren_hit) {
+        nuclei_systimer_set_mtime(s, 0);
+    }
+
+    if (s->mtimectl & MTIMECTL_TIMESTOP) {
         return;
     }
 
-    error_report("clint: invalid write: %08x", (uint32_t)addr);
+    for (uint32_t i = 0; i < s->num_harts; i++) {
+        CPURISCVState *env = get_env_by_hartid(s, i);
+
+        if (!env || env->mtimecmp == UINT64_MAX || mtime >= env->mtimecmp) {
+            continue;
+        }
+
+        set_mtimecmp(s, i, env->mtimecmp);
+    }
 }
 
-static void nuclei_timer_reset(DeviceState *dev)
+static void update_ssip(NucleiSYSTIMERState *s, uint32_t hart_idx,
+                        uint32_t level)
 {
-    NucleiSYSTIMERState *s = NUCLEI_SYSTIMER(dev);
-    s->mtime_lo = 0x0;
-    s->mtime_hi = 0x0;
-    s->mtimecmp_lo = 0xFFFFFFFF;
-    s->mtimecmp_hi = 0xFFFFFFFF;
-    s->mtime_srw_ctrl = 0x0;
-    s->msftrst = 0x0;
-    s->mtimectl = 0x0;
-    s->msip = 0x0;
-    s->ssip = 0x0;
+    CPURISCVState *env = get_env_by_hartid(s, hart_idx);
+
+    if (!env) {
+        return;
+    }
+
+    s->ssip[hart_idx] = level;
+    if (riscv_intc_is_clic_mode(env)) {
+        qemu_set_irq(s->s_soft_irq[hart_idx], level);
+    } else {
+        riscv_cpu_update_mip(env, MIP_SSIP, BOOL_TO_MASK(level));
+    }
 }
 
-static uint64_t nuclei_timer_read(void *opaque, hwaddr offset,
-                                    unsigned size)
+static void update_msip(NucleiSYSTIMERState *s, uint32_t hart_idx, bool level)
 {
-    uint64_t timebase_f = 0;
+    CPURISCVState *env = get_env_by_hartid(s, hart_idx);
+
+    if (!env) {
+        return;
+    }
+
+    s->msip[hart_idx] = level ? 1 : 0;
+    if (riscv_intc_is_clic_mode(env)) {
+        qemu_set_irq(s->m_soft_irq[hart_idx], level);
+    } else {
+        riscv_cpu_update_mip(env, MIP_MSIP, BOOL_TO_MASK(level));
+    }
+}
+
+static uint64_t nuclei_timer_read(void *opaque, hwaddr offset, unsigned size)
+{
     NucleiSYSTIMERState *s = NUCLEI_SYSTIMER(opaque);
+    uint32_t hart_idx = current_hartid(s);
+    CPURISCVState *env = get_env_by_hartid(s, hart_idx);
+    CPURISCVState *hart0_env = get_env_by_hartid(s, 0);
+    bool srw_blocked;
 
-    if(s->prv_s && (s->mtime_srw_ctrl & 0x1))
+    if (!env) {
         return 0;
-
-    if (offset >= NUCLEI_SYSTIMER_CLINT_MSIP_HART0) {
-        return nuclei_clint_read(opaque, offset, size);
     }
-    CPUState *cpu = qemu_get_cpu(nuclei_systimer_get_current_cpu(s));
-    CPURISCVState *env = cpu ? cpu_env(cpu) : NULL;
-    uint64_t value = 0;
+
+    srw_blocked = env->priv == PRV_U ||
+                  (env->priv == PRV_S && s->mtime_srw_ctrl == 1);
+
+    /* Array windows expose per-hart MSIP/MTIMECMP/SSIP words. */
+    if (offset >= REG_MSIP_BASE && offset < REG_MSIP_BASE + s->num_harts * 4) {
+        uint32_t idx = (offset - REG_MSIP_BASE) / 4;
+
+        if (srw_blocked || idx >= s->num_harts) {
+            return 0;
+        }
+        return s->msip[idx];
+    }
+
+    if (offset >= REG_MTIMECMP_BASE &&
+        offset < REG_MTIMECMP_BASE + s->num_harts * 8) {
+        uint32_t idx = (offset - REG_MTIMECMP_BASE) / 8;
+        CPURISCVState *h_env;
+
+        if (srw_blocked || idx >= s->num_harts) {
+            return 0;
+        }
+
+        h_env = get_env_by_hartid(s, idx);
+        if (!h_env) {
+            return 0;
+        }
+
+        if ((offset & 0x7) == 0) {
+            return h_env->mtimecmp & 0xffffffffu;
+        }
+        return (h_env->mtimecmp >> 32) & 0xffffffffu;
+    }
+
+    if (offset >= REG_SSIP_BASE && offset < REG_SSIP_BASE + s->num_harts * 4) {
+        uint32_t idx = (offset - REG_SSIP_BASE) / 4;
+
+        if (env->priv == PRV_U || idx >= s->num_harts) {
+            return 0;
+        }
+        return s->ssip[idx];
+    }
 
     switch (offset) {
-    case NUCLEI_SYSTIMER_REG_MTIMELO:
-        timebase_f = s->timebase_freq;
-        value = nuclei_cpu_riscv_read_rtc(&timebase_f);
-        s->mtime_lo = value & 0xffffffff;
-        s->mtime_hi = (value >> 32) & 0xffffffff;
-        value = s->mtime_lo;
-        break;
-    case NUCLEI_SYSTIMER_REG_MTIMEHI:
-        value = s->mtime_hi;
-        break;
-    case NUCLEI_SYSTIMER_REG_MTIMECMPLO:
-        s->mtimecmp_lo = (env->mtimecmp) & 0xFFFFFFFF;
-        value = s->mtimecmp_lo;
-        break;
-    case NUCLEI_SYSTIMER_REG_MTIMECMPHI:
-        s->mtimecmp_hi = (env->mtimecmp >> 32) & 0xFFFFFFFF;
-        value = s->mtimecmp_hi;
-        break;
-    case NUCLEI_SYSTIMER_REG_MTIMER_SRW_CTRL:
-        value = s->mtime_srw_ctrl;
-        break;
-    case NUCLEI_SYSTIMER_REG_MSFTRST:
-        break;
-    case NUCLEI_SYSTIMER_REG_SSIP:
-        value = s->ssip;
-        break;
-    case NUCLEI_SYSTIMER_REG_MTIMECTL:
-        value = s->mtimectl;
-        break;
-    case NUCLEI_SYSTIMER_REG_MSIP:
-        value = s->msip;
-        break;
+    case REG_MTIME_LO:
+        return srw_blocked ? 0 : (nuclei_systimer_get_mtime(s) & 0xffffffffu);
+    case REG_MTIME_HI:
+        return srw_blocked ? 0 :
+               ((nuclei_systimer_get_mtime(s) >> 32) & 0xffffffffu);
+    case REG_MTIMECMP_LO:
+        /*
+         * Spec 13.1 defines the local MTIMECMP shadow window as the 1st-hart
+         * copy in CLINT mode, not a current-hart alias.
+         */
+        return (srw_blocked || !hart0_env) ? 0 :
+               (hart0_env->mtimecmp & 0xffffffffu);
+    case REG_MTIMECMP_HI:
+        return (srw_blocked || !hart0_env) ? 0 :
+               ((hart0_env->mtimecmp >> 32) & 0xffffffffu);
+    case REG_MTIME_SRW_CTRL:
+        return env->priv == PRV_M ? s->mtime_srw_ctrl : 0;
+    case REG_MSFTRST:
+        return srw_blocked ? 0 : s->msftrst;
+    case REG_SSIP:
+        /* The single-register SSIP alias is the hart0 shadow copy. */
+        return env->priv == PRV_U ? 0 : s->ssip[0];
+    case REG_MTIMECTL:
+        return srw_blocked ? 0 : s->mtimectl;
+    case REG_MSIP:
+        /* The single-register MSIP alias is the hart0 shadow copy. */
+        return srw_blocked ? 0 : s->msip[0];
+    /* 0xcff8 is the shared MTIME alias defined by the Nuclei timer window. */
+    case REG_MTIME:
+        return srw_blocked ? 0 : (nuclei_systimer_get_mtime(s) & 0xffffffffu);
+    case REG_MTIME + 4:
+        return srw_blocked ? 0 :
+               ((nuclei_systimer_get_mtime(s) >> 32) & 0xffffffffu);
     default:
-        break;
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "systimer: read at invalid offset 0x%" HWADDR_PRIx "\n",
+                      offset);
+        return 0;
     }
-
-    return (value & 0xFFFFFFFF);
 }
 
 static void nuclei_timer_write(void *opaque, hwaddr offset,
-                                 uint64_t value, unsigned size)
+                               uint64_t value, unsigned size)
 {
     NucleiSYSTIMERState *s = NUCLEI_SYSTIMER(opaque);
-    size_t hartid = nuclei_systimer_get_current_cpu(s);
-    CPUState *cpu = qemu_get_cpu(hartid);
-    CPURISCVState *env = cpu ? cpu_env(cpu) : NULL;
-    uint64_t timecmp_hi;
-    uint64_t timecmp_lo;
+    uint32_t hart_idx = current_hartid(s);
+    CPURISCVState *env = get_env_by_hartid(s, hart_idx);
+    CPURISCVState *hart0_env = get_env_by_hartid(s, 0);
+    bool srw_blocked;
 
-    if (s->prv_s && (s->mtime_srw_ctrl & 0x1))
+    if (!env) {
         return;
-
-    if (offset >= NUCLEI_SYSTIMER_CLINT_MSIP_HART0) {
-        return nuclei_clint_write(opaque, offset, value, size);
     }
 
-    value = value & 0xFFFFFFFF;
+    value &= 0xffffffffu;
+    srw_blocked = env->priv == PRV_U ||
+                  (env->priv == PRV_S && s->mtime_srw_ctrl == 1);
+
+    /* Array windows expose per-hart MSIP/MTIMECMP/SSIP words. */
+    if (offset >= REG_MSIP_BASE && offset < REG_MSIP_BASE + s->num_harts * 4) {
+        uint32_t idx = (offset - REG_MSIP_BASE) / 4;
+
+        if (!srw_blocked && idx < s->num_harts) {
+            update_msip(s, idx, value & 0x1);
+        }
+        return;
+    }
+
+    if (offset >= REG_MTIMECMP_BASE &&
+        offset < REG_MTIMECMP_BASE + s->num_harts * 8) {
+        uint32_t idx = (offset - REG_MTIMECMP_BASE) / 8;
+        CPURISCVState *h_env;
+        uint64_t cmp;
+
+        if (srw_blocked || idx >= s->num_harts) {
+            return;
+        }
+
+        h_env = get_env_by_hartid(s, idx);
+        if (!h_env) {
+            return;
+        }
+
+        cmp = h_env->mtimecmp;
+        if ((offset & 0x7) == 0) {
+            cmp = (cmp & 0xffffffff00000000ULL) | value;
+        } else {
+            cmp = (cmp & 0xffffffffULL) | (value << 32);
+        }
+        set_mtimecmp(s, idx, cmp);
+        return;
+    }
+
+    if (offset >= REG_SSIP_BASE && offset < REG_SSIP_BASE + s->num_harts * 4) {
+        uint32_t idx = (offset - REG_SSIP_BASE) / 4;
+
+        if (env->priv != PRV_U && idx < s->num_harts) {
+            update_ssip(s, idx, value & 0x1);
+        }
+        return;
+    }
+
     switch (offset) {
-    case NUCLEI_SYSTIMER_REG_MTIMELO:
-        s->mtime_lo = value;
-        env->mtimer->expire_time &= 0xFFFFFFFF00000000ULL;
-        env->mtimer->expire_time |= (value & 0xFFFFFFFF);
-        break;
-    case NUCLEI_SYSTIMER_REG_MTIMEHI:
-        s->mtime_hi = value;
-        env->mtimer->expire_time &= 0x00000000FFFFFFFFULL;
-        env->mtimer->expire_time |= (value << 32);
-        break;
-    case NUCLEI_SYSTIMER_REG_MTIMECMPLO:
-        if (riscv_intc_is_clic_mode(env)) {
-            s->mtimecmp_lo = value;
-            nuclei_timer_update_compare(s);
-        } else {
-            timecmp_hi = env->timecmp >> 32;
-            nuclei_clint_write_timecmp(RISCV_CPU(cpu),
-                timecmp_hi << 32 | (value & 0xFFFFFFFF), s->timebase_freq);
+    case REG_MTIME_LO:
+    {
+        uint64_t mtime;
+
+        if (srw_blocked) {
+            return;
         }
-        break;
-    case NUCLEI_SYSTIMER_REG_MTIMECMPHI:
-        s->mtimecmp_hi = value;
-        if (riscv_intc_is_clic_mode(env)) {
-            nuclei_timer_update_compare(s);
-        } else {
-            timecmp_lo = env->timecmp;
-            nuclei_clint_write_timecmp(RISCV_CPU(cpu),
-                value << 32 | (timecmp_lo & 0xFFFFFFFF), s->timebase_freq);
+
+        /*
+         * MTIME is a shared 64-bit register exposed as two 32-bit words, so
+         * merge the incoming half with the current visible MTIME value.
+         */
+        mtime = nuclei_systimer_get_mtime(s);
+        mtime = (mtime & 0xffffffff00000000ULL) | value;
+        nuclei_systimer_set_mtime(s, mtime);
+        nuclei_systimer_update_all_timers(s);
+        return;
+    }
+    case REG_MTIME_HI:
+    {
+        uint64_t mtime;
+
+        if (srw_blocked) {
+            return;
         }
-        break;
-    case NUCLEI_SYSTIMER_REG_MTIMER_SRW_CTRL:
-        s->mtime_srw_ctrl = value;
-        break;
-    case NUCLEI_SYSTIMER_REG_MSFTRST:
-        if (value == 0x80000a5f)
+
+        mtime = nuclei_systimer_get_mtime(s);
+        mtime = (mtime & 0xffffffffULL) | (value << 32);
+        nuclei_systimer_set_mtime(s, mtime);
+        nuclei_systimer_update_all_timers(s);
+        return;
+    }
+    case REG_MTIMECMP_LO:
+    {
+        uint64_t cmp;
+
+        if (srw_blocked || !hart0_env) {
+            return;
+        }
+
+        /*
+         * Spec 13.1 defines the local MTIMECMP shadow window as the 1st-hart
+         * copy in CLINT mode, so local writes always target hart0.
+         */
+        cmp = hart0_env->mtimecmp;
+        cmp = (cmp & 0xffffffff00000000ULL) | value;
+        set_mtimecmp(s, 0, cmp);
+        return;
+    }
+    case REG_MTIMECMP_HI:
+    {
+        uint64_t cmp;
+
+        if (srw_blocked || !hart0_env) {
+            return;
+        }
+
+        cmp = hart0_env->mtimecmp;
+        cmp = (cmp & 0xffffffffULL) | (value << 32);
+        set_mtimecmp(s, 0, cmp);
+        return;
+    }
+    case REG_MTIME_SRW_CTRL:
+        if (env->priv == PRV_M) {
+            s->mtime_srw_ctrl = value & 0x1;
+        }
+        return;
+    case REG_MSFTRST:
+        if (!srw_blocked && value == MSFTRST_MAGIC) {
+            s->msftrst = 0x80000000u;
             qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
-        break;
-    case NUCLEI_SYSTIMER_REG_SSIP:
-        if (riscv_intc_is_clic_mode(env)) {
-            s->ssip = value;
-            if ((s->ssip & 0x1) == 1) {
-                qemu_set_irq(nuclei_eclic_get_irq(DEVICE(env->eclic),
-                                                  Internal_SysTimerSW_S_IRQn,
-                                                  hartid), 1);
-            } else {
-                qemu_set_irq(nuclei_eclic_get_irq(DEVICE(env->eclic),
-                                                  Internal_SysTimerSW_S_IRQn,
-                                                  hartid), 0);
-            }
-        } else {
-            riscv_cpu_update_mip(env, MIP_SSIP, BOOL_TO_MASK(value));
         }
-        break;
-    case NUCLEI_SYSTIMER_REG_MTIMECTL:
-        s->mtimectl = value;
-        if (s->mtimectl & 0x1)
-            timer_del(env->mtimer);
-        break;
-    case NUCLEI_SYSTIMER_REG_MSIP:
-        if (riscv_intc_is_clic_mode(env)) {
-            s->msip = value;
-            if ((s->msip & 0x1) == 1) {
-                qemu_set_irq(*(s->soft_irq[hartid]), 1);
-            } else {
-                qemu_set_irq(*(s->soft_irq[hartid]), 0);
-            }
-        } else {
-            riscv_cpu_update_mip(env, MIP_MSIP, BOOL_TO_MASK(value));
+        return;
+    case REG_SSIP:
+        if (env->priv != PRV_U) {
+            update_ssip(s, 0, value & 0x1);
         }
-        break;
+        return;
+    case REG_MTIMECTL:
+        if (!srw_blocked) {
+            uint32_t new_mtimectl = MTIMECTL_HDBG |
+                                    (value & MTIMECTL_RW_MASK);
+            uint64_t mtime;
+
+            if ((s->mtimectl ^ new_mtimectl) & MTIMECTL_TIMESTOP) {
+                /*
+                 * Freeze the currently visible MTIME on stop, or resume from
+                 * that same visible value when TIMESTOP is cleared.
+                 */
+                mtime = nuclei_systimer_get_mtime(s);
+                if (new_mtimectl & MTIMECTL_TIMESTOP) {
+                    s->time_stop = mtime;
+                    s->mtimectl = new_mtimectl;
+                } else {
+                    s->mtimectl = new_mtimectl;
+                    nuclei_systimer_set_mtime(s, mtime);
+                }
+            } else {
+                s->mtimectl = new_mtimectl;
+            }
+            nuclei_systimer_update_all_timers(s);
+        }
+        return;
+    case REG_MSIP:
+        if (!srw_blocked) {
+            update_msip(s, 0, value & 0x1);
+        }
+        return;
+    /* 0xcff8 is the shared MTIME alias and still only accepts WORD writes. */
+    case REG_MTIME:
+    {
+        uint64_t mtime;
+
+        if (srw_blocked) {
+            return;
+        }
+
+        mtime = nuclei_systimer_get_mtime(s);
+        mtime = (mtime & 0xffffffff00000000ULL) | value;
+        nuclei_systimer_set_mtime(s, mtime);
+        nuclei_systimer_update_all_timers(s);
+        return;
+    }
+    case REG_MTIME + 4:
+    {
+        uint64_t mtime;
+
+        if (srw_blocked) {
+            return;
+        }
+
+        mtime = nuclei_systimer_get_mtime(s);
+        mtime = (mtime & 0xffffffffULL) | (value << 32);
+        nuclei_systimer_set_mtime(s, mtime);
+        nuclei_systimer_update_all_timers(s);
+        return;
+    }
     default:
-        break;
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "systimer: write at invalid offset 0x%" HWADDR_PRIx
+                      " value 0x%" PRIx64 "\n",
+                      offset, value);
+        return;
     }
 }
 
@@ -419,133 +548,179 @@ static const MemoryRegionOps nuclei_timer_ops = {
     .read = nuclei_timer_read,
     .write = nuclei_timer_write,
     .endianness = DEVICE_LITTLE_ENDIAN,
+    .valid = {
+        .min_access_size = 4,
+        .max_access_size = 8,
+    },
     .impl = {
         .min_access_size = 4,
         .max_access_size = 4,
     },
 };
 
-static Property nuclei_systimer_properties[] = {
-    DEFINE_PROP_UINT32("hartid-base", NucleiSYSTIMERState, hartid_base, 0),
-    DEFINE_PROP_UINT32("num-harts", NucleiSYSTIMERState, num_harts, 0),
-    DEFINE_PROP_UINT32("msip-base", NucleiSYSTIMERState, msip_base, 0),
-    DEFINE_PROP_UINT32("mtimecmp-base", NucleiSYSTIMERState, mtimecmp_base, 0),
-    DEFINE_PROP_UINT32("mtime-base", NucleiSYSTIMERState, mtime_base, 0),
-    DEFINE_PROP_UINT32("ssip-base", NucleiSYSTIMERState, ssip_base, 0),
-    DEFINE_PROP_UINT32("aperture-size", NucleiSYSTIMERState, aperture_size, 0),
-    DEFINE_PROP_UINT64("timebase-freq", NucleiSYSTIMERState, timebase_freq, 0),
-    DEFINE_PROP_END_OF_LIST(),
-};
-
-static void nuclei_timer_realize(DeviceState *dev, Error **errp)
+static void nuclei_systimer_cb(void *opaque)
 {
-    NucleiSYSTIMERState *s = NUCLEI_SYSTIMER(dev);
+    CPUState *cs = opaque;
+    RISCVCPU *cpu = RISCV_CPU(cs);
+    CPURISCVState *env = &cpu->env;
+    NucleiSYSTIMERState *s = NUCLEI_SYSTIMER(env->systimer);
+    uint32_t hart_idx = cs->cpu_index - s->hartid_base;
 
-    if( s->aperture_size == 0)
-         s->aperture_size = 0x10000;
-
-    if( s->hartid_base == 0)
-         s->hartid_base = 0;
-
-    if( s->msip_base == 0)
-         s->msip_base = NUCLEI_MSIP_BASE;
-
-    if( s->mtimecmp_base == 0)
-         s->mtimecmp_base = NUCLEI_MTIMECMP_BASE;
-
-    if( s->mtime_base == 0)
-         s->mtime_base = NUCLEI_MTIME_BASE;
-
-    if( s->ssip_base == 0)
-         s->ssip_base = NUCLEI_SSIP_BASE;
-
-    if( s->num_harts == 0)
-    {
-        s->num_harts = hart_numbers;
+    if (hart_idx >= s->num_harts) {
+        return;
     }
 
-    memory_region_init_io(&s->iomem, OBJECT(dev), &nuclei_timer_ops,
-                          s,TYPE_NUCLEI_SYSTIMER, s->aperture_size);
+    if (s->mtimectl & MTIMECTL_CMPCLREN) {
+        nuclei_systimer_update_all_timers(s);
+        return;
+    }
 
-    sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->iomem);
+    nuclei_systimer_set_timer_irq(s, hart_idx, true);
 }
 
-static void nuclei_timer_class_init(ObjectClass *klass, void *data)
+static void nuclei_systimer_reset(DeviceState *dev)
 {
-    DeviceClass *dc = DEVICE_CLASS(klass);
-    dc->realize = nuclei_timer_realize;
-    dc->reset = nuclei_timer_reset;
-    dc->desc = "Nuclei Systimer Timer";
-    device_class_set_props(dc, nuclei_systimer_properties);
-}
-
-static const TypeInfo nuclei_timer_info = {
-    .name = TYPE_NUCLEI_SYSTIMER,
-    .parent = TYPE_SYS_BUS_DEVICE,
-    .instance_size = sizeof(NucleiSYSTIMERState),
-    .class_init = nuclei_timer_class_init,
-};
-
-static void nuclei_timer_register_types(void)
-{
-    type_register_static(&nuclei_timer_info);
-}
-type_init(nuclei_timer_register_types);
-
-static void nuclei_mtimecmp_cb(void *opaque) {
-    CPUState *cs = (CPUState *)opaque;
-    RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(cs->cpu_index));
-    CPURISCVState *env = &cpu->env;
-
-    nuclei_eclic_systimer_cb(env);
-    timer_del(env->mtimer);
-}
-
-DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size, uint32_t hartid_base,
-                        uint32_t num_harts, DeviceState *eclic, uint32_t timebase_freq)
-{
-    hart_numbers = num_harts;
-    int i = 0;
-
-    DeviceState *dev = qdev_new(TYPE_NUCLEI_SYSTIMER);
-    qdev_prop_set_uint32(dev, "hartid-base", hartid_base);
-    qdev_prop_set_uint32(dev, "num-harts", num_harts);
-    qdev_prop_set_uint32(dev, "msip-base", NUCLEI_MSIP_BASE);
-    qdev_prop_set_uint32(dev, "mtimecmp-base", NUCLEI_MTIMECMP_BASE);
-    qdev_prop_set_uint32(dev, "mtime-base", NUCLEI_MTIME_BASE);
-    qdev_prop_set_uint32(dev, "ssip-base", NUCLEI_SSIP_BASE);
-    qdev_prop_set_uint32(dev, "aperture-size", size);
-    qdev_prop_set_uint32(dev, "timebase-freq", timebase_freq);
     NucleiSYSTIMERState *s = NUCLEI_SYSTIMER(dev);
 
-    s->timer_irq = g_new0(qemu_irq *, s->num_harts);
-    s->soft_irq  = g_new0(qemu_irq *, s->num_harts);
+    s->mtime_srw_ctrl = 0;
+    s->msftrst = 0;
+    s->mtimectl = MTIMECTL_HDBG;
+    s->time_delta = 0;
+    s->time_stop = 0;
+    nuclei_systimer_set_mtime(s, 0);
 
-    for (i = 0; i < num_harts; i++) {
-        CPUState *cpu = qemu_get_cpu(hartid_base + i);
-        CPURISCVState *env = cpu ? cpu_env(cpu) : NULL;
+    for (uint32_t i = 0; i < s->num_harts; i++) {
+        CPURISCVState *env = get_env_by_hartid(s, i);
+
+        s->msip[i] = 0;
+        s->ssip[i] = 0;
 
         if (!env) {
             continue;
         }
 
-        env->mtimecmp = 0;
-        if (eclic != NULL) {
-            s->eclic = eclic;
-            s->soft_irq[i] = g_new(qemu_irq, 1);
-            s->timer_irq[i] = g_new(qemu_irq, 1);
-            *s->soft_irq[i] = nuclei_eclic_get_irq(eclic,
-                                                   Internal_SysTimerSW_IRQn, i);
-            *s->timer_irq[i] = nuclei_eclic_get_irq(eclic,
-                                                    Internal_SysTimer_IRQn, i);
-            riscv_cpu_set_rdtime_fn(env, nuclei_cpu_riscv_read_rtc, &(s->timebase_freq));
-            env->mtimer = timer_new_ns(QEMU_CLOCK_VIRTUAL, &nuclei_mtimecmp_cb, cpu);
-        } else {
-            riscv_cpu_set_rdtime_fn(env, nuclei_cpu_riscv_read_rtc, &(s->timebase_freq));
-            env->mtimer = timer_new_ns(QEMU_CLOCK_VIRTUAL, &nuclei_clint_timer_cb, cpu);
+        /*
+         * Keep the reset-time local compare inactive until software programs
+         * a real value. This matches the SDK expectation that timer demos arm
+         * MTIMECMP explicitly instead of taking an interrupt immediately after
+         * global interrupt enable.
+         */
+        env->mtimecmp = UINT64_MAX;
+        if (env->mtimer) {
+            timer_del(env->mtimer);
         }
-        env->systimer = s;
+        nuclei_systimer_set_timer_irq(s, i, false);
+
+        if (riscv_intc_is_clic_mode(env)) {
+            qemu_set_irq(s->m_soft_irq[i], 0);
+            qemu_set_irq(s->s_soft_irq[i], 0);
+        } else {
+            riscv_cpu_update_mip(env, MIP_MSIP, BOOL_TO_MASK(0));
+            riscv_cpu_update_mip(env, MIP_SSIP, BOOL_TO_MASK(0));
+        }
     }
+}
+
+static void nuclei_systimer_realize(DeviceState *dev, Error **errp)
+{
+    NucleiSYSTIMERState *s = NUCLEI_SYSTIMER(dev);
+    int i;
+
+    s->msip = g_new0(uint32_t, s->num_harts);
+    s->ssip = g_new0(uint32_t, s->num_harts);
+    s->timer_irq = g_new0(qemu_irq, s->num_harts);
+    s->m_soft_irq = g_new0(qemu_irq, s->num_harts);
+    s->s_soft_irq = g_new0(qemu_irq, s->num_harts);
+
+    memory_region_init_io(&s->iomem, OBJECT(dev), &nuclei_timer_ops,
+                          s, TYPE_NUCLEI_SYSTIMER, 0x10000);
+    sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->iomem);
+
+    for (i = 0; i < s->num_harts; i++) {
+        CPUState *cpu = qemu_get_cpu(s->hartid_base + i);
+        CPURISCVState *env;
+
+        if (!cpu) {
+            continue;
+        }
+
+        env = cpu_env(cpu);
+        env->mtimer = timer_new_ns(QEMU_CLOCK_VIRTUAL, &nuclei_systimer_cb,
+                                   cpu);
+        env->systimer = s;
+        env->mtimecmp = UINT64_MAX;
+
+        if (s->eclic) {
+            s->timer_irq[i] = nuclei_eclic_get_irq(s->eclic,
+                                                   Internal_SysTimer_IRQn, i);
+            s->m_soft_irq[i] = nuclei_eclic_get_irq(s->eclic,
+                                                    Internal_SysTimerSW_IRQn,
+                                                    i);
+            s->s_soft_irq[i] = nuclei_eclic_get_irq(s->eclic,
+                                                    Internal_SysTimerSW_S_IRQn,
+                                                    i);
+        }
+        riscv_cpu_set_rdtime_fn(env, nuclei_cpu_riscv_read_rtc, s);
+    }
+
+    s->mtime_srw_ctrl = 0;
+    s->msftrst = 0;
+    s->mtimectl = MTIMECTL_HDBG;
+    s->time_delta = 0;
+    s->time_stop = 0;
+    nuclei_systimer_set_mtime(s, 0);
+}
+
+static Property nuclei_systimer_properties[] = {
+    DEFINE_PROP_UINT32("hartid-base", NucleiSYSTIMERState, hartid_base, 0),
+    DEFINE_PROP_UINT32("num-harts", NucleiSYSTIMERState, num_harts, 0),
+    DEFINE_PROP_UINT32("aperture-size", NucleiSYSTIMERState, aperture_size, 0),
+    DEFINE_PROP_UINT64("timebase-freq", NucleiSYSTIMERState, timebase_freq, 0),
+    DEFINE_PROP_END_OF_LIST(),
+};
+
+static void nuclei_systimer_class_init(ObjectClass *klass, void *data)
+{
+    DeviceClass *dc = DEVICE_CLASS(klass);
+
+    dc->realize = nuclei_systimer_realize;
+    dc->reset = nuclei_systimer_reset;
+    dc->desc = "Nuclei Systimer";
+    device_class_set_props(dc, nuclei_systimer_properties);
+}
+
+static const TypeInfo nuclei_systimer_info = {
+    .name = TYPE_NUCLEI_SYSTIMER,
+    .parent = TYPE_SYS_BUS_DEVICE,
+    .instance_size = sizeof(NucleiSYSTIMERState),
+    .class_init = nuclei_systimer_class_init,
+};
+
+static void nuclei_systimer_register_types(void)
+{
+    type_register_static(&nuclei_systimer_info);
+}
+
+type_init(nuclei_systimer_register_types);
+
+DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size,
+                                    uint32_t hartid_base, uint32_t num_harts,
+                                    DeviceState *eclic,
+                                    uint32_t timebase_freq)
+{
+    DeviceState *dev = qdev_new(TYPE_NUCLEI_SYSTIMER);
+    NucleiSYSTIMERState *s = NUCLEI_SYSTIMER(dev);
+
+    assert(num_harts <= NUCLEI_SYSTIMER_MAX_HARTS);
+
+    qdev_prop_set_uint32(dev, "hartid-base", hartid_base);
+    qdev_prop_set_uint32(dev, "num-harts", num_harts);
+    qdev_prop_set_uint32(dev, "aperture-size", size);
+    qdev_prop_set_uint64(dev, "timebase-freq", timebase_freq);
+    if (eclic) {
+        s->eclic = eclic;
+    }
+
     sysbus_realize_and_unref(SYS_BUS_DEVICE(dev), &error_fatal);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, addr);
 
