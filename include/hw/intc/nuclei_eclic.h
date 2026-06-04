@@ -31,17 +31,20 @@
 #define INTERRUPT_SOURCE_MAX_ID (4096)
 
 typedef struct NucleiECLICState NucleiECLICState;
+typedef struct NucleiECLICExternalRoute NucleiECLICExternalRoute;
 DECLARE_INSTANCE_CHECKER(NucleiECLICState, NUCLEI_ECLIC,
                          TYPE_NUCLEI_ECLIC)
 
 typedef struct ECLICPendingInterrupt
 {
-    int irq;
-    int prio;
-    int level;
-    int enable;
-    int trigger;
-    int sig;
+    int irq;        /* Source ID within the per-hart ECLIC bank. */
+    int mode;       /* Resolved delivery mode: PRV_M or PRV_S. */
+    int prio;       /* Decoded priority compare key, kept left-justified. */
+    int level;      /* Decoded level compare key after nlbits padding. */
+    int enable;     /* Cached IE bit for deliverability checks. */
+    int trigger;    /* 0/2: level, 1: rising edge, 3: falling edge. */
+    int sig;        /* Last sampled input level used for edge detection. */
+    bool pending;   /* True while the entry is linked into pending_list[]. */
     QLIST_ENTRY(ECLICPendingInterrupt)
     next;
 } ECLICPendingInterrupt;
@@ -49,19 +52,22 @@ typedef struct ECLICPendingInterrupt
 #define NUCLEI_ECLIC_REG_CLICCFG     0x0000
 #define NUCLEI_ECLIC_REG_CLICINFO    0x0004
 #define NUCLEI_ECLIC_REG_MINTTHRESH  0x0008
+#define NUCLEI_ECLIC_REG_MINTTHRESH_HI 0x000a
+#define NUCLEI_ECLIC_REG_STH         0x0009
 #define NUCLEI_ECLIC_REG_MTH         0x000b
 #define NUCLEI_ECLIC_REG_CLICINTIP_BASE 0x1000
 #define NUCLEI_ECLIC_REG_CLICINTIE_BASE 0x1001
 #define NUCLEI_ECLIC_REG_CLICINTATTR_BASE 0x1002
 #define NUCLEI_ECLIC_REG_CLICINTCTL_BASE 0x1003
 #define NUCLEI_ECLIC_REG_SINTTHRESH     0x2008
-#define NUCLEI_ECLIC_REG_STH            0x2009
+#define NUCLEI_ECLIC_REG_SINTTHRESH_HI  0x200a
+#define NUCLEI_ECLIC_REG_SSTH           0x2009
 #define NUCLEI_ECLIC_REG_CLICINTIP_BASE_S 0x3000
 #define NUCLEI_ECLIC_REG_CLICINTIE_BASE_S 0x3001
 #define NUCLEI_ECLIC_REG_CLICINTATTR_BASE_S 0x3002
 #define NUCLEI_ECLIC_REG_CLICINTCTL_BASE_S 0x3003
 
-#define CLICINTCTLBITS 0x6
+#define NUCLEI_ECLIC_DEFAULT_INTCTLBITS 0x6
 
 #define ECLIC_MAX_HARTS 64
 
@@ -70,8 +76,6 @@ typedef struct NucleiECLICState
     /*< private >*/
     SysBusDevice parent_obj;
 
-    bool prv_s;
-    bool prv_u;
     bool nvbits;
 
     /*< public >*/
@@ -79,39 +83,93 @@ typedef struct NucleiECLICState
 
     uint32_t num_harts;
     uint32_t num_sources; /* 4-1024 */
-    uint32_t eclicintctlbits;
+    uint32_t eclicintctlbits; /* Board-configurable CLICINFO.CLICINTCTLBITS. */
     uint32_t eclic_mmode_base;
     uint64_t mclicbase;
-    uint32_t shadow_gpr_num;
+    uint32_t shadow_gpr_num;  /* Implemented shadow caller-saved bank count. */
     /* config */
-    uint8_t cliccfg[ECLIC_MAX_HARTS];   /*  nlbits(1~4) */
+    uint8_t cliccfg[ECLIC_MAX_HARTS];   /* nlbits(1~4), nmbits(5~6 RO on read) */
     uint32_t clicinfo[ECLIC_MAX_HARTS]; /*  NUM_INTERRUPT(0~12)  VERSION(13~20) CLICINTCTLBITS(21~24) */
     uint8_t mth[ECLIC_MAX_HARTS];       /* mth(0~7) */
-    uint8_t clicintip[ECLIC_MAX_HARTS][4096];
-    uint8_t clicintie[ECLIC_MAX_HARTS][4096];
-    uint8_t clicintattr[ECLIC_MAX_HARTS][4096]; /* shv(0) trig(1~2)*/
-    uint8_t clicintctl[ECLIC_MAX_HARTS][4096];  /*  level (cliccfg.nlbits) priority( (CLICINTCTLBITS - cliccfg.nlbits)*/
-    ECLICPendingInterrupt clicintlist[ECLIC_MAX_HARTS][4096];
+    uint8_t clicintip[ECLIC_MAX_HARTS][INTERRUPT_SOURCE_MAX_ID];
+    uint8_t clicintie[ECLIC_MAX_HARTS][INTERRUPT_SOURCE_MAX_ID];
+    uint8_t clicintattr[ECLIC_MAX_HARTS][INTERRUPT_SOURCE_MAX_ID];
+    uint8_t clicintctl[ECLIC_MAX_HARTS][INTERRUPT_SOURCE_MAX_ID];
+    ECLICPendingInterrupt clicintlist[ECLIC_MAX_HARTS][INTERRUPT_SOURCE_MAX_ID];
 
-    uint8_t sth[ECLIC_MAX_HARTS];
-    uint8_t clicintip_s[ECLIC_MAX_HARTS][4096];
-    uint8_t clicintie_s[ECLIC_MAX_HARTS][4096];
-    uint8_t clicintattr_s[ECLIC_MAX_HARTS][4096]; /* shv(0) trig(1~2)*/
-    uint8_t clicintctl_s[ECLIC_MAX_HARTS][4096];  /*  level (cliccfg.nlbits) priority( (CLICINTCTLBITS - cliccfg.nlbits)*/
-    ECLICPendingInterrupt clicintlist_s[ECLIC_MAX_HARTS][4096];
+    uint8_t sth[ECLIC_MAX_HARTS];  /* Per-hart supervisor threshold mirror. */
+    uint32_t *exccode;             /* Encoded IRQ selection handed to each CPU. */
+    uint32_t aperture_size;        /* MMIO window size configured by the board. */
+    NucleiECLICExternalRoute *external_routes[INTERRUPT_SOURCE_MAX_ID];
+    /* Raw external source fanout used when an SMP topology wires ECLIC
+     * directly without an intermediate CIDU distributor.
+     */
 
-
-    uint32_t *exccode;
-    uint32_t aperture_size;
-
+    /*
+     * Each hart keeps one pending queue ordered by mode/level/priority/ID.
+     * Delivery eligibility is decided when the queue is scanned, rather than
+     * by splitting M/S-mode interrupts into separate lists.
+     */
     QLIST_HEAD(, ECLICPendingInterrupt)
     pending_list[ECLIC_MAX_HARTS];
-    size_t active_count;
-
-    QLIST_HEAD(, ECLICPendingInterrupt)
-    pending_list_s[ECLIC_MAX_HARTS];
-    size_t active_count_s;
 } NucleiECLICState;
+
+static inline uint8_t nuclei_eclic_effective_ctlbits(
+    const NucleiECLICState *eclic)
+{
+    return eclic->eclicintctlbits ? eclic->eclicintctlbits :
+           NUCLEI_ECLIC_DEFAULT_INTCTLBITS;
+}
+
+/* cliccfg.nlbits is software-visible, but only the implemented ctlbits slice
+ * participates in level/priority decoding.
+ */
+static inline uint8_t nuclei_eclic_effective_nlbits(
+    const NucleiECLICState *eclic, int hartid)
+{
+    return MIN((eclic->cliccfg[hartid] >> 1) & 0xf,
+               nuclei_eclic_effective_ctlbits(eclic));
+}
+
+/* Return the raw MMIO byte pattern that represents logical interrupt level 0
+ * for the current nlbits setting.
+ */
+static inline uint8_t nuclei_eclic_level_zero_encoding(
+    const NucleiECLICState *eclic, int hartid)
+{
+    uint8_t nlbits;
+
+    if (!eclic || hartid < 0 || hartid >= eclic->num_harts) {
+        return 0;
+    }
+
+    nlbits = nuclei_eclic_effective_nlbits(eclic, hartid);
+    if (nlbits >= 8) {
+        return 0;
+    }
+
+    return (1u << (8 - nlbits)) - 1u;
+}
+
+/* Convert the raw encoded level byte back to the logical level value used by
+ * shadow-group matching and trap-state bookkeeping.
+ */
+static inline uint8_t nuclei_eclic_level_decode_logical(
+    const NucleiECLICState *eclic, int hartid, uint8_t encoded_level)
+{
+    uint8_t nlbits;
+
+    if (!eclic || hartid < 0 || hartid >= eclic->num_harts) {
+        return encoded_level;
+    }
+
+    nlbits = nuclei_eclic_effective_nlbits(eclic, hartid);
+    if (nlbits == 0) {
+        return 0;
+    }
+
+    return encoded_level >> (8 - nlbits);
+}
 
 enum
 {
@@ -137,26 +195,28 @@ enum
     Internal_Reserved_Max_IRQn = 19, /*!<  Internal reserved  Max */
 };
 
-DeviceState *nuclei_eclic_create(hwaddr addr, uint32_t aperture_size, bool prv_s, bool prv_u, bool vector,
+DeviceState *nuclei_eclic_create(hwaddr addr, uint32_t aperture_size, bool vector,
                                uint32_t num_harts, uint32_t num_sources,
                                uint8_t clicintctlbits, uint32_t shadow_gpr_num);
 qemu_irq nuclei_eclic_get_irq(DeviceState *dev, int irq, int hartid);
 qemu_irq nuclei_eclic_get_external_irq(DeviceState *dev, int irq);
 bool nuclei_eclic_irq_enabled(DeviceState *dev, uint32_t irq, int hartid);
 void nuclei_eclic_systimer_cb(void *opaque);
-void riscv_cpu_eclic_int_handler_start(void *eclic_ptr, int mode, int irq, int hartid);
-void riscv_cpu_eclic_int_handler_start_s(void *eclic_ptr, int mode, int irq, int hartid);
+void riscv_cpu_eclic_int_handler_start(void *eclic_ptr, int irq, int hartid);
 bool riscv_intc_is_clic_mode(CPUArchState *env);
 bool riscv_intc_is_eclicv2_mode(CPUArchState *env);
-void shadow_gpr_push(CPUArchState *env, uint8_t grp, bool stack_save);
+void shadow_gpr_push(CPUArchState *env, uint8_t grp, uint8_t stack_save_mask);
 void shadow_gpr_pop(CPUArchState *env);
 int get_shadow_gpr_stack_size(CPUArchState *env);
 void riscv_shadow_gpr_switch_grp(CPUArchState *env, uint8_t grp_index);
 void riscv_backup_shadow_gpr(CPUArchState *env, uint8_t grp_index);
-void nuclei_eclic_next_interrupt(void *eclic, int mode, int hartid);
-bool nuclei_eclic_shv_interrupt(void *opaque, int mode, int hartid, int irq);
-bool nuclei_eclic_edge_triggered(void *opaque, int mode, int hartid, int irq);
-void nuclei_eclic_clean_pending(void *opaque, int mode, int hartid, int irq);
+void nuclei_eclic_next_interrupt(void *eclic, int hartid);
+uint8_t nuclei_eclic_get_threshold(void *opaque, int mode, int hartid);
+void nuclei_eclic_set_threshold(void *opaque, int mode, int hartid,
+                                uint8_t threshold);
+bool nuclei_eclic_shv_interrupt(void *opaque, int hartid, int irq);
+bool nuclei_eclic_edge_triggered(void *opaque, int hartid, int irq);
+void nuclei_eclic_clean_pending(void *opaque, int hartid, int irq);
 void nuclei_eclic_irq_request(void *opaque, int id, int new_intip);
 
 #endif
