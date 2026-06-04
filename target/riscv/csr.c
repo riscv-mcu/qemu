@@ -21,6 +21,7 @@
 #include "qemu/log.h"
 #include "qemu/timer.h"
 #include "cpu.h"
+#include "internals.h"
 #include "tcg/tcg-cpu.h"
 #include "pmu.h"
 #include "time_helper.h"
@@ -34,6 +35,31 @@
 #if !defined(CONFIG_USER_ONLY)
 #include "hw/intc/nuclei_eclic.h"
 #include "hw/intc/riscv_clic.h"
+#endif
+
+#if !defined(CONFIG_USER_ONLY)
+bool nuclei_eclic_tsp_swap_needed(CPURISCVState *env,
+                                         target_ulong xcause,
+                                         target_ulong xsubm)
+{
+    /* scause/mcause.{SPIL,MPIL} and mintstatus.{SIL,MIL} carry logical
+     * interrupt levels in QEMU's ECLIC path, so zero-detection must compare
+     * against logical level 0 instead of the MMIO encoding of level zero.
+     */
+    if (env->priv <= PRV_S) {
+        return ((((get_field(xcause, SCAUSE_SPIL) == 0) ^
+                  (get_field(env->mintstatus, MINTSTATUS_SIL) == 0)) &&
+                 (get_field(xsubm, XSUBM_TYP) == SUBM_INT)) ||
+                ((env->priv != get_field(env->mstatus, MSTATUS_SPP)) &&
+                 (get_field(xsubm, XSUBM_TYP) > SUBM_INT)));
+    }
+
+    return ((((get_field(xcause, MCAUSE_MPIL) == 0) ^
+              (get_field(env->mintstatus, MINTSTATUS_MIL) == 0)) &&
+             (get_field(xsubm, XSUBM_TYP) == SUBM_INT)) ||
+            ((env->priv != get_field(env->mstatus, MSTATUS_MPP)) &&
+             (get_field(xsubm, XSUBM_TYP) > SUBM_INT)));
+}
 #endif
 
 /* CSR function table public API */
@@ -1487,6 +1513,70 @@ static target_ulong legalize_mpp(CPURISCVState *env, target_ulong old_mpp,
     return val;
 }
 
+static inline target_ulong nuclei_mcause_ext_mask(void)
+{
+    return MCAUSE_MINHV | MCAUSE_MPP | MCAUSE_MPIE | MCAUSE_MPIL;
+}
+
+static inline target_ulong nuclei_scause_ext_mask(void)
+{
+    return SCAUSE_SINHV | SCAUSE_SPP | SCAUSE_SPIE | SCAUSE_SPIL;
+}
+
+static bool nuclei_xcause_ext_fields_active(CPURISCVState *env)
+{
+#if !defined(CONFIG_USER_ONLY)
+    /* The extra xcause fields are only architecturally visible in Nuclei
+     * CLIC/ECLIC mode; outside that mode QEMU keeps them as internal state.
+     */
+    return riscv_intc_is_clic_mode(env);
+#else
+    return false;
+#endif
+}
+
+#if !defined(CONFIG_USER_ONLY)
+void riscv_nuclei_sync_mcause_from_mstatus(CPURISCVState *env)
+{
+    /* mcause mirrors trap-return privilege bits in Nuclei CLIC mode. */
+    env->mcause = set_field(env->mcause, MCAUSE_MPP,
+                            get_field(env->mstatus, MSTATUS_MPP));
+    env->mcause = set_field(env->mcause, MCAUSE_MPIE,
+                            get_field(env->mstatus, MSTATUS_MPIE));
+}
+
+void riscv_nuclei_sync_mstatus_from_mcause(CPURISCVState *env)
+{
+    target_ulong mstatus = env->mstatus;
+
+    /* Writes to mcause must feed the mirrored mstatus bits back as well. */
+    mstatus = set_field(mstatus, MSTATUS_MPIE,
+                        get_field(env->mcause, MCAUSE_MPIE));
+    mstatus = set_field(mstatus, MSTATUS_MPP,
+                        get_field(env->mcause, MCAUSE_MPP));
+    env->mstatus = legalize_mpp(env, get_field(env->mstatus, MSTATUS_MPP),
+                                mstatus);
+}
+
+void riscv_nuclei_sync_scause_from_sstatus(CPURISCVState *env)
+{
+    /* scause mirrors trap-return privilege bits in Nuclei CLIC mode. */
+    env->scause = set_field(env->scause, SCAUSE_SPP,
+                            get_field(env->mstatus, MSTATUS_SPP));
+    env->scause = set_field(env->scause, SCAUSE_SPIE,
+                            get_field(env->mstatus, MSTATUS_SPIE));
+}
+
+void riscv_nuclei_sync_sstatus_from_scause(CPURISCVState *env)
+{
+    /* Writes to scause must feed the mirrored sstatus bits back as well. */
+    env->mstatus = set_field(env->mstatus, MSTATUS_SPP,
+                             get_field(env->scause, SCAUSE_SPP));
+    env->mstatus = set_field(env->mstatus, MSTATUS_SPIE,
+                             get_field(env->scause, SCAUSE_SPIE));
+}
+#endif
+
 static RISCVException write_mstatus(CPURISCVState *env, int csrno,
                                     target_ulong val)
 {
@@ -1527,14 +1617,8 @@ static RISCVException write_mstatus(CPURISCVState *env, int csrno,
     env->mstatus = mstatus;
 
     if (riscv_intc_is_clic_mode(env)) {
-        env->mcause = set_field(env->mcause, MCAUSE_MPP,
-                                get_field(mstatus, MSTATUS_MPP));
-        env->mcause = set_field(env->mcause, MCAUSE_MPIE,
-                                get_field(mstatus, MSTATUS_MPIE));
-        env->scause = set_field(env->scause, SCAUSE_SPP,
-                                get_field(mstatus, MSTATUS_SPP));
-        env->scause = set_field(env->scause, SCAUSE_SPIE,
-                                get_field(mstatus, MSTATUS_SPIE));
+        riscv_nuclei_sync_mcause_from_mstatus(env);
+        riscv_nuclei_sync_scause_from_sstatus(env);
     }
 
     /*
@@ -1681,6 +1765,17 @@ static RISCVException rmw_mideleg64(CPURISCVState *env, int csrno,
 {
     uint64_t mask = wr_mask & delegable_ints;
 
+    /*
+     * In Nuclei ECLIC mode, mideleg is architecturally bypassed:
+     * reads return zero and writes are ignored.
+     */
+    if (riscv_intc_is_clic_mode(env)) {
+        if (ret_val) {
+            *ret_val = 0;
+        }
+        return RISCV_EXCP_NONE;
+    }
+
     if (ret_val) {
         *ret_val = env->mideleg;
     }
@@ -1731,6 +1826,17 @@ static RISCVException rmw_mie64(CPURISCVState *env, int csrno,
                                 uint64_t new_val, uint64_t wr_mask)
 {
     uint64_t mask = wr_mask & all_ints;
+
+    /*
+     * In Nuclei ECLIC mode, mie is functionally bypassed:
+     * reads return zero and writes are ignored.
+     */
+    if (riscv_intc_is_clic_mode(env)) {
+        if (ret_val) {
+            *ret_val = 0;
+        }
+        return RISCV_EXCP_NONE;
+    }
 
     if (ret_val) {
         *ret_val = env->mie;
@@ -2207,13 +2313,33 @@ static RISCVException read_mcause(CPURISCVState *env, int csrno,
                                   target_ulong *val)
 {
     *val = env->mcause;
+    if (!nuclei_xcause_ext_fields_active(env)) {
+        /* Keep the internal mirror bits intact but hide them from software
+         * outside Nuclei CLIC/ECLIC mode.
+         */
+        *val &= ~nuclei_mcause_ext_mask();
+    }
     return RISCV_EXCP_NONE;
 }
 
 static RISCVException write_mcause(CPURISCVState *env, int csrno,
                                    target_ulong val)
 {
+    if (!nuclei_xcause_ext_fields_active(env)) {
+        /* Non-CLIC configurations must not let software scribble over the
+         * internal Nuclei-only mirror bits.
+         */
+        val = (val & ~nuclei_mcause_ext_mask()) |
+              (env->mcause & nuclei_mcause_ext_mask());
+    }
+
     env->mcause = val;
+#if !defined(CONFIG_USER_ONLY)
+    if (nuclei_xcause_ext_fields_active(env)) {
+        riscv_nuclei_sync_mstatus_from_mcause(env);
+        riscv_nuclei_sync_mcause_from_mstatus(env);
+    }
+#endif
     return RISCV_EXCP_NONE;
 }
 
@@ -2639,10 +2765,12 @@ static RISCVException rmw_mip(CPURISCVState *env, int csrno,
     return ret;
 }
 
-static bool get_xnxti_status(CPURISCVState *env)
+static bool get_xnxti_status(CPURISCVState *env, int *clic_priv_out,
+                             int *clic_il_out, int *clic_irq_out)
 {
     CPUState *cs = env_cpu(env);
     int clic_irq, clic_priv, clic_il, pil;
+    uint8_t threshold;
 
     if (!env->exccode) { /* No interrupt */
         return false;
@@ -2657,9 +2785,17 @@ static bool get_xnxti_status(CPURISCVState *env)
         riscv_clic_decode_exccode(env->exccode, &clic_priv, &clic_il,
                                   &clic_irq);
         if (env->priv == PRV_M) {
-            pil = MAX(get_field(env->mcause, MCAUSE_MPIL), env->mintthresh);
+            threshold = env->eclic ?
+                        nuclei_eclic_get_threshold(env->eclic, PRV_M,
+                                                   cs->cpu_index) :
+                        env->mintthresh;
+            pil = MAX(get_field(env->mcause, MCAUSE_MPIL), threshold);
         } else if (env->priv == PRV_S) {
-            pil = MAX(get_field(env->scause, SCAUSE_SPIL), env->sintthresh);
+            threshold = env->eclic ?
+                        nuclei_eclic_get_threshold(env->eclic, PRV_S,
+                                                   cs->cpu_index) :
+                        env->sintthresh;
+            pil = MAX(get_field(env->scause, SCAUSE_SPIL), threshold);
         } else {
             qemu_log_mask(LOG_GUEST_ERROR,
                           "CSR: rmw xnxti with unsupported mode\n");
@@ -2668,13 +2804,44 @@ static bool get_xnxti_status(CPURISCVState *env)
 
         if ((clic_priv != env->priv) || /* No horizontal interrupt */
             (clic_il <= pil) || /* No higher level interrupt */
-            (nuclei_eclic_shv_interrupt(env->eclic, clic_priv, cs->cpu_index,
-                                      clic_irq))) { /* CLIC vector mode */
+            (nuclei_eclic_shv_interrupt(env->eclic, cs->cpu_index,
+                                        clic_irq))) { /* CLIC vector mode */
             return false;
-        } else {
-            return true;
         }
+
+        if (clic_priv_out) {
+            *clic_priv_out = clic_priv;
+        }
+        if (clic_il_out) {
+            *clic_il_out = clic_il;
+        }
+        if (clic_irq_out) {
+            *clic_irq_out = clic_irq;
+        }
+        return true;
     }
+
+    return false;
+}
+
+static inline void nuclei_xnxti_update_int_enable(CPURISCVState *env,
+                                                  target_ulong new_value,
+                                                  target_ulong write_mask)
+{
+    /*
+     * snxti/mnxti are intended to be used through CSRRSI/CSRRCI so the write
+     * side can update the interrupt-enable state while returning the handler
+     * entry pointer. Preserve the existing low-bit scope, but honor CSRRCI
+     * clears as well as CSRRSI/CSRRW sets.
+     */
+    const target_ulong xnxti_mask = 0x1f;
+    target_ulong mask = write_mask & xnxti_mask;
+
+    if (!mask) {
+        return;
+    }
+
+    env->mstatus = (env->mstatus & ~mask) | (new_value & mask);
 }
 
 static int rmw_mnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
@@ -2692,28 +2859,23 @@ static int rmw_mnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
         return RISCV_EXCP_NONE;
     }
 
-    if (write_mask) {
-        env->mstatus |= new_value & (write_mask & 0b11111);
-    }
+    nuclei_xnxti_update_int_enable(env, new_value, write_mask);
 
     bql_lock();
-    ready = get_xnxti_status(env);
+    ready = get_xnxti_status(env, &clic_priv, &clic_il, &clic_irq);
     if (ready) {
-        riscv_clic_decode_exccode(env->exccode, &clic_priv, &clic_il,
-                                  &clic_irq);
         if (write_mask) {
-            bool edge = nuclei_eclic_edge_triggered(env->eclic, clic_priv,
-                                                  cs->cpu_index, clic_irq);
+            bool edge = nuclei_eclic_edge_triggered(env->eclic,
+                                                    cs->cpu_index, clic_irq);
             if (edge) {
-                nuclei_eclic_clean_pending(env->eclic, clic_priv,
-                                         cs->cpu_index, clic_irq);
+                nuclei_eclic_clean_pending(env->eclic, cs->cpu_index,
+                                           clic_irq);
                 /*
                  * mnxti consumes the currently selected edge-triggered source
                  * in place. Advance the ECLIC state here so env->exccode does
                  * not keep pointing at the just-removed pending entry.
                  */
-                nuclei_eclic_next_interrupt(env->eclic, clic_priv,
-                                            cs->cpu_index);
+                nuclei_eclic_next_interrupt(env->eclic, cs->cpu_index);
             }
             env->mintstatus = set_field(env->mintstatus,
                                         MINTSTATUS_MIL, clic_il);
@@ -3005,6 +3167,17 @@ static RISCVException rmw_sie64(CPURISCVState *env, int csrno,
     RISCVException ret;
 
     /*
+     * In Nuclei ECLIC mode, sie is functionally bypassed:
+     * reads return zero and writes are ignored.
+     */
+    if (riscv_intc_is_clic_mode(env)) {
+        if (ret_val) {
+            *ret_val = 0;
+        }
+        return RISCV_EXCP_NONE;
+    }
+
+    /*
      * mideleg[i]  mvien[i]
      *   0           0      sie[i] read-only zero.
      *   0           1      sie[i] is a separate writable bit.
@@ -3086,7 +3259,7 @@ static RISCVException write_stvec(CPURISCVState *env, int csrno,
          * If only CLIC mode is supported, writes to bit 1 are also ignored and
          * it is always set to one. CLIC mode hardwires xtvec bits 2-5 to zero.
          */
-        env->stvec = ((val & ~0x3f) << 6) | (0b000011);
+        env->stvec = (val & ~((target_ulong)0x3f)) | (0b000011);
     } else {
         qemu_log_mask(LOG_UNIMP, "CSR_STVEC: reserved mode not supported\n");
     }
@@ -3155,13 +3328,33 @@ static RISCVException read_scause(CPURISCVState *env, int csrno,
                                   target_ulong *val)
 {
     *val = env->scause;
+    if (!nuclei_xcause_ext_fields_active(env)) {
+        /* Keep the internal mirror bits intact but hide them from software
+         * outside Nuclei CLIC/ECLIC mode.
+         */
+        *val &= ~nuclei_scause_ext_mask();
+    }
     return RISCV_EXCP_NONE;
 }
 
 static RISCVException write_scause(CPURISCVState *env, int csrno,
                                    target_ulong val)
 {
+    if (!nuclei_xcause_ext_fields_active(env)) {
+        /* Non-CLIC configurations must not let software scribble over the
+         * internal Nuclei-only mirror bits.
+         */
+        val = (val & ~nuclei_scause_ext_mask()) |
+              (env->scause & nuclei_scause_ext_mask());
+    }
+
     env->scause = val;
+#if !defined(CONFIG_USER_ONLY)
+    if (nuclei_xcause_ext_fields_active(env)) {
+        riscv_nuclei_sync_sstatus_from_scause(env);
+        riscv_nuclei_sync_scause_from_sstatus(env);
+    }
+#endif
     return RISCV_EXCP_NONE;
 }
 
@@ -3307,28 +3500,23 @@ static int rmw_snxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
         return RISCV_EXCP_NONE;
     }
 
-    if (write_mask) {
-        env->mstatus |= new_value & (write_mask & 0b11111);
-    }
+    nuclei_xnxti_update_int_enable(env, new_value, write_mask);
 
     bql_lock();
-    ready = get_xnxti_status(env);
+    ready = get_xnxti_status(env, &clic_priv, &clic_il, &clic_irq);
     if (ready) {
-        riscv_clic_decode_exccode(env->exccode, &clic_priv, &clic_il,
-                                  &clic_irq);
         if (write_mask) {
-            bool edge = nuclei_eclic_edge_triggered(env->eclic, clic_priv,
-                                                  cs->cpu_index, clic_irq);
+            bool edge = nuclei_eclic_edge_triggered(env->eclic,
+                                                    cs->cpu_index, clic_irq);
             if (edge) {
-                nuclei_eclic_clean_pending(env->eclic, clic_priv,
-                                         cs->cpu_index, clic_irq);
+                nuclei_eclic_clean_pending(env->eclic, cs->cpu_index,
+                                           clic_irq);
                 /*
                  * snxti has the same in-place consume semantics as mnxti for
                  * edge-triggered sources, so refresh the next deliverable
                  * interrupt only on this CSR path.
                  */
-                nuclei_eclic_next_interrupt(env->eclic, clic_priv,
-                                            cs->cpu_index);
+                nuclei_eclic_next_interrupt(env->eclic, cs->cpu_index);
             }
             env->mintstatus = set_field(env->mintstatus,
                                         MINTSTATUS_SIL, clic_il);
@@ -4914,7 +5102,7 @@ static int read_stvt(CPURISCVState *env, int csrno, target_ulong *val)
 
 static int write_stvt(CPURISCVState *env, int csrno, target_ulong val)
 {
-    env->stvt = val & ~((1ULL << 6) - 1);
+    env->stvt = val & ~((target_ulong)0x3f);
     return RISCV_EXCP_NONE;
 }
 
@@ -4931,7 +5119,8 @@ static int read_stvt2(CPURISCVState *env, int csrno, target_ulong *val)
 
 static int write_stvt2(CPURISCVState *env, int csrno, target_ulong val)
 {
-    env->stvt2 = val;
+    /* xtvt2 exposes bit0 as the enable bit while bit1 is reserved/tied to 0. */
+    env->stvt2 = val & ~((target_ulong)0x2);
     return RISCV_EXCP_NONE;
 }
 
@@ -5226,7 +5415,8 @@ static int read_mtvt2(CPURISCVState *env, int csrno, target_ulong *val)
 
 static int write_mtvt2(CPURISCVState *env, int csrno, target_ulong val)
 {
-    env->mtvt2 = val;
+    /* xtvt2 exposes bit0 as the enable bit while bit1 is reserved/tied to 0. */
+    env->mtvt2 = val & ~((target_ulong)0x2);
     return RISCV_EXCP_NONE;
 }
 
@@ -5235,6 +5425,9 @@ static int rmw_jalmnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
 {
 #ifndef CONFIG_USER_ONLY
     target_ulong addr;
+    int clic_priv, clic_il, clic_irq;
+    bool ready;
+    CPUState *cs = env_cpu(env);
 
     // If in debug mode, directly return
     if (env->debugger) {
@@ -5250,18 +5443,35 @@ static int rmw_jalmnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
         riscv_addr_size = 8;
     }
 
-    if (env->irq_pending) {
-        uint64_t vec_addr = (env->mcause & 0x3FF) *riscv_addr_size + env->mtvt;
+    bql_lock();
+    ready = get_xnxti_status(env, &clic_priv, &clic_il, &clic_irq);
+    if (ready) {
+        uint64_t vec_addr = clic_irq * riscv_addr_size + env->mtvt;
         cpu_physical_memory_rw(vec_addr, &addr,  riscv_addr_size, 0);
-        env->gpr[1] = env->pc;  //ret use
+        /*
+         * jalmnxti must return to the CSR instruction itself so the common
+         * entry can re-check pending non-vectored interrupts for tail-chaining.
+         */
+        env->gpr[1] = env->pc - 4;
         if (ret_value) {
             *ret_value = addr;
         }
+        env->mintstatus = set_field(env->mintstatus, MINTSTATUS_MIL, clic_il);
+        env->mcause = set_field(env->mcause, MCAUSE_EXCCODE, clic_irq);
         env->mstatus = set_field(env->mstatus, MSTATUS_MIE, 1);
-        riscv_cpu_eclic_int_handler_start(env->eclic, env->priv, env->mcause & 0x3ff, env->mhartid);
-    } else if (ret_value) {
+        riscv_cpu_eclic_int_handler_start(env->eclic, clic_irq,
+                                          cs->cpu_index);
+        /*
+         * jalmnxti delivers the next non-vectored interrupt synchronously via
+         * the common entry loop. Keep env->exccode/irq_pending for the next
+         * tail-chained claim, but suppress the asynchronous trap request so we
+         * do not re-enter irq_entry before the handler returns to this CSR.
+         */
+        cpu_reset_interrupt(cs, CPU_INTERRUPT_ECLIC);
+    } else {
         *ret_value = env->pc;
     }
+    bql_unlock();
 #endif
     return RISCV_EXCP_NONE;
 }
@@ -5319,6 +5529,9 @@ static int rmw_jalsnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
 {
 #ifndef CONFIG_USER_ONLY
     target_ulong addr;
+    int clic_priv, clic_il, clic_irq;
+    bool ready;
+    CPUState *cs = env_cpu(env);
 
     // If in debug mode, directly return
     if (env->debugger) {
@@ -5334,18 +5547,38 @@ static int rmw_jalsnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
         riscv_addr_size = 8;
     }
 
-    if (env->irq_pending) {
-        uint64_t vec_addr = (env->scause & 0x3FF) *riscv_addr_size + env->stvt;
+    bql_lock();
+    ready = get_xnxti_status(env, &clic_priv, &clic_il, &clic_irq);
+    if (ready) {
+        uint64_t vec_addr = clic_irq * riscv_addr_size + env->stvt;
         cpu_physical_memory_rw(vec_addr, &addr,  riscv_addr_size, 0);
-        env->gpr[1] = env->pc;
+        /*
+         * jalsnxti has the same self-linking tail-chaining behavior as
+         * jalmnxti, so it must re-enter the CSR instruction after the ISR.
+         */
+        env->gpr[1] = env->pc - 4;
         if (ret_value) {
             *ret_value = addr;
         }
+        env->mintstatus = set_field(env->mintstatus, MINTSTATUS_SIL, clic_il);
+        env->scause = set_field(env->scause, SCAUSE_EXCCODE, clic_irq);
         env->mstatus = set_field(env->mstatus, MSTATUS_SIE, 1);
-        riscv_cpu_eclic_int_handler_start_s(env->eclic, env->priv, env->scause & 0x3ff, env->mhartid);
+        riscv_cpu_eclic_int_handler_start(env->eclic, clic_irq,
+                                          cs->cpu_index);
+        /*
+         * jalsnxti shares the same synchronous tail-chaining contract as
+         * jalmnxti: re-use the current common entry instead of taking a fresh
+         * asynchronous trap for the next pending non-vectored interrupt.
+         */
+        cpu_reset_interrupt(cs, CPU_INTERRUPT_ECLIC);
     } else if (ret_value) {
-        *ret_value = env->pc + riscv_addr_size;
+        /*
+         * The translator advances env->pc before entering the jalxnxti
+         * helper, so the no-pending fallback must return the current PC.
+         */
+        *ret_value = env->pc;
     }
+    bql_unlock();
 #endif
     return RISCV_EXCP_NONE;
 }
@@ -5402,16 +5635,17 @@ static int rmw_mtspcsw(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
     target_ulong t;
-    if ((env->priv == PRV_M) && get_field(env->meclic_ctl, XECLIC_CTL_TSP_EN)) {
-        if ((((get_field(env->mcause, MCAUSE_MPIL) == 0) ^ (get_field(env->mintstatus, MINTSTATUS_MIL) == 0))
-            && (get_field(env->msubm, XSUBM_TYP) == SUBM_INT))
-            || ((env->priv != get_field(env->mstatus, MSTATUS_MPP)) && (get_field(env->msubm, XSUBM_TYP) > SUBM_INT))) {
-            t = new_value;
-            if (ret_value) {
-                *ret_value = env->mtsp;
-            }
-            env->mtsp = t;
+    if ((env->priv == PRV_M) &&
+        nuclei_eclic_tsp_swap_needed(env, env->mcause, env->msubm)) {
+        /*
+         * XTSPCSW is the software fallback when TSP_EN is disabled, so its
+         * swap semantics must not depend on TSP_EN itself.
+         */
+        t = new_value;
+        if (ret_value) {
+            *ret_value = env->mtsp;
         }
+        env->mtsp = t;
     } else {
         if (ret_value) {
             *ret_value = new_value;
@@ -5424,16 +5658,17 @@ static int rmw_stspcsw(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
     target_ulong t;
-    if ((env->priv <= PRV_S) && get_field(env->seclic_ctl, XECLIC_CTL_TSP_EN)) {
-        if ((((get_field(env->scause, MCAUSE_MPIL) == 0) ^ (get_field(env->mintstatus, MINTSTATUS_SIL) == 0))
-            && (get_field(env->ssubm, XSUBM_TYP) == SUBM_INT))
-            || ((env->priv != get_field(env->mstatus, MSTATUS_SPP)) && (get_field(env->ssubm, XSUBM_TYP) > SUBM_INT))) {
-            t = new_value;
-            if (ret_value) {
-                *ret_value = env->stsp;
-            }
-            env->stsp = t;
+    if ((env->priv <= PRV_S) &&
+        nuclei_eclic_tsp_swap_needed(env, env->scause, env->ssubm)) {
+        /*
+         * XTSPCSW is the software fallback when TSP_EN is disabled, so its
+         * swap semantics must not depend on TSP_EN itself.
+         */
+        t = new_value;
+        if (ret_value) {
+            *ret_value = env->stsp;
         }
+        env->stsp = t;
     } else {
         if (ret_value) {
             *ret_value = new_value;
@@ -5525,25 +5760,31 @@ static int rmw_pushssubm(CPURISCVState *env, int csrno, target_ulong *ret_value,
 
 static int read_meclic_ctl(CPURISCVState *env, int csrno, target_ulong *val)
 {
-    *val = env->meclic_ctl;
+    /* FEAT_EN is a read-only mirror of mmisc_ctl.HW_AUTO_CONTEXT. */
+    *val = set_field(env->meclic_ctl, XECLIC_CTL_FEAT_EN,
+                     !!(env->mmisc_ctl & (1U << 21)));
     return RISCV_EXCP_NONE;
 }
 
 static int write_meclic_ctl(CPURISCVState *env, int csrno, target_ulong val)
 {
-    env->meclic_ctl = val;
+    /* Ignore FEAT_EN writes and keep only the writable control bits. */
+    env->meclic_ctl = set_field(val, XECLIC_CTL_FEAT_EN, 0);
     return RISCV_EXCP_NONE;
 }
 
 static int read_seclic_ctl(CPURISCVState *env, int csrno, target_ulong *val)
 {
-    *val = env->seclic_ctl;
+    /* FEAT_EN is a read-only mirror of mmisc_ctl.HW_AUTO_CONTEXT. */
+    *val = set_field(env->seclic_ctl, XECLIC_CTL_FEAT_EN,
+                     !!(env->mmisc_ctl & (1U << 21)));
     return RISCV_EXCP_NONE;
 }
 
 static int write_seclic_ctl(CPURISCVState *env, int csrno, target_ulong val)
 {
-    env->seclic_ctl = val;
+    /* Ignore FEAT_EN writes and keep only the writable control bits. */
+    env->seclic_ctl = set_field(val, XECLIC_CTL_FEAT_EN, 0);
     return RISCV_EXCP_NONE;
 }
 
@@ -5579,15 +5820,18 @@ static int rmw_popxret(CPURISCVState *env, int csrno, target_ulong *ret_value,
 {
     uint64_t notify_addr = 0;
     uint32_t riscv_addr_size = 4;
+    uint32_t gpr_frame_size;
+    uint32_t fpr_size;
+    uint32_t fpr_frame_size;
     uint32_t stack_ofst;
     uint8_t current_grp, prev_grp;
     target_ulong retpc;
     target_ulong xeclic_ctl, xtsp;
     RISCVEclicShadowState *shadow = &env->eclic_shadow;
-    bool need_stack_pop;
-    void *xcause, *xepc, *xsubm;
+    uint8_t stack_save_mask;
+    target_ulong *xcause, *xepc, *xsubm;
 
-    // If in debug mode, directly return
+    /* Debug mode does not consume the saved Nuclei trap frame. */
     if (env->debugger) {
         if (ret_value) {
             *ret_value = 0;
@@ -5598,39 +5842,53 @@ static int rmw_popxret(CPURISCVState *env, int csrno, target_ulong *ret_value,
     if (riscv_cpu_mxl(env) != MXL_RV32) {
         riscv_addr_size = 8;
     }
+    gpr_frame_size = nuclei_eclic_gpr_frame_size(env);
+    fpr_size = nuclei_eclic_fpr_slot_size(env);
 
     xcause = (env->priv <= PRV_S) ? &env->scause : &env->mcause;
     xepc = (env->priv <= PRV_S) ? &env->sepc : &env->mepc;
     xsubm = (env->priv <= PRV_S) ? &env->ssubm : &env->msubm;
     xeclic_ctl = (env->priv <= PRV_S) ? env->seclic_ctl : env->meclic_ctl;
     xtsp = (env->priv <= PRV_S) ? env->stsp : env->mtsp;
+    fpr_frame_size = nuclei_eclic_fpr_frame_size(env);
 
+    /* popxret always starts from the current trap stack pointer, where the
+     * auto-context frame stores xcause/xepc/xsubm as its trailer.
+     */
     notify_addr = env->gpr[2];
     cpu_physical_memory_rw(notify_addr + riscv_addr_size * 13, xsubm, riscv_addr_size, 0);
     cpu_physical_memory_rw(notify_addr + riscv_addr_size * 12, xepc, riscv_addr_size, 0);
     cpu_physical_memory_rw(notify_addr + riscv_addr_size * 11, xcause, riscv_addr_size, 0);
 
-    if((get_shadow_gpr_stack_size(env) > 0)) {
+    if ((get_shadow_gpr_stack_size(env) > 0)) {
         /* Based on the current grp stack popping information of the interrupt,
          * decide whether to pop the register from the stack or directly release
          * the corresponding shadow register group */
-        need_stack_pop = shadow->grp_stack[shadow->grp_stack_top].needs_stack_save;
+        stack_save_mask =
+            shadow->grp_stack[shadow->grp_stack_top].stack_save_mask;
         current_grp = shadow->grp_stack[shadow->grp_stack_top].grp_index;
         shadow_gpr_pop(env);
-        prev_grp = shadow->grp_stack[shadow->grp_stack_top].grp_index;
+        prev_grp = (shadow->grp_stack_top >= 0) ?
+                   shadow->grp_stack[shadow->grp_stack_top].grp_index : 0;
 
-        if (need_stack_pop) {
+        if (stack_save_mask & ECLIC_STACK_SAVE_GPRS) {
             for (uint32_t i = 0; i < 17; i++) {
                 stack_ofst = i;
                 if (i > 10) {
                     if (riscv_has_ext(env, RVE)) {
                         continue;
                     } else {
-                        stack_ofst += 4;
+                        stack_ofst += 3;
                     }
                 }
                 cpu_physical_memory_rw(notify_addr + riscv_addr_size * stack_ofst,
                                         &env->gpr[context_regs[i]], riscv_addr_size, 0);
+            }
+        }
+        if (stack_save_mask & ECLIC_STACK_SAVE_FPRS) {
+            for (uint32_t i = 0; i < SHADOW_FPR_COUNT; i++) {
+                cpu_physical_memory_rw(notify_addr + gpr_frame_size + fpr_size * i,
+                                    &env->fpr[fpu_context_regs[i]], fpr_size, 0);
             }
         }
 
@@ -5640,29 +5898,32 @@ static int rmw_popxret(CPURISCVState *env, int csrno, target_ulong *ret_value,
              * shadow grp; otherwise, it will still be executed under the current shadow grp. */
             if (prev_grp) {
                 riscv_shadow_gpr_switch_grp(env, prev_grp);
-                shadow->shadow_grp_used[current_grp - 1] = 0;
             } else {
                 /* If 'prev_grp' is 0, it indicates that this is the outermost interrupt
                  * and you need to switch back to the base gpr of the main text. */
                 riscv_shadow_gpr_switch_grp(env, 0);
-                // shadow->shadow_grp_used[0] = 0; // 0或者9
+            }
+
+            if (current_grp != 0) {
+                shadow->shadow_grp_used[current_grp - 1] = 0;
             }
         }
     }
 
-    if (get_field(xeclic_ctl, XECLIC_CTL_TSP_EN)) {
+    if (get_field(xeclic_ctl, XECLIC_CTL_TSP_EN) &&
+        nuclei_eclic_tsp_swap_needed(env, *xcause, *xsubm)) {
         notify_addr = xtsp;
         if (env->priv <= PRV_S) {
-            env->stsp= env->gpr[2] + riscv_addr_size * ((!riscv_has_ext(env, RVE)) ? 20 : 14);
+            env->stsp = env->gpr[2] + gpr_frame_size + fpr_frame_size;
         } else {
-            env->mtsp= env->gpr[2] + riscv_addr_size * ((!riscv_has_ext(env, RVE)) ? 20 : 14);
+            env->mtsp = env->gpr[2] + gpr_frame_size + fpr_frame_size;
         }
         env->gpr[2] = notify_addr;
     } else {
-        env->gpr[2] += riscv_addr_size * ((!riscv_has_ext(env, RVE)) ? 20 : 14);
+        env->gpr[2] += gpr_frame_size + fpr_frame_size;
     }
 
-    // set xsubm
+    /* Restore the previous trap type/group metadata before executing xret. */
     if (env->priv <= PRV_S) {
         env->ssubm = set_field(env->ssubm, XSUBM_TYP, get_field(env->ssubm, XSUBM_PTYP));
         env->ssubm = set_field(env->ssubm, XSUBM_GPRIDX, get_field(env->ssubm, XSUBM_PGPRIDX));
@@ -5700,7 +5961,8 @@ static int write_sleepvalue(CPURISCVState *env, int csrno, target_ulong val)
 {
     env->sleepvalue = val;
 #if !defined(CONFIG_USER_ONLY)
-    riscv_cpu_eclic_int_handler_start(env->eclic, env->priv, env->mcause & val, env->mhartid);
+    riscv_cpu_eclic_int_handler_start(env->eclic, env->mcause & val,
+                                      env_cpu(env)->cpu_index);
 #endif
     return RISCV_EXCP_NONE;
 }
@@ -5744,15 +6006,49 @@ static int read_sintstatus(CPURISCVState *env, int csrno, target_ulong *val)
     return RISCV_EXCP_NONE;
 }
 
+static int read_mintthresh(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    /* Nuclei packs M and S thresholds into the shared mintthresh view. */
+    *val = ((target_ulong)env->mintthresh << 24) |
+           ((target_ulong)env->sintthresh << 8);
+    return RISCV_EXCP_NONE;
+}
+
+static int read_sintthresh(CPURISCVState *env, int csrno, target_ulong *val)
+{
+    *val = (target_ulong)env->sintthresh << 8;
+    return RISCV_EXCP_NONE;
+}
+
 static int write_mintthresh(CPURISCVState *env, int csrno, target_ulong val)
 {
-    env->mintthresh = val;
+    uint8_t mthreshold = (val >> 24) & 0xff;
+    uint8_t sthreshold = (val >> 8) & 0xff;
+
+    /* Always keep the CPU-side mirrors up to date; if ECLIC is active, also
+     * push the change into the controller so MMIO and CSR views stay aligned.
+     */
+    env->mintthresh = mthreshold;
+    env->sintthresh = sthreshold;
+    if (env->eclic && riscv_intc_is_clic_mode(env)) {
+        nuclei_eclic_set_threshold(env->eclic, PRV_M, env_cpu(env)->cpu_index,
+                                   mthreshold);
+        nuclei_eclic_set_threshold(env->eclic, PRV_S, env_cpu(env)->cpu_index,
+                                   sthreshold);
+    }
     return RISCV_EXCP_NONE;
 }
 
 static int write_sintthresh(CPURISCVState *env, int csrno, target_ulong val)
 {
-    env->sintthresh = val;
+    uint8_t threshold = (val >> 8) & 0xff;
+
+    /* Keep the CPU-side mirror even on non-ECLIC configurations. */
+    env->sintthresh = threshold;
+    if (env->eclic && riscv_intc_is_clic_mode(env)) {
+        nuclei_eclic_set_threshold(env->eclic, PRV_S, env_cpu(env)->cpu_index,
+                                   threshold);
+    }
     return RISCV_EXCP_NONE;
 }
 
@@ -6810,9 +7106,11 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_STSP]           = { "stsp",           smode, read_stsp, write_stsp },
 
     /* Machine Mode Core Level Interrupt Controller */
-    [CSR_MINTSTATUS]            = {"mintstatus",      any, read_mintstatus, write_mintthresh },
+    [CSR_MINTSTATUS]            = {"mintstatus",      any, read_mintstatus, write_ignore },
+    [CSR_MINTTHRESH]            = {"mintthresh",      any, read_mintthresh, write_mintthresh },
     /* Supervisor Mode Core Level Interrupt Controller */
-    [CSR_SINTSTATUS]            = {"sintstatus",      smode, read_sintstatus, write_sintthresh },
+    [CSR_SINTSTATUS]            = {"sintstatus",      smode, read_sintstatus, write_ignore },
+    [CSR_SINTTHRESH]            = {"sintthresh",      smode, read_sintthresh, write_sintthresh },
     [CSR_SSCRATCHCSW]           = {"sscratchcsw",     any, NULL, NULL, rmw_sscratchcsw },
     [CSR_SSCRATCHCSWL]          = {"sscratchcswl",    any, NULL, NULL, rmw_sscratchcswl },
     /* Supervisor Mode Core Level Interrupt Controller */
