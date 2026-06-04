@@ -73,6 +73,11 @@ target_ulong fclass_h_bf16(uint64_t frs1);
 
 #ifndef CONFIG_USER_ONLY
 extern const VMStateDescription vmstate_riscv_cpu;
+void riscv_nuclei_sync_mcause_from_mstatus(CPURISCVState *env);
+void riscv_nuclei_sync_mstatus_from_mcause(CPURISCVState *env);
+void riscv_nuclei_sync_scause_from_sstatus(CPURISCVState *env);
+void riscv_nuclei_sync_sstatus_from_scause(CPURISCVState *env);
+bool nuclei_eclic_tsp_swap_needed(CPURISCVState *env, target_ulong xcause, target_ulong xsubm);
 #endif
 
 enum {

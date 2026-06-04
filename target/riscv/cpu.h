@@ -167,24 +167,93 @@ typedef struct PMUCTRState {
 } PMUCTRState;
 
 #define SHADOW_GPR_GROUPS 9
-#define SHADOW_GPR_COUNT 17     /* Callee saved reg count */
+#define SHADOW_GPR_COUNT 17     /* Caller-saved integer reg count */
+#define SHADOW_FPR_COUNT 20     /* Caller-saved floating-point reg count */
 #define TOTAL_GPR_GROUPS (1 + SHADOW_GPR_GROUPS * 2)
+#define ECLIC_STACK_SAVE_GPRS 0x1
+#define ECLIC_STACK_SAVE_FPRS 0x2
+/*
+ * Shadow register allocation and nested trap restore metadata are separate
+ * concerns. Only the first non-vectored interrupt may switch to a shadow
+ * bank; subsequent nested traps still push restore metadata and may nest up
+ * to the interrupt-level depth supported by the architecture.
+ */
+#define ECLIC_MAX_TRAP_FRAMES 256
 
-/* Callee saved reg index */
+/* Caller-saved integer reg index */
 static const uint8_t context_regs[SHADOW_GPR_COUNT] = {
     1, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15,
     16, 17, 28, 29, 30, 31
 };
 
+/* Caller-saved floating-point reg index */
+static const uint8_t fpu_context_regs[SHADOW_FPR_COUNT] = {
+    0, 1, 2, 3, 4, 5, 6, 7, 10, 11,
+    12, 13, 14, 15, 16, 17, 28, 29, 30, 31
+};
+
+static inline int riscv_has_ext(CPURISCVState *env, target_ulong ext);
+
+static inline bool nuclei_eclic_has_float_context(CPURISCVState *env)
+{
+    return riscv_has_ext(env, RVF);
+}
+
+static inline bool nuclei_eclic_float_shadow_enabled(CPURISCVState *env,
+                                                     target_ulong xeclic_ctl)
+{
+    return nuclei_eclic_has_float_context(env) &&
+           get_field(xeclic_ctl, XECLIC_CTL_SHADOW_FPU_EN);
+}
+
+static inline uint32_t nuclei_eclic_gpr_frame_slots(CPURISCVState *env)
+{
+    return riscv_has_ext(env, RVE) ? 14 : 20;
+}
+
+static inline uint32_t nuclei_eclic_gpr_frame_size(CPURISCVState *env)
+{
+    uint32_t gpr_size = sizeof(target_ulong);
+
+    return gpr_size * nuclei_eclic_gpr_frame_slots(env);
+}
+
+static inline uint32_t nuclei_eclic_fpr_slot_size(CPURISCVState *env)
+{
+    return riscv_has_ext(env, RVD) ? 8 : 4;
+}
+
+static inline uint32_t nuclei_eclic_fpr_frame_size(CPURISCVState *env)
+{
+    if (!nuclei_eclic_has_float_context(env)) {
+        return 0;
+    }
+
+    return nuclei_eclic_fpr_slot_size(env) * SHADOW_FPR_COUNT;
+}
+
 typedef struct {
-    uint8_t current_grp;    /* The gpr group currently in use */
+    /* Active shadow bank currently backing the architectural caller-saved
+     * integer and floating-point register view.
+     */
+    uint8_t current_grp;
+    /* Full per-group snapshots of the caller-saved register subset. Group 0 is
+     * the architectural base bank; the remaining groups implement M/S shadow
+     * acceleration.
+     */
     target_ulong gpr_banks[TOTAL_GPR_GROUPS][32];
+    uint64_t fpr_banks[TOTAL_GPR_GROUPS][32];
     struct {
+        /* Per-trap restore metadata consumed by popxret(). */
         uint8_t grp_index;
-        bool needs_stack_save;
-    } grp_stack[(SHADOW_GPR_GROUPS + 1) * 2];
-    int8_t grp_stack_top;
-    uint8_t shadow_grp_used[(SHADOW_GPR_GROUPS + 1) * 2]; /* Mark whether the shadow group has been used */
+        uint8_t stack_save_mask;
+    } grp_stack[ECLIC_MAX_TRAP_FRAMES];
+    int16_t grp_stack_top;
+    /* First-come-first-served shadow allocation state for M-side groups 1..9
+     * and S-side groups 10..18. Group 0 is the base bank and is therefore not
+     * tracked here.
+     */
+    uint8_t shadow_grp_used[(SHADOW_GPR_GROUPS + 1) * 2];
 } RISCVEclicShadowState;
 
 struct CPUArchState {
@@ -520,6 +589,7 @@ struct CPUArchState {
     target_ulong mmacro_dev_en;
     target_ulong mmacro_noc_en;
     target_ulong mmacro_ca_en;
+    /* Nuclei ECLIC v2 trap-state/shadow-register CSRs. */
     target_ulong mtspcsw;
     target_ulong mshadgprlvl0;
     target_ulong mshadgprlvl1;
@@ -538,11 +608,9 @@ struct CPUArchState {
 
     /*nuclei timer comparators */
     uint64_t mtimecmp;
-    uint64_t timecmp;
-
     QEMUTimer *mtimer; /* Nuclei Internal timer */
 
-    uint32_t exccode;
+    uint32_t exccode; /* Current encoded ECLIC claim for riscv_cpu_do_interrupt(). */
     bool irq_pending;
     void *eclic;
     void *clic;       /* clic interrupt controller */
@@ -640,7 +708,6 @@ bool riscv_cpu_tlb_fill(CPUState *cs, vaddr address, int size,
 char *riscv_isa_string(RISCVCPU *cpu);
 int riscv_cpu_max_xlen(RISCVCPUClass *mcc);
 bool riscv_cpu_option_set(const char *optname);
-void nuclei_eclic_context_auto_saving(CPURISCVState *env, int int_vec_mode, int irq_level);
 
 #ifndef CONFIG_USER_ONLY
 void riscv_isa_write_fdt(RISCVCPU *cpu, void *fdt, char *nodename);
