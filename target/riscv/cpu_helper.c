@@ -82,23 +82,28 @@ static int riscv_cpu_local_irq_mode_enabled(CPUState *cs, int excode, int level)
 
     target_ulong mintstatus_mil = get_field(env->mintstatus, MINTSTATUS_MIL);
     target_ulong mintstatus_sil = get_field(env->mintstatus, MINTSTATUS_SIL);
+    bool enabled;
 
-    if(((mode == PRV_M) && (mintstatus_mil >= level))
+    if (((mode == PRV_M) && (mintstatus_mil >= level))
         || ((mode == PRV_S) && (mintstatus_sil >= level))) {
-        return false;
+        enabled = false;
+    } else {
+        switch (mode) {
+        case PRV_M:
+            enabled = env->priv < PRV_M ||
+                      (env->priv == PRV_M && get_field(env->mstatus, MSTATUS_MIE));
+            break;
+        case PRV_S:
+            enabled = env->priv < PRV_S ||
+                      (env->priv == PRV_S && get_field(env->mstatus, MSTATUS_SIE));
+            break;
+        default:
+            enabled = false;
+            break;
+        }
     }
 
-    switch (mode) {
-    case PRV_M:
-        return env->priv < PRV_M ||
-               (env->priv == PRV_M && get_field(env->mstatus, MSTATUS_MIE));
-    case PRV_S:
-        return env->priv < PRV_S ||
-               (env->priv == PRV_S && get_field(env->mstatus, MSTATUS_SIE));
-    default:
-        return false;
-    }
-
+    return enabled;
 }
 #endif
 
@@ -1769,17 +1774,74 @@ static target_ulong riscv_intr_pc(CPURISCVState *env, target_ulong tvec,
 }
 #endif
 
-// auto save context for non-vector intc
-void nuclei_eclic_context_auto_saving(CPURISCVState *env, int int_vec_mode, int irq_level) {
 #if !defined(CONFIG_USER_ONLY)
-    target_ulong stack_addr;
+static void nuclei_eclic_save_caller_saved_gprs(CPURISCVState *env,
+                                                target_ulong stack_addr,
+                                                uint32_t gpr_size)
+{
     uint32_t stack_ofst;
+
+    /* The ECLIC auto-save frame stores the caller-saved subset in the same
+     * layout that popxret() later walks when rebuilding the interrupted
+     * context.
+     */
+    for (uint32_t i = 0; i < SHADOW_GPR_COUNT; i++) {
+        stack_ofst = i;
+        if (i > 10) {
+            if (riscv_has_ext(env, RVE)) {
+                continue;
+            } else {
+                stack_ofst += 3;
+            }
+        }
+        cpu_physical_memory_rw(stack_addr + gpr_size * stack_ofst,
+                               &env->gpr[context_regs[i]], gpr_size, 1);
+    }
+}
+
+static void nuclei_eclic_save_caller_saved_fprs(CPURISCVState *env,
+                                                target_ulong stack_addr,
+                                                uint32_t fpr_size)
+{
+    /* Floating-point caller-saved registers are always packed densely after
+     * the integer frame, regardless of whether the interrupt eventually uses
+     * integer shadow, floating shadow, or pure stack-save.
+     */
+    for (uint32_t i = 0; i < SHADOW_FPR_COUNT; i++) {
+        cpu_physical_memory_rw(stack_addr + fpr_size * i,
+                               &env->fpr[fpu_context_regs[i]], fpr_size, 1);
+    }
+}
+
+/*
+ * Trap auto-context helper for Nuclei ECLIC v2 trap entry.
+ *
+ * ECLIC v2 hardware auto-context covers exceptions and non-vectored
+ * interrupts. Shadow registers only accelerate the first non-vectored
+ * interrupt; exceptions and deeper interrupts fall back to the regular
+ * stack-save path and record restore metadata for popxret().
+ */
+static void nuclei_eclic_context_auto_saving(CPURISCVState *env,
+                                             int int_vec_mode, int irq_level)
+{
+    const NucleiECLICState *eclic = env->eclic;
+    target_ulong stack_addr;
     uint32_t gpr_size = 4;
+    uint32_t gpr_frame_size;
+    uint32_t fpr_size;
+    uint32_t fpr_frame_size;
     target_ulong xcause, xtsp, xeclic_ctl, xshadgprlvl0, xshadgprlvl1;
     uint64_t shadow_cfg;
     RISCVEclicShadowState *shadow = &env->eclic_shadow;
     uint32_t first_shadow_grp, shadow_stack_size;
     void *xcause_addr, *xepc_addr, *xsubm_addr;
+    bool is_interrupt;
+    bool int_shadow_enabled;
+    bool float_shadow_enabled;
+    bool use_shadow;
+    bool tsp_swap;
+    uint8_t stack_save_mask = 0;
+
     if (riscv_cpu_mxl(env) != MXL_RV32) {
         gpr_size = 8;
     }
@@ -1789,110 +1851,130 @@ void nuclei_eclic_context_auto_saving(CPURISCVState *env, int int_vec_mode, int 
     xtsp = (env->priv <= PRV_S) ? env->stsp : env->mtsp;
     xshadgprlvl0 = (env->priv <= PRV_S) ? env->sshadgprlvl0 : env->mshadgprlvl0;
     xshadgprlvl1 = (env->priv <= PRV_S) ? env->sshadgprlvl1 : env->mshadgprlvl1;
+    /*
+     * mshadgprlvl0/sshadgprlvl0 already store logical level values, not MMIO
+     * encodings. Build one linear table here so the later group-selection
+     * logic can compare the saved level bytes directly against irq_level.
+     */
     shadow_cfg = (riscv_cpu_mxl(env) == MXL_RV32) ?
                     (uint64_t)(xshadgprlvl0 | (uint64_t)xshadgprlvl1 << 32) : xshadgprlvl0;
 
     xcause_addr = (env->priv <= PRV_S) ? &env->scause : &env->mcause;
     xepc_addr = (env->priv <= PRV_S) ? &env->sepc : &env->mepc;
     xsubm_addr = (env->priv <= PRV_S) ? &env->ssubm : &env->msubm;
+    is_interrupt = xcause >> (TARGET_LONG_BITS - 1);
+    shadow_stack_size = get_shadow_gpr_stack_size(env);
+    int_shadow_enabled = get_field(xeclic_ctl, XECLIC_CTL_SHADOW_EN) &&
+                         eclic && eclic->shadow_gpr_num > 0;
+    float_shadow_enabled = nuclei_eclic_float_shadow_enabled(env, xeclic_ctl) &&
+                           eclic && eclic->shadow_gpr_num > 0;
+    /*
+     * Spec 15.14 shadow acceleration only applies to the first non-vectored
+     * interrupt in the nesting chain. Exceptions and deeper interrupts stay on
+     * the stack-save path so popxret() can unwind the nesting chain one frame
+     * at a time.
+     */
+    use_shadow = (int_shadow_enabled || float_shadow_enabled) &&
+                 shadow_stack_size == 0 && is_interrupt && !int_vec_mode;
+    tsp_swap = get_field(xeclic_ctl, XECLIC_CTL_TSP_EN) &&
+               nuclei_eclic_tsp_swap_needed(env, xcause,
+                                            (env->priv <= PRV_S) ?
+                                            env->ssubm : env->msubm);
+    gpr_frame_size = nuclei_eclic_gpr_frame_size(env);
+    fpr_size = nuclei_eclic_fpr_slot_size(env);
+    fpr_frame_size = nuclei_eclic_fpr_frame_size(env);
 
     /* For sp exchange processing in non-vector interrupts or exceptions,
      * when XECLIC_CTL:[TSP_EN] is enabled, the hardware will automatically
      * switch the stack. Otherwise, the software needs to switch through
      * "csrrw sp, XTSPCSW, sp". */
     stack_addr = env->gpr[2];
-    if (get_field(xeclic_ctl, XECLIC_CTL_TSP_EN)) {
-        env->gpr[2] = xtsp - gpr_size * ((!riscv_has_ext(env, RVE)) ? 20 : 14);
+    if (tsp_swap) {
+        env->gpr[2] = xtsp - gpr_frame_size - fpr_frame_size;
         if (env->priv <= PRV_S) {
             env->stsp = stack_addr;
         } else {
             env->mtsp = stack_addr;
         }
     } else {
-        env->gpr[2] -= gpr_size * ((!riscv_has_ext(env, RVE)) ? 20 : 14);
+        env->gpr[2] -= gpr_frame_size + fpr_frame_size;
     }
     stack_addr = env->gpr[2];
 
     first_shadow_grp = (env->priv <= PRV_S) ? 9 : 0;
-    shadow_stack_size = get_shadow_gpr_stack_size(env);
-    if (get_field(xeclic_ctl, XECLIC_CTL_SHADOW_EN)) {
-        if ((shadow_stack_size == 0) && (xcause >> (TARGET_LONG_BITS - 1))
-            && !int_vec_mode ) {
-            /* For the first interruption, group 10 is used in S mode and group 0 in M mode */
-            riscv_backup_shadow_gpr(env, 0);
-            shadow->current_grp = ((env->priv <= PRV_S) ? 9 : 0) + 1;
-            riscv_shadow_gpr_switch_grp(env, shadow->current_grp);
-            shadow_gpr_push(env, shadow->current_grp, false);
-            shadow->shadow_grp_used[first_shadow_grp] = 1;
-        } else if (shadow_stack_size > 0 && (xcause >> (TARGET_LONG_BITS - 1))
-            && !int_vec_mode) {
-            /* Nested interrupts, select groups based on the interrupt level */
-            uint32_t shadow_match = 0;
-            irq_level = irq_level >> (8 - CLICINTCTLBITS);
-            riscv_backup_shadow_gpr(env, shadow->current_grp);
-            for (int i = 0; i < (SHADOW_GPR_GROUPS - 1); i++) {
-                if ((irq_level == ((shadow_cfg >> (8 * i)) & 0xff))
-                    && !shadow->shadow_grp_used[first_shadow_grp + 1 + i]) {
-                    uint8_t target_grp = first_shadow_grp + 2 + i;
-                    shadow_match = 1;
-                    riscv_shadow_gpr_switch_grp(env, target_grp);
-                    shadow_gpr_push(env, shadow->current_grp, false);
-                    shadow->shadow_grp_used[shadow->current_grp - 1] = 1;
-                    break;
-                }
-            }
-            if (!shadow_match) {
-                for (uint32_t i = 0; i < SHADOW_GPR_COUNT; i++) {
-                    stack_ofst = i;
-                    if (i > 10) {
-                        if (riscv_has_ext(env, RVE)) {
-                            continue;
-                        } else {
-                            stack_ofst += 4;
-                        }
-                    }
-                    cpu_physical_memory_rw(stack_addr + gpr_size * stack_ofst,
-                                            &env->gpr[context_regs[i]], gpr_size, 1);
-                }
-                shadow_gpr_push(env, shadow->current_grp, true);
-            }
-        } else if (shadow_stack_size > 0) {
-            /* Exception handling, restore to default group 0. */
-            shadow_gpr_push(env, shadow->current_grp, false);
-            if (shadow->current_grp != 0) {
-                riscv_shadow_gpr_switch_grp(env, shadow->current_grp);
-            }
-            shadow->current_grp = 0;
+    if (use_shadow) {
+        uint8_t target_grp = first_shadow_grp + 1;
+        int configurable_groups = 0;
+
+        /*
+         * Spec 15.14: on the first non-vectored interrupt, use the
+         * level-bound shadow group when configured, otherwise fall back to
+         * the first-come-first-served shadow group 0.
+         */
+        if (eclic && eclic->shadow_gpr_num > 0) {
+            configurable_groups = MIN(MAX((int)eclic->shadow_gpr_num - 1, 0),
+                                      SHADOW_GPR_GROUPS - 1);
         }
+        for (int i = 0; i < configurable_groups; i++) {
+            uint8_t cfg_level = (shadow_cfg >> (8 * i)) & 0xff;
+
+            if (cfg_level == irq_level) {
+                target_grp = first_shadow_grp + 2 + i;
+                break;
+            }
+        }
+
+        riscv_backup_shadow_gpr(env, 0);
+        riscv_shadow_gpr_switch_grp(env, target_grp);
+        if (!int_shadow_enabled) {
+            nuclei_eclic_save_caller_saved_gprs(env, stack_addr, gpr_size);
+            stack_save_mask |= ECLIC_STACK_SAVE_GPRS;
+        }
+        if (!float_shadow_enabled && fpr_frame_size) {
+            nuclei_eclic_save_caller_saved_fprs(env,
+                                                stack_addr + gpr_frame_size,
+                                                fpr_size);
+            stack_save_mask |= ECLIC_STACK_SAVE_FPRS;
+        }
+        shadow_gpr_push(env, target_grp, stack_save_mask);
+        shadow->shadow_grp_used[target_grp - 1] = 1;
     } else {
-        /* If the shadow register group is not enabled,
-         * the context is automatically saved to the stack. */
-        for (uint32_t i = 0; i < SHADOW_GPR_COUNT; i++) {
-            stack_ofst = i;
-            if (i > 10) {
-                if (riscv_has_ext(env, RVE)) {
-                    continue;
-                } else {
-                    stack_ofst += 4;
-                }
-            }
-            cpu_physical_memory_rw(stack_addr + gpr_size * stack_ofst,
-                                    &env->gpr[context_regs[i]], gpr_size, 1);
+        /*
+         * All non-shadow traps save caller-saved registers to the trap stack.
+         * Record the active register group so popxret() can restore the frame
+         * even when shadow acceleration is disabled.
+         */
+        if ((int_shadow_enabled || float_shadow_enabled) &&
+            shadow->current_grp != 0) {
+            riscv_backup_shadow_gpr(env, shadow->current_grp);
         }
+        nuclei_eclic_save_caller_saved_gprs(env, stack_addr, gpr_size);
+        stack_save_mask |= ECLIC_STACK_SAVE_GPRS;
+        if (fpr_frame_size) {
+            nuclei_eclic_save_caller_saved_fprs(env,
+                                                stack_addr + gpr_frame_size,
+                                                fpr_size);
+            stack_save_mask |= ECLIC_STACK_SAVE_FPRS;
+        }
+        shadow_gpr_push(env, shadow->current_grp, stack_save_mask);
     }
 
     if (env->priv <= PRV_S) {
         env->ssubm = set_field(env->ssubm, XSUBM_GPRIDX, shadow->current_grp);
     } else {
-        env->msubm = set_field(env->msubm, XSUBM_GPRIDX, shadow->current_grp); 
+        env->msubm = set_field(env->msubm, XSUBM_GPRIDX, shadow->current_grp);
     }
 
-    // auto save csr context
+    /*
+     * The hardware-context frame always terminates with xcause/xepc/xsubm so
+     * popxret() can rebuild the interrupted trap state before helper_sret() /
+     * helper_mret() executes the architectural return sequence.
+     */
     cpu_physical_memory_rw(stack_addr + gpr_size * 11, xcause_addr, gpr_size, 1);
     cpu_physical_memory_rw(stack_addr + gpr_size * 12, xepc_addr, gpr_size, 1);
     cpu_physical_memory_rw(stack_addr + gpr_size * 13, xsubm_addr, gpr_size, 1);
-#endif
 }
+#endif
 
 /*
  * Handle Traps
@@ -1916,9 +1998,16 @@ void riscv_cpu_do_interrupt(CPUState *cs)
      * so we mask off the MSB and separate into trap type and cause.
      */
     bool async = !!(cs->exception_index & RISCV_EXCP_INT_FLAG);
-    bool eclic_flag = !!(cs->exception_index & RISCV_EXCP_INT_ECLIC);  //TODO: eclic support
+    /*
+     * ECLIC uses its own exception-index tag, but architecturally it still
+     * delivers asynchronous interrupts. Keep the transport tag separate from
+     * the trap semantics so vectored ECLIC interrupts do not fall into the
+     * exception/HWCTX path by mistake.
+     */
+    bool eclic_flag = !!(cs->exception_index & RISCV_EXCP_INT_ECLIC);
+    bool is_interrupt = async || eclic_flag;
     target_ulong cause = cs->exception_index & RISCV_EXCP_INT_MASK;
-    uint64_t deleg = async ? env->mideleg : env->medeleg;
+    uint64_t deleg = is_interrupt ? env->mideleg : env->medeleg;
     bool s_injected = env->mvip & (1 << cause) & env->mvien &&
         !(env->mip & (1 << cause));
     bool vs_injected = env->hvip & (1 << cause) & env->hvien &&
@@ -1929,7 +2018,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     target_ulong mtval2 = 0;
     uint32_t int_vec_mode = 0;
 
-    if (!async) {
+    if (!is_interrupt) {
         /* set tval to badaddr for traps with address information */
         switch (cause) {
         case RISCV_EXCP_SEMIHOST:
@@ -1998,6 +2087,10 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     }
     if(eclic_flag)
     {
+        /* Nuclei encodes delivery mode and logical interrupt level together
+         * with the IRQ cause. Unpack them once so trap entry can update
+         * mintstatus/xsubm consistently before privilege delegation.
+         */
         mode = (cause >> 12) & 0x3;
         level = (cause >> 14) & 0xFF;
         cause &= 0x3ff;
@@ -2022,14 +2115,14 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         cause = set_field(cause, MCAUSE_INTERRUPT, 0);
     }
 
-    trace_riscv_trap(env->mhartid, async, cause, env->pc, tval,
-                     riscv_cpu_get_trap_name(cause, async));
+    trace_riscv_trap(env->mhartid, is_interrupt, cause, env->pc, tval,
+                     riscv_cpu_get_trap_name(cause, is_interrupt));
 
     qemu_log_mask(CPU_LOG_INT,
                   "%s: hart:"TARGET_FMT_ld", async:%d, cause:"TARGET_FMT_lx", "
                   "epc:0x"TARGET_FMT_lx", tval:0x"TARGET_FMT_lx", desc=%s\n",
-                  __func__, env->mhartid, async, cause, env->pc, tval,
-                  riscv_cpu_get_trap_name(cause, async));
+                  __func__, env->mhartid, is_interrupt, cause, env->pc, tval,
+                  riscv_cpu_get_trap_name(cause, is_interrupt));
 
     if (env->priv <= PRV_S && ((cause < 64 &&
         (((deleg >> cause) & 1) || s_injected || vs_injected))
@@ -2040,21 +2133,25 @@ void riscv_cpu_do_interrupt(CPUState *cs)
             if (riscv_cpu_mxl(env) == MXL_RV64) {
                 riscv_addr_size = 8;
             }
-            int_vec_mode = nuclei_eclic_shv_interrupt(env->eclic, mode, cs->cpu_index, cause & 0x3FF);
+            int_vec_mode = nuclei_eclic_shv_interrupt(env->eclic, cs->cpu_index,
+                                                      cause & 0x3FF);
             if (int_vec_mode) {
                 uint64_t vec_addr = (cause & 0x3FF) *riscv_addr_size + env->stvt;
                 cpu_physical_memory_rw(vec_addr, &newpc,  riscv_addr_size, 0);
             } else {
+                /* Non-vectored S-mode delivery selects stvec or stvt2 based on
+                 * the selector bit defined by the Nuclei extension.
+                 */
                 if ((env->stvt2 & 0x1) == 0) {
-                    newpc = env->stvec & 0xfffffffc;
+                    newpc = env->stvec & ~((target_ulong)0x3);
                 } else if ((env->stvt2 & 0x1) == 1) {
-                    newpc = env->stvt2 & 0xfffffffc;
+                    newpc = env->stvt2 & ~((target_ulong)0x3);
                 }
             }
         }
 
         if (riscv_has_ext(env, RVH)) {
-            uint64_t hdeleg = async ? env->hideleg : env->hedeleg;
+            uint64_t hdeleg = is_interrupt ? env->hideleg : env->hedeleg;
 
             if (env->virt_enabled &&
                 (((hdeleg >> cause) & 1) || vs_injected)) {
@@ -2063,8 +2160,9 @@ void riscv_cpu_do_interrupt(CPUState *cs)
                  * See if we need to adjust cause. Yes if its VS mode interrupt
                  * no if hypervisor has delegated one of hs mode's interrupt
                  */
-                if (async && (cause == IRQ_VS_TIMER || cause == IRQ_VS_SOFT ||
-                              cause == IRQ_VS_EXT)) {
+                if (is_interrupt &&
+                    (cause == IRQ_VS_TIMER || cause == IRQ_VS_SOFT ||
+                     cause == IRQ_VS_EXT)) {
                     cause = cause - 1;
                 }
                 write_gva = false;
@@ -2091,24 +2189,29 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         s = set_field(s, MSTATUS_SPP, env->priv);
         s = set_field(s, MSTATUS_SIE, 0);
         env->mstatus = s;
-        if (!async && riscv_intc_is_clic_mode(env)) {
+        if (!is_interrupt && !eclic_flag && riscv_intc_is_clic_mode(env)) {
             env->ssubm = set_field(env->ssubm, XSUBM_PTYP,
                                    get_field(env->ssubm, XSUBM_TYP));
             env->ssubm = set_field(env->ssubm, XSUBM_TYP, SUBM_EXC);
             cause = set_field(cause, SCAUSE_SPP, env->priv);
         }
-        env->scause = cause | ((target_ulong)(async | eclic_flag) <<
+        env->scause = cause | ((target_ulong)is_interrupt <<
                                (TARGET_LONG_BITS - 1));
+        if (riscv_intc_is_clic_mode(env)) {
+            riscv_nuclei_sync_scause_from_sstatus(env);
+        }
         env->sepc = env->pc;
         env->stval = tval;
         env->htval = htval;
         env->htinst = tinst;
 
-        env->pc = eclic_flag ? newpc : riscv_intr_pc(env, env->stvec, env->stvt, async,
+        env->pc = eclic_flag ? newpc : riscv_intr_pc(env, env->stvec, env->stvt, is_interrupt,
                                         eclic_flag & 0xfff, cause, PRV_S);
 
         riscv_cpu_set_mode(env, PRV_S);
-        if (eclic_flag && riscv_intc_is_eclicv2_mode(env) && !int_vec_mode) {
+        if (riscv_intc_is_clic_mode(env) &&
+            riscv_intc_is_eclicv2_mode(env) &&
+            (!is_interrupt || (eclic_flag && !int_vec_mode))) {
             nuclei_eclic_context_auto_saving(env, int_vec_mode, level);
         }
     } else {
@@ -2118,19 +2221,20 @@ void riscv_cpu_do_interrupt(CPUState *cs)
             if (riscv_cpu_mxl(env) == MXL_RV64) {
                 riscv_addr_size = 8;
             }
-            int_vec_mode = nuclei_eclic_shv_interrupt(env->eclic, mode, cs->cpu_index, cause & 0x3FF);
+            int_vec_mode = nuclei_eclic_shv_interrupt(env->eclic, cs->cpu_index,
+                                                      cause & 0x3FF);
             if (int_vec_mode) {
                 uint64_t vec_addr = (cause & 0x3FF) *riscv_addr_size + env->mtvt;
                 cpu_physical_memory_rw(vec_addr, &newpc,  riscv_addr_size, 0);
             } else {
+                /* Non-vectored M-mode delivery selects mtvec or mtvt2 based on
+                 * the selector bit defined by the Nuclei extension.
+                 */
                 if ((env->mtvt2 & 0x1) == 0) {
-                    newpc = env->mtvec & 0xfffffffc;
+                    newpc = env->mtvec & ~((target_ulong)0x3);
                 } else if ((env->mtvt2 & 0x1) == 1) {
-                    newpc = env->mtvt2 & 0xfffffffc;
+                    newpc = env->mtvt2 & ~((target_ulong)0x3);
                 }
-                if(!nuclei_eclic_edge_triggered(env->eclic, mode, cs->cpu_index, cause & 0x3FF)
-                    && (env->priv != PRV_M))
-                    nuclei_eclic_clean_pending(env->eclic, mode, cs->cpu_index, cause & 0x3FF);
             }
         } else {
             newpc = (env->mtvec >> 2 << 2) +
@@ -2157,21 +2261,26 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         s = set_field(s, MSTATUS_MPP, env->priv);
         s = set_field(s, MSTATUS_MIE, 0);
         env->mstatus = s;
-        if (!async && riscv_intc_is_clic_mode(env)) {
+        if (!is_interrupt && !eclic_flag && riscv_intc_is_clic_mode(env)) {
             env->msubm = set_field(env->msubm, XSUBM_PTYP,
                                    get_field(env->msubm, XSUBM_TYP));
             env->msubm = set_field(env->msubm, XSUBM_TYP, SUBM_EXC);
             cause = set_field(cause, MCAUSE_MPP, env->priv);
         }
-        env->mcause = cause | ((target_ulong)(async | eclic_flag) <<
+        env->mcause = cause | ((target_ulong)is_interrupt <<
                                (TARGET_LONG_BITS - 1));
+        if (riscv_intc_is_clic_mode(env)) {
+            riscv_nuclei_sync_mcause_from_mstatus(env);
+        }
         env->mepc = env->pc;
         env->mtval = tval;
         env->mtval2 = mtval2;
         env->mtinst = tinst;
         env->pc = newpc;
         riscv_cpu_set_mode(env, PRV_M);
-        if (eclic_flag && riscv_intc_is_eclicv2_mode(env) && !int_vec_mode) {
+        if (riscv_intc_is_clic_mode(env) &&
+            riscv_intc_is_eclicv2_mode(env) &&
+            (!is_interrupt || (eclic_flag && !int_vec_mode))) {
             nuclei_eclic_context_auto_saving(env, int_vec_mode, level);
         }
     }
@@ -2187,10 +2296,10 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     env->two_stage_indirect_lookup = false;
 
     if (eclic_flag) {
-        if (env->priv <= PRV_S && nuclei_eclic_shv_interrupt(env->eclic, mode, cs->cpu_index, cause & 0x3FF)) {
-            riscv_cpu_eclic_int_handler_start_s(env->eclic, env->priv, cause & 0x3ff, env->mhartid);
-        } else if (env->priv == PRV_M && nuclei_eclic_shv_interrupt(env->eclic, mode, cs->cpu_index, cause & 0x3FF)) {
-            riscv_cpu_eclic_int_handler_start(env->eclic, env->priv, cause & 0x3ff, env->mhartid);
+        if (nuclei_eclic_shv_interrupt(env->eclic, cs->cpu_index,
+                                       cause & 0x3FF)) {
+            riscv_cpu_eclic_int_handler_start(env->eclic, cause & 0x3ff,
+                                              cs->cpu_index);
         }
     }
 
