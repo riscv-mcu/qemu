@@ -22,6 +22,7 @@
 #include "time_helper.h"
 #include "hw/intc/riscv_aclint.h"
 #include "hw/intc/nuclei_eclic.h"
+#include "hw/intc/nuclei_systimer.h"
 
 static void riscv_vstimer_cb(void *opaque)
 {
@@ -53,11 +54,13 @@ void riscv_timer_write_timecmp(CPURISCVState *env, QEMUTimer *timer,
 {
     uint64_t diff, ns_diff, next;
     RISCVAclintMTimerState *mtimer;
+    NucleiSYSTIMERState *systimer;
     uint32_t timebase_freq;
     uint64_t rtc_r = env->rdtime_fn(env->rdtime_fn_arg) + delta;
 
-    if (env->mcfg_info){
-        timebase_freq = *(uint64_t *)(env->rdtime_fn_arg);
+    if (env->mcfg_info) {
+        systimer = env->rdtime_fn_arg;
+        timebase_freq = systimer->timebase_freq;
     } else {
         mtimer = env->rdtime_fn_arg;
         timebase_freq = mtimer->timebase_freq;
