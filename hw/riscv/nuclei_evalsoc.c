@@ -817,13 +817,14 @@ static void parse_json_config(MachineState *machine)
 
     // Peripherals mapping
     const JsonFieldMapping iregion_mappings[] = {
-        {"base",  &s->iregion.base,     "iregion.base"},
-        {"size",  &s->iregion.size,     "iregion.size"},
-        {"debug", &s->iregion.debug_en, "iregion.debug"},
-        {"eclic", &s->iregion.eclic_en, "iregion.eclic"},
-        {"smpcc", &s->iregion.smpcc_en, "iregion.smpcc"},
-        {"cidu",  &s->iregion.cidu_en,  "iregion.cidu"},
-        {"plic",  &s->iregion.plic_en,  "iregion.plic"},
+        {"base",           &s->iregion.base,            "iregion.base"},
+        {"size",           &s->iregion.size,            "iregion.size"},
+        {"debug",          &s->iregion.debug_en,        "iregion.debug"},
+        {"eclic",          &s->iregion.eclic_en,        "iregion.eclic"},
+        {"smpcc",          &s->iregion.smpcc_en,        "iregion.smpcc"},
+        {"cidu",           &s->iregion.cidu_en,         "iregion.cidu"},
+        {"plic",           &s->iregion.plic_en,         "iregion.plic"},
+        {"clicintctlbits", &s->iregion.clicintctlbits,  "iregion.clicintctlbits"},
     };
     const JsonFieldMapping mrom_mappings[] = {
         {"base",    &s->mrom.base,     "mrom.base"},
@@ -959,6 +960,12 @@ static void parse_json_config(MachineState *machine)
                                 parse_json_keys_and_values(options_page2, norflash_mappings, ARRAY_SIZE(norflash_mappings));
                             } else if (!strcmp(page1->key, "iregion")) {
                                 parse_json_keys_and_values(options_page2, iregion_mappings, ARRAY_SIZE(iregion_mappings));
+                                if (s->iregion.clicintctlbits < 2 ||
+                                    s->iregion.clicintctlbits > 8) {
+                                    error_report("iregion.clicintctlbits must be in range [2, 8], got %" PRIu64,
+                                                 s->iregion.clicintctlbits);
+                                    exit(1);
+                                }
                                 s->iregion.size = (s->iregion.plic_en) ? IREGION_MAX_SIZE : IREGION_MIN_SIZE;
                             } else if (!strcmp(page1->key, "mrom")) {
                                 parse_json_keys_and_values(options_page2, mrom_mappings, ARRAY_SIZE(mrom_mappings));
@@ -1014,6 +1021,8 @@ static void parse_json_config(MachineState *machine)
             }
         }
     }
+
+    s->iregion.cidu_en = !!s->iregion.cidu_en && s->cidu_opt != 0;
 }
 
 static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCState *s, uint32_t smp_cpus)
@@ -1444,6 +1453,7 @@ static void evalsoc_machine_instance_init(Object *obj)
             2.plic  irq 0: wire 0 external irq:irq[1...1023]
     */
     s->irqmax = EVALSOC_DEFAULT_IRQMAX;
+    /* Default to the Nuclei reset value unless soc-cfg overrides it. */
     s->iregion.base = IREGION_BASE_ADDR;
     s->iregion.size = IREGION_MAX_SIZE;
     s->iregion.debug_en = 1;
@@ -1451,6 +1461,8 @@ static void evalsoc_machine_instance_init(Object *obj)
     s->iregion.smpcc_en = 1;
     s->iregion.cidu_en = 1;
     s->iregion.plic_en = 1;
+    s->iregion.clicintctlbits = NUCLEI_ECLIC_DEFAULT_INTCTLBITS;
+    s->cidu_opt = -1;
     s->ddr.base = -1;
     s->ddr.size = memmap[EVALSOC_DDR].size;
     s->ddr.startup_addr = -1;
@@ -1551,6 +1563,20 @@ static void evalsoc_machine_set_soccfg(Object *obj, const char *value, Error **e
     s->soccfg = g_strdup(value);
 }
 
+static bool evalsoc_machine_get_cidu(Object *obj, Error **errp)
+{
+    EvalSoCState *s = RISCV_EVALSOC_MACHINE(obj);
+
+    return !!s->iregion.cidu_en && s->cidu_opt != 0;
+}
+
+static void evalsoc_machine_set_cidu(Object *obj, bool value, Error **errp)
+{
+    EvalSoCState *s = RISCV_EVALSOC_MACHINE(obj);
+
+    s->cidu_opt = value ? 1 : 0;
+}
+
 static char *evalsoc_machine_get_aia(Object *obj, Error **errp)
 {
     EvalSoCState *s = RISCV_EVALSOC_MACHINE(obj);
@@ -1634,6 +1660,13 @@ static void evalsoc_machine_class_init(ObjectClass *oc, void *data)
                                           "Set on to tell QEMU's ROM to jump to "
                                           "download mode. Otherwise QEMU will jump to flash base address, aka download=flashxip"
                                           "nuclei support these download modes(flashxip,flash,ilm,ddr,sram)");
+    object_class_property_add_bool(oc, "cidu",
+                                   evalsoc_machine_get_cidu,
+                                   evalsoc_machine_set_cidu);
+    object_class_property_set_description(oc, "cidu",
+                                          "Enable CIDU. Enabled by default; "
+                                          "setting this property to off or "
+                                          "soc-cfg iregion.cidu=0 disables it.");
     object_class_property_add_str(oc, "aia",
                                   evalsoc_machine_get_aia,
                                   evalsoc_machine_set_aia);
@@ -1680,7 +1713,6 @@ static void riscv_evalsoc_soc_init(Object *obj)
     object_initialize_child(obj, "xec0", &s->xec0, TYPE_NUCLEI_XEC);
     object_initialize_child(obj, "spi0", &s->spi0, TYPE_NUCLEI_SPI);
     object_initialize_child(obj, "spi2", &s->spi2, TYPE_NUCLEI_SPI);
-    object_initialize_child(obj, "timer", &s->timer, TYPE_NUCLEI_SYSTIMER);
 }
 
 static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
@@ -1832,10 +1864,13 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     s->eclic = (mst->iregion.eclic_en) ?
                 nuclei_eclic_create(memmap[EVALSOC_ECLIC].base + mst->iregion.base,
                     memmap[EVALSOC_ECLIC].size,
-                    false, false, true,
+                    true,
                     ms->smp.cpus,
                     eclic_num_sources,
-                    EVALSOC_CLIC_INTCTLBITS,
+                    /* Pass the board-visible CLICINTCTLBITS straight into the
+                     * ECLIC model so clicinfo matches the selected soc-cfg.
+                     */
+                    mst->iregion.clicintctlbits,
                     SHADOW_GPR_GROUPS) : NULL;
 
     s->smpcc = (mst->iregion.smpcc_en) ?
@@ -1862,11 +1897,6 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion.base,
                            memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus,
                            timer_eclic, mst->timer_freq);
-
-    if (!sysbus_realize(SYS_BUS_DEVICE(&s->timer), errp))
-    {
-        return;
-    }
 
     qdev_prop_set_uint32(DEVICE(&s->gpio), "ngpio", 32);
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->gpio), errp))

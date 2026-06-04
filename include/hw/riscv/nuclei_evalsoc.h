@@ -48,9 +48,6 @@
 /* CLINT timebase frequency */
 #define CLINT_TIMEBASE_FREQ 1000000
 
-#define EVALSOC_CLIC_INTCTLBITS 3
-//#define NUCLEI_U_ECLIC_INTCTLBITS 3
-
 #define XEC_REVISION        0x00010000
 
 #define TYPE_EVALSOC_SOC "riscv.evalsoc.soc"
@@ -121,6 +118,7 @@ typedef struct {
     uint64_t smpcc_en;
     uint64_t cidu_en;
     uint64_t plic_en;
+    uint64_t clicintctlbits; /* SoC-configured CLICINTCTLBITS for iregion ECLIC. */
 } evalsoc_iregion_info;
 
 typedef struct
@@ -162,6 +160,7 @@ typedef struct
     uint32_t serial;
     EvalsocAIAType aia_type;
     int aia_guests;
+    int8_t cidu_opt;
 } EvalSoCState;
 
 #define TYPE_RISCV_EVALSOC_MACHINE MACHINE_TYPE_NAME("nuclei_evalsoc")
