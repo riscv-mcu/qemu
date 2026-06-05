@@ -5760,31 +5760,79 @@ static int rmw_pushssubm(CPURISCVState *env, int csrno, target_ulong *ret_value,
 
 static int read_meclic_ctl(CPURISCVState *env, int csrno, target_ulong *val)
 {
+    NucleiECLICState *eclic = env->eclic;
+    target_ulong wr_mask = XECLIC_CTL_TSP_EN;
+
+    if (nuclei_eclic_has_float_context(env)) {
+        wr_mask |= XECLIC_CTL_FPU_HW_STACK_EN;
+        if (eclic && eclic->shadow_gpr_num > 0) {
+            wr_mask |= XECLIC_CTL_SHADOW_FPU_EN;
+        }
+    }
+    if (eclic && eclic->shadow_gpr_num > 0) {
+        wr_mask |= XECLIC_CTL_SHADOW_EN;
+    }
     /* FEAT_EN is a read-only mirror of mmisc_ctl.HW_AUTO_CONTEXT. */
-    *val = set_field(env->meclic_ctl, XECLIC_CTL_FEAT_EN,
+    *val = set_field(env->meclic_ctl & wr_mask, XECLIC_CTL_FEAT_EN,
                      !!(env->mmisc_ctl & (1U << 21)));
     return RISCV_EXCP_NONE;
 }
 
 static int write_meclic_ctl(CPURISCVState *env, int csrno, target_ulong val)
 {
+    NucleiECLICState *eclic = env->eclic;
+    target_ulong wr_mask = XECLIC_CTL_TSP_EN;
+
+    if (nuclei_eclic_has_float_context(env)) {
+        wr_mask |= XECLIC_CTL_FPU_HW_STACK_EN;
+        if (eclic && eclic->shadow_gpr_num > 0) {
+            wr_mask |= XECLIC_CTL_SHADOW_FPU_EN;
+        }
+    }
+    if (eclic && eclic->shadow_gpr_num > 0) {
+        wr_mask |= XECLIC_CTL_SHADOW_EN;
+    }
     /* Ignore FEAT_EN writes and keep only the writable control bits. */
-    env->meclic_ctl = set_field(val, XECLIC_CTL_FEAT_EN, 0);
+    env->meclic_ctl = val & wr_mask;
     return RISCV_EXCP_NONE;
 }
 
 static int read_seclic_ctl(CPURISCVState *env, int csrno, target_ulong *val)
 {
+    NucleiECLICState *eclic = env->eclic;
+    target_ulong wr_mask = XECLIC_CTL_TSP_EN;
+
+    if (nuclei_eclic_has_float_context(env)) {
+        wr_mask |= XECLIC_CTL_FPU_HW_STACK_EN;
+        if (eclic && eclic->shadow_gpr_num > 0) {
+            wr_mask |= XECLIC_CTL_SHADOW_FPU_EN;
+        }
+    }
+    if (eclic && eclic->shadow_gpr_num > 0) {
+        wr_mask |= XECLIC_CTL_SHADOW_EN;
+    }
     /* FEAT_EN is a read-only mirror of mmisc_ctl.HW_AUTO_CONTEXT. */
-    *val = set_field(env->seclic_ctl, XECLIC_CTL_FEAT_EN,
+    *val = set_field(env->seclic_ctl & wr_mask, XECLIC_CTL_FEAT_EN,
                      !!(env->mmisc_ctl & (1U << 21)));
     return RISCV_EXCP_NONE;
 }
 
 static int write_seclic_ctl(CPURISCVState *env, int csrno, target_ulong val)
 {
+    NucleiECLICState *eclic = env->eclic;
+    target_ulong wr_mask = XECLIC_CTL_TSP_EN;
+
+    if (nuclei_eclic_has_float_context(env)) {
+        wr_mask |= XECLIC_CTL_FPU_HW_STACK_EN;
+        if (eclic && eclic->shadow_gpr_num > 0) {
+            wr_mask |= XECLIC_CTL_SHADOW_FPU_EN;
+        }
+    }
+    if (eclic && eclic->shadow_gpr_num > 0) {
+        wr_mask |= XECLIC_CTL_SHADOW_EN;
+    }
     /* Ignore FEAT_EN writes and keep only the writable control bits. */
-    env->seclic_ctl = set_field(val, XECLIC_CTL_FEAT_EN, 0);
+    env->seclic_ctl = val & wr_mask;
     return RISCV_EXCP_NONE;
 }
 
@@ -5819,16 +5867,20 @@ static int rmw_popxret(CPURISCVState *env, int csrno, target_ulong *ret_value,
                 target_ulong new_value, target_ulong write_mask)
 {
     uint64_t notify_addr = 0;
+    uint64_t float_addr = 0;
     uint32_t riscv_addr_size = 4;
     uint32_t gpr_frame_size;
     uint32_t fpr_size;
     uint32_t fpr_frame_size;
     uint32_t stack_ofst;
-    uint8_t current_grp, prev_grp;
+    uint8_t current_gpr_grp, current_fpr_grp;
+    uint8_t prev_gpr_grp, prev_fpr_grp;
+    uint8_t frame_restore_mask = 0;
     target_ulong retpc;
     target_ulong xeclic_ctl, xtsp;
     RISCVEclicShadowState *shadow = &env->eclic_shadow;
-    uint8_t stack_save_mask;
+    bool tsp_swapped;
+    target_ulong fcsr;
     target_ulong *xcause, *xepc, *xsubm;
 
     /* Debug mode does not consume the saved Nuclei trap frame. */
@@ -5850,28 +5902,51 @@ static int rmw_popxret(CPURISCVState *env, int csrno, target_ulong *ret_value,
     xsubm = (env->priv <= PRV_S) ? &env->ssubm : &env->msubm;
     xeclic_ctl = (env->priv <= PRV_S) ? env->seclic_ctl : env->meclic_ctl;
     xtsp = (env->priv <= PRV_S) ? env->stsp : env->mtsp;
-    fpr_frame_size = nuclei_eclic_fpr_frame_size(env);
+    if (nuclei_eclic_has_float_context(env) &&
+        (get_field(xeclic_ctl, XECLIC_CTL_SHADOW_FPU_EN) ||
+         get_field(xeclic_ctl, XECLIC_CTL_FPU_HW_STACK_EN))) {
+        frame_restore_mask |= ECLIC_STACK_SAVE_FCSR;
+    }
+    if (nuclei_eclic_float_stack_enabled(env, xeclic_ctl)) {
+        frame_restore_mask |= ECLIC_STACK_SAVE_FPRS;
+    }
+    tsp_swapped = get_field(xeclic_ctl, XECLIC_CTL_TSP_EN);
+    if (get_shadow_gpr_stack_size(env) > 0) {
+        frame_restore_mask =
+            shadow->grp_stack[shadow->grp_stack_top].frame_restore_mask;
+        tsp_swapped = shadow->grp_stack[shadow->grp_stack_top].tsp_swapped;
+    }
+    fpr_frame_size = (frame_restore_mask & ECLIC_STACK_SAVE_FCSR) ?
+                     fpr_size * ECLIC_FPR_FRAME_SLOTS : 0;
 
-    /* popxret always starts from the current trap stack pointer, where the
-     * auto-context frame stores xcause/xepc/xsubm as its trailer.
+    /* popxret always starts from the current trap stack pointer, with the
+     * integer frame first, an optional float frame appended after it, and
+     * xcause/xepc/xsubm carried in the integer-frame trailer.
      */
     notify_addr = env->gpr[2];
-    cpu_physical_memory_rw(notify_addr + riscv_addr_size * 13, xsubm, riscv_addr_size, 0);
-    cpu_physical_memory_rw(notify_addr + riscv_addr_size * 12, xepc, riscv_addr_size, 0);
-    cpu_physical_memory_rw(notify_addr + riscv_addr_size * 11, xcause, riscv_addr_size, 0);
+    float_addr = notify_addr + gpr_frame_size;
+    cpu_physical_memory_rw(notify_addr + riscv_addr_size * 13,
+                           xsubm, riscv_addr_size, 0);
+    cpu_physical_memory_rw(notify_addr + riscv_addr_size * 12,
+                           xepc, riscv_addr_size, 0);
+    cpu_physical_memory_rw(notify_addr + riscv_addr_size * 11,
+                           xcause, riscv_addr_size, 0);
 
     if ((get_shadow_gpr_stack_size(env) > 0)) {
         /* Based on the current grp stack popping information of the interrupt,
          * decide whether to pop the register from the stack or directly release
          * the corresponding shadow register group */
-        stack_save_mask =
-            shadow->grp_stack[shadow->grp_stack_top].stack_save_mask;
-        current_grp = shadow->grp_stack[shadow->grp_stack_top].grp_index;
+        current_gpr_grp =
+            shadow->grp_stack[shadow->grp_stack_top].gpr_grp_index;
+        current_fpr_grp =
+            shadow->grp_stack[shadow->grp_stack_top].fpr_grp_index;
         shadow_gpr_pop(env);
-        prev_grp = (shadow->grp_stack_top >= 0) ?
-                   shadow->grp_stack[shadow->grp_stack_top].grp_index : 0;
+        prev_gpr_grp = (shadow->grp_stack_top >= 0) ?
+                       shadow->grp_stack[shadow->grp_stack_top].gpr_grp_index : 0;
+        prev_fpr_grp = (shadow->grp_stack_top >= 0) ?
+                       shadow->grp_stack[shadow->grp_stack_top].fpr_grp_index : 0;
 
-        if (stack_save_mask & ECLIC_STACK_SAVE_GPRS) {
+        if (frame_restore_mask & ECLIC_STACK_SAVE_GPRS) {
             for (uint32_t i = 0; i < 17; i++) {
                 stack_ofst = i;
                 if (i > 10) {
@@ -5881,37 +5956,43 @@ static int rmw_popxret(CPURISCVState *env, int csrno, target_ulong *ret_value,
                         stack_ofst += 3;
                     }
                 }
-                cpu_physical_memory_rw(notify_addr + riscv_addr_size * stack_ofst,
+                cpu_physical_memory_rw(notify_addr +
+                                       riscv_addr_size * stack_ofst,
                                         &env->gpr[context_regs[i]], riscv_addr_size, 0);
             }
         }
-        if (stack_save_mask & ECLIC_STACK_SAVE_FPRS) {
+        if (frame_restore_mask & ECLIC_STACK_SAVE_FCSR) {
+            cpu_physical_memory_rw(float_addr, &fcsr, riscv_addr_size, 0);
+            env->frm = (fcsr & FSR_RD) >> FSR_RD_SHIFT;
+            riscv_cpu_set_fflags(env, (fcsr & FSR_AEXC) >> FSR_AEXC_SHIFT);
+        }
+        if (frame_restore_mask & ECLIC_STACK_SAVE_FPRS) {
             for (uint32_t i = 0; i < SHADOW_FPR_COUNT; i++) {
-                cpu_physical_memory_rw(notify_addr + gpr_frame_size + fpr_size * i,
+                cpu_physical_memory_rw(float_addr + fpr_size * (i + 4),
                                     &env->fpr[fpu_context_regs[i]], fpr_size, 0);
             }
         }
 
-        if (current_grp != prev_grp) {
+        if (current_gpr_grp != prev_gpr_grp ||
+            current_fpr_grp != prev_fpr_grp) {
             /* If the shadow grp currently in use is not in the same as the shadow grp used
              * in the previous interrupt, then after this interrupt returns, switch to that
              * shadow grp; otherwise, it will still be executed under the current shadow grp. */
-            if (prev_grp) {
-                riscv_shadow_gpr_switch_grp(env, prev_grp);
-            } else {
-                /* If 'prev_grp' is 0, it indicates that this is the outermost interrupt
-                 * and you need to switch back to the base gpr of the main text. */
-                riscv_shadow_gpr_switch_grp(env, 0);
-            }
+            riscv_shadow_gpr_switch_grp(env, prev_gpr_grp, prev_fpr_grp);
 
-            if (current_grp != 0) {
-                shadow->shadow_grp_used[current_grp - 1] = 0;
+            current_gpr_grp = MAX(current_gpr_grp, current_fpr_grp);
+            prev_gpr_grp = MAX(prev_gpr_grp, prev_fpr_grp);
+            if (current_gpr_grp != prev_gpr_grp && current_gpr_grp != 0) {
+                shadow->shadow_grp_used[current_gpr_grp - 1] = 0;
             }
         }
+    } else if (frame_restore_mask & ECLIC_STACK_SAVE_FCSR) {
+        cpu_physical_memory_rw(float_addr, &fcsr, riscv_addr_size, 0);
+        env->frm = (fcsr & FSR_RD) >> FSR_RD_SHIFT;
+        riscv_cpu_set_fflags(env, (fcsr & FSR_AEXC) >> FSR_AEXC_SHIFT);
     }
 
-    if (get_field(xeclic_ctl, XECLIC_CTL_TSP_EN) &&
-        nuclei_eclic_tsp_swap_needed(env, *xcause, *xsubm)) {
+    if (tsp_swapped && nuclei_eclic_tsp_swap_needed(env, *xcause, *xsubm)) {
         notify_addr = xtsp;
         if (env->priv <= PRV_S) {
             env->stsp = env->gpr[2] + gpr_frame_size + fpr_frame_size;
@@ -5927,9 +6008,11 @@ static int rmw_popxret(CPURISCVState *env, int csrno, target_ulong *ret_value,
     if (env->priv <= PRV_S) {
         env->ssubm = set_field(env->ssubm, XSUBM_TYP, get_field(env->ssubm, XSUBM_PTYP));
         env->ssubm = set_field(env->ssubm, XSUBM_GPRIDX, get_field(env->ssubm, XSUBM_PGPRIDX));
+        env->ssubm = set_field(env->ssubm, XSUBM_FGPRIDX, get_field(env->ssubm, XSUBM_PFGPRIDX));
     } else {
         env->msubm = set_field(env->msubm, XSUBM_TYP, get_field(env->msubm, XSUBM_PTYP));
         env->msubm = set_field(env->msubm, XSUBM_GPRIDX, get_field(env->msubm, XSUBM_PGPRIDX));
+        env->msubm = set_field(env->msubm, XSUBM_FGPRIDX, get_field(env->msubm, XSUBM_PFGPRIDX));
     }
     retpc = (env->priv == PRV_S) ? helper_sret(env) : helper_mret(env);
     /* After rmw_*, pc will be refreshed to the next instruction.

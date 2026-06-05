@@ -205,11 +205,14 @@ void nuclei_eclic_systimer_cb(void *opaque);
 void riscv_cpu_eclic_int_handler_start(void *eclic_ptr, int irq, int hartid);
 bool riscv_intc_is_clic_mode(CPUArchState *env);
 bool riscv_intc_is_eclicv2_mode(CPUArchState *env);
-void shadow_gpr_push(CPUArchState *env, uint8_t grp, uint8_t stack_save_mask);
+void shadow_gpr_push(CPUArchState *env, uint8_t gpr_grp, uint8_t fpr_grp,
+                     uint8_t frame_restore_mask, bool tsp_swapped);
 void shadow_gpr_pop(CPUArchState *env);
 int get_shadow_gpr_stack_size(CPUArchState *env);
-void riscv_shadow_gpr_switch_grp(CPUArchState *env, uint8_t grp_index);
-void riscv_backup_shadow_gpr(CPUArchState *env, uint8_t grp_index);
+void riscv_shadow_gpr_switch_grp(CPUArchState *env, uint8_t gpr_grp_index,
+                                 uint8_t fpr_grp_index);
+void riscv_backup_shadow_gpr(CPUArchState *env, uint8_t gpr_grp_index,
+                             uint8_t fpr_grp_index);
 void nuclei_eclic_next_interrupt(void *eclic, int hartid);
 uint8_t nuclei_eclic_get_threshold(void *opaque, int mode, int hartid);
 void nuclei_eclic_set_threshold(void *opaque, int mode, int hartid,

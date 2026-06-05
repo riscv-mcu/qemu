@@ -169,9 +169,11 @@ typedef struct PMUCTRState {
 #define SHADOW_GPR_GROUPS 9
 #define SHADOW_GPR_COUNT 17     /* Caller-saved integer reg count */
 #define SHADOW_FPR_COUNT 20     /* Caller-saved floating-point reg count */
+#define ECLIC_FPR_FRAME_SLOTS 24
 #define TOTAL_GPR_GROUPS (1 + SHADOW_GPR_GROUPS * 2)
 #define ECLIC_STACK_SAVE_GPRS 0x1
 #define ECLIC_STACK_SAVE_FPRS 0x2
+#define ECLIC_STACK_SAVE_FCSR 0x4
 /*
  * Shadow register allocation and nested trap restore metadata are separate
  * concerns. Only the first non-vectored interrupt may switch to a shadow
@@ -206,6 +208,13 @@ static inline bool nuclei_eclic_float_shadow_enabled(CPURISCVState *env,
            get_field(xeclic_ctl, XECLIC_CTL_SHADOW_FPU_EN);
 }
 
+static inline bool nuclei_eclic_float_stack_enabled(CPURISCVState *env,
+                                                    target_ulong xeclic_ctl)
+{
+    return nuclei_eclic_has_float_context(env) &&
+           get_field(xeclic_ctl, XECLIC_CTL_FPU_HW_STACK_EN);
+}
+
 static inline uint32_t nuclei_eclic_gpr_frame_slots(CPURISCVState *env)
 {
     return riscv_has_ext(env, RVE) ? 14 : 20;
@@ -223,30 +232,38 @@ static inline uint32_t nuclei_eclic_fpr_slot_size(CPURISCVState *env)
     return riscv_has_ext(env, RVD) ? 8 : 4;
 }
 
-static inline uint32_t nuclei_eclic_fpr_frame_size(CPURISCVState *env)
+static inline uint32_t nuclei_eclic_fpr_frame_size(CPURISCVState *env,
+                                                   target_ulong xeclic_ctl)
 {
-    if (!nuclei_eclic_has_float_context(env)) {
+    if (!nuclei_eclic_has_float_context(env) ||
+        !(get_field(xeclic_ctl, XECLIC_CTL_SHADOW_FPU_EN) ||
+          get_field(xeclic_ctl, XECLIC_CTL_FPU_HW_STACK_EN))) {
         return 0;
     }
 
-    return nuclei_eclic_fpr_slot_size(env) * SHADOW_FPR_COUNT;
+    return nuclei_eclic_fpr_slot_size(env) * ECLIC_FPR_FRAME_SLOTS;
 }
 
 typedef struct {
-    /* Active shadow bank currently backing the architectural caller-saved
-     * integer and floating-point register view.
+    /* Combined active shadow-group allocation. When only one domain uses
+     * shadow acceleration, this tracks the non-zero domain.
      */
     uint8_t current_grp;
+    uint8_t current_gpr_grp;
+    uint8_t current_fpr_grp;
     /* Full per-group snapshots of the caller-saved register subset. Group 0 is
      * the architectural base bank; the remaining groups implement M/S shadow
      * acceleration.
      */
     target_ulong gpr_banks[TOTAL_GPR_GROUPS][32];
     uint64_t fpr_banks[TOTAL_GPR_GROUPS][32];
+    target_ulong fcsr_banks[TOTAL_GPR_GROUPS];
     struct {
         /* Per-trap restore metadata consumed by popxret(). */
-        uint8_t grp_index;
-        uint8_t stack_save_mask;
+        uint8_t gpr_grp_index;
+        uint8_t fpr_grp_index;
+        uint8_t frame_restore_mask;
+        uint8_t tsp_swapped;
     } grp_stack[ECLIC_MAX_TRAP_FRAMES];
     int16_t grp_stack_top;
     /* First-come-first-served shadow allocation state for M-side groups 1..9

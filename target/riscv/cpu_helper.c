@@ -1803,12 +1803,11 @@ static void nuclei_eclic_save_caller_saved_fprs(CPURISCVState *env,
                                                 target_ulong stack_addr,
                                                 uint32_t fpr_size)
 {
-    /* Floating-point caller-saved registers are always packed densely after
-     * the integer frame, regardless of whether the interrupt eventually uses
-     * integer shadow, floating shadow, or pure stack-save.
+    /* The float frame reserves slots 0..3 for FCSR/alignment and stores the
+     * caller-saved FPR subset starting at slot 4, matching popxret().
      */
     for (uint32_t i = 0; i < SHADOW_FPR_COUNT; i++) {
-        cpu_physical_memory_rw(stack_addr + fpr_size * i,
+        cpu_physical_memory_rw(stack_addr + fpr_size * (i + 4),
                                &env->fpr[fpu_context_regs[i]], fpr_size, 1);
     }
 }
@@ -1825,22 +1824,24 @@ static void nuclei_eclic_context_auto_saving(CPURISCVState *env,
                                              int int_vec_mode, int irq_level)
 {
     const NucleiECLICState *eclic = env->eclic;
-    target_ulong stack_addr;
+    target_ulong frame_addr, stack_addr, float_addr;
     uint32_t gpr_size = 4;
     uint32_t gpr_frame_size;
     uint32_t fpr_size;
     uint32_t fpr_frame_size;
-    target_ulong xcause, xtsp, xeclic_ctl, xshadgprlvl0, xshadgprlvl1;
+    target_ulong xcause, xtsp, xeclic_ctl, xshadgprlvl0, xshadgprlvl1, fcsr;
     uint64_t shadow_cfg;
     RISCVEclicShadowState *shadow = &env->eclic_shadow;
     uint32_t first_shadow_grp, shadow_stack_size;
+    uint8_t current_gpr_grp, current_fpr_grp;
     void *xcause_addr, *xepc_addr, *xsubm_addr;
     bool is_interrupt;
     bool int_shadow_enabled;
     bool float_shadow_enabled;
+    bool float_stack_enabled;
     bool use_shadow;
     bool tsp_swap;
-    uint8_t stack_save_mask = 0;
+    uint8_t frame_restore_mask = 0;
 
     if (riscv_cpu_mxl(env) != MXL_RV32) {
         gpr_size = 8;
@@ -1868,6 +1869,7 @@ static void nuclei_eclic_context_auto_saving(CPURISCVState *env,
                          eclic && eclic->shadow_gpr_num > 0;
     float_shadow_enabled = nuclei_eclic_float_shadow_enabled(env, xeclic_ctl) &&
                            eclic && eclic->shadow_gpr_num > 0;
+    float_stack_enabled = nuclei_eclic_float_stack_enabled(env, xeclic_ctl);
     /*
      * Spec 15.14 shadow acceleration only applies to the first non-vectored
      * interrupt in the nesting chain. Exceptions and deeper interrupts stay on
@@ -1882,24 +1884,34 @@ static void nuclei_eclic_context_auto_saving(CPURISCVState *env,
                                             env->ssubm : env->msubm);
     gpr_frame_size = nuclei_eclic_gpr_frame_size(env);
     fpr_size = nuclei_eclic_fpr_slot_size(env);
-    fpr_frame_size = nuclei_eclic_fpr_frame_size(env);
+    fpr_frame_size = nuclei_eclic_fpr_frame_size(env, xeclic_ctl);
+    current_gpr_grp = shadow->current_gpr_grp;
+    current_fpr_grp = shadow->current_fpr_grp;
 
     /* For sp exchange processing in non-vector interrupts or exceptions,
      * when XECLIC_CTL:[TSP_EN] is enabled, the hardware will automatically
      * switch the stack. Otherwise, the software needs to switch through
      * "csrrw sp, XTSPCSW, sp". */
-    stack_addr = env->gpr[2];
+    frame_addr = env->gpr[2];
     if (tsp_swap) {
         env->gpr[2] = xtsp - gpr_frame_size - fpr_frame_size;
         if (env->priv <= PRV_S) {
-            env->stsp = stack_addr;
+            env->stsp = frame_addr;
         } else {
-            env->mtsp = stack_addr;
+            env->mtsp = frame_addr;
         }
     } else {
         env->gpr[2] -= gpr_frame_size + fpr_frame_size;
     }
-    stack_addr = env->gpr[2];
+    frame_addr = env->gpr[2];
+    stack_addr = frame_addr;
+    float_addr = frame_addr + gpr_frame_size;
+    if (fpr_frame_size) {
+        fcsr = (riscv_cpu_get_fflags(env) << FSR_AEXC_SHIFT) |
+               (env->frm << FSR_RD_SHIFT);
+        cpu_physical_memory_rw(float_addr, &fcsr, gpr_size, 1);
+        frame_restore_mask |= ECLIC_STACK_SAVE_FCSR;
+    }
 
     first_shadow_grp = (env->priv <= PRV_S) ? 9 : 0;
     if (use_shadow) {
@@ -1924,19 +1936,20 @@ static void nuclei_eclic_context_auto_saving(CPURISCVState *env,
             }
         }
 
-        riscv_backup_shadow_gpr(env, 0);
-        riscv_shadow_gpr_switch_grp(env, target_grp);
+        riscv_backup_shadow_gpr(env, current_gpr_grp, current_fpr_grp);
+        current_gpr_grp = int_shadow_enabled ? target_grp : current_gpr_grp;
+        current_fpr_grp = float_shadow_enabled ? target_grp : current_fpr_grp;
+        riscv_shadow_gpr_switch_grp(env, current_gpr_grp, current_fpr_grp);
         if (!int_shadow_enabled) {
             nuclei_eclic_save_caller_saved_gprs(env, stack_addr, gpr_size);
-            stack_save_mask |= ECLIC_STACK_SAVE_GPRS;
+            frame_restore_mask |= ECLIC_STACK_SAVE_GPRS;
         }
-        if (!float_shadow_enabled && fpr_frame_size) {
-            nuclei_eclic_save_caller_saved_fprs(env,
-                                                stack_addr + gpr_frame_size,
-                                                fpr_size);
-            stack_save_mask |= ECLIC_STACK_SAVE_FPRS;
+        if (!float_shadow_enabled && float_stack_enabled) {
+            nuclei_eclic_save_caller_saved_fprs(env, float_addr, fpr_size);
+            frame_restore_mask |= ECLIC_STACK_SAVE_FPRS;
         }
-        shadow_gpr_push(env, target_grp, stack_save_mask);
+        shadow_gpr_push(env, current_gpr_grp, current_fpr_grp,
+                        frame_restore_mask, tsp_swap);
         shadow->shadow_grp_used[target_grp - 1] = 1;
     } else {
         /*
@@ -1945,24 +1958,29 @@ static void nuclei_eclic_context_auto_saving(CPURISCVState *env,
          * even when shadow acceleration is disabled.
          */
         if ((int_shadow_enabled || float_shadow_enabled) &&
-            shadow->current_grp != 0) {
-            riscv_backup_shadow_gpr(env, shadow->current_grp);
+            (current_gpr_grp != 0 || current_fpr_grp != 0)) {
+            riscv_backup_shadow_gpr(env, current_gpr_grp, current_fpr_grp);
         }
         nuclei_eclic_save_caller_saved_gprs(env, stack_addr, gpr_size);
-        stack_save_mask |= ECLIC_STACK_SAVE_GPRS;
-        if (fpr_frame_size) {
-            nuclei_eclic_save_caller_saved_fprs(env,
-                                                stack_addr + gpr_frame_size,
-                                                fpr_size);
-            stack_save_mask |= ECLIC_STACK_SAVE_FPRS;
+        frame_restore_mask |= ECLIC_STACK_SAVE_GPRS;
+        if (float_stack_enabled) {
+            nuclei_eclic_save_caller_saved_fprs(env, float_addr, fpr_size);
+            frame_restore_mask |= ECLIC_STACK_SAVE_FPRS;
         }
-        shadow_gpr_push(env, shadow->current_grp, stack_save_mask);
+        shadow_gpr_push(env, current_gpr_grp, current_fpr_grp,
+                        frame_restore_mask, tsp_swap);
     }
 
     if (env->priv <= PRV_S) {
-        env->ssubm = set_field(env->ssubm, XSUBM_GPRIDX, shadow->current_grp);
+        env->ssubm = set_field(env->ssubm, XSUBM_GPRIDX,
+                               shadow->current_gpr_grp);
+        env->ssubm = set_field(env->ssubm, XSUBM_FGPRIDX,
+                               shadow->current_fpr_grp);
     } else {
-        env->msubm = set_field(env->msubm, XSUBM_GPRIDX, shadow->current_grp);
+        env->msubm = set_field(env->msubm, XSUBM_GPRIDX,
+                               shadow->current_gpr_grp);
+        env->msubm = set_field(env->msubm, XSUBM_FGPRIDX,
+                               shadow->current_fpr_grp);
     }
 
     /*
@@ -2102,6 +2120,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
             env->ssubm = set_field(env->ssubm, XSUBM_PTYP, get_field(env->ssubm, XSUBM_TYP));
             env->ssubm = set_field(env->ssubm, XSUBM_TYP, SUBM_INT);
             env->ssubm = set_field(env->ssubm, XSUBM_PGPRIDX, get_field(env->ssubm, XSUBM_GPRIDX));
+            env->ssubm = set_field(env->ssubm, XSUBM_PFGPRIDX, get_field(env->ssubm, XSUBM_FGPRIDX));
         } else {
             cause |= get_field(env->mintstatus, MINTSTATUS_MIL) << 16;
             cause |= get_field(env->mstatus, MSTATUS_MPIE) << 27;
@@ -2110,6 +2129,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
             env->msubm = set_field(env->msubm, XSUBM_PTYP, get_field(env->msubm, XSUBM_TYP));
             env->msubm = set_field(env->msubm, XSUBM_TYP, SUBM_INT);
             env->msubm = set_field(env->msubm, XSUBM_PGPRIDX, get_field(env->msubm, XSUBM_GPRIDX));
+            env->msubm = set_field(env->msubm, XSUBM_PFGPRIDX, get_field(env->msubm, XSUBM_FGPRIDX));
         }
     }else{
         cause = set_field(cause, MCAUSE_INTERRUPT, 0);
@@ -2193,6 +2213,10 @@ void riscv_cpu_do_interrupt(CPUState *cs)
             env->ssubm = set_field(env->ssubm, XSUBM_PTYP,
                                    get_field(env->ssubm, XSUBM_TYP));
             env->ssubm = set_field(env->ssubm, XSUBM_TYP, SUBM_EXC);
+            env->ssubm = set_field(env->ssubm, XSUBM_PGPRIDX,
+                                   get_field(env->ssubm, XSUBM_GPRIDX));
+            env->ssubm = set_field(env->ssubm, XSUBM_PFGPRIDX,
+                                   get_field(env->ssubm, XSUBM_FGPRIDX));
             cause = set_field(cause, SCAUSE_SPP, env->priv);
         }
         env->scause = cause | ((target_ulong)is_interrupt <<
@@ -2265,6 +2289,10 @@ void riscv_cpu_do_interrupt(CPUState *cs)
             env->msubm = set_field(env->msubm, XSUBM_PTYP,
                                    get_field(env->msubm, XSUBM_TYP));
             env->msubm = set_field(env->msubm, XSUBM_TYP, SUBM_EXC);
+            env->msubm = set_field(env->msubm, XSUBM_PGPRIDX,
+                                   get_field(env->msubm, XSUBM_GPRIDX));
+            env->msubm = set_field(env->msubm, XSUBM_PFGPRIDX,
+                                   get_field(env->msubm, XSUBM_FGPRIDX));
             cause = set_field(cause, MCAUSE_MPP, env->priv);
         }
         env->mcause = cause | ((target_ulong)is_interrupt <<

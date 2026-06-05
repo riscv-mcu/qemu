@@ -1060,12 +1060,15 @@ typedef enum RISCVException {
 #define SUBM_NMI 3      /* NMI Handing Mode */
 
 /* msubm */
+#define XSUBM_PFGPRIDX                     0x3e000000 /* pfgpridx[4:0], previous floating caller-saved bank index */
+#define XSUBM_FGPRIDX                      0x01f00000 /* fgpridx[4:0], current floating caller-saved bank index */
 #define XSUBM_PGPRIDX                      0x000f8000 /* pgpridx[4:0], previous caller-saved bank index */
 #define XSUBM_GPRIDX                       0x00007c00 /* gpridx[4:0], current caller-saved bank index */
 #define XSUBM_PTYP                         0x00000300 /* ptyp[1:0] */
 #define XSUBM_TYP                          0x000000c0 /* typ[1:0] */
 
 /* eclic_ctl */
+#define XECLIC_CTL_FPU_HW_STACK_EN         0x00000010 /* fpu_hw_stack_en, enable hardware float-context stack save/restore */
 #define XECLIC_CTL_SHADOW_FPU_EN           0x00000008 /* shadow_fpu_en, enable FPR shadow-bank acceleration */
 #define XECLIC_CTL_SHADOW_EN               0x00000004 /* shadow_en */
 #define XECLIC_CTL_TSP_EN                  0x00000002 /* tsp_en */

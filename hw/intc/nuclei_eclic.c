@@ -219,7 +219,8 @@ bool riscv_intc_is_eclicv2_mode(CPUArchState *env)
     return env->eclic && (env->mmisc_ctl & (1U << 21));
 }
 
-void shadow_gpr_push(CPUArchState *env, uint8_t grp, uint8_t stack_save_mask)
+void shadow_gpr_push(CPUArchState *env, uint8_t gpr_grp, uint8_t fpr_grp,
+                     uint8_t frame_restore_mask, bool tsp_swapped)
 {
     RISCVEclicShadowState *shadow = &env->eclic_shadow;
 
@@ -228,9 +229,11 @@ void shadow_gpr_push(CPUArchState *env, uint8_t grp, uint8_t stack_save_mask)
      */
     if (shadow->grp_stack_top < (int)ARRAY_SIZE(shadow->grp_stack) - 1) {
         shadow->grp_stack_top++;
-        shadow->grp_stack[shadow->grp_stack_top].grp_index = grp;
-        shadow->grp_stack[shadow->grp_stack_top].stack_save_mask =
-            stack_save_mask;
+        shadow->grp_stack[shadow->grp_stack_top].gpr_grp_index = gpr_grp;
+        shadow->grp_stack[shadow->grp_stack_top].fpr_grp_index = fpr_grp;
+        shadow->grp_stack[shadow->grp_stack_top].frame_restore_mask =
+            frame_restore_mask;
+        shadow->grp_stack[shadow->grp_stack_top].tsp_swapped = tsp_swapped;
     } else {
         error_report("ECLIC trap context stack overflow\n");
         exit(1);
@@ -250,79 +253,103 @@ int get_shadow_gpr_stack_size(CPUArchState *env)
     return env->eclic_shadow.grp_stack_top + 1;
 }
 
+static void riscv_shadow_save_gpr_bank(CPUArchState *env, uint8_t grp_index)
+{
+    RISCVEclicShadowState *shadow = &env->eclic_shadow;
+
+    for (int i = 0; i < SHADOW_GPR_COUNT; i++) {
+        uint8_t reg_idx = context_regs[i];
+
+        shadow->gpr_banks[grp_index][reg_idx] = env->gpr[reg_idx];
+    }
+}
+
+static void riscv_shadow_load_gpr_bank(CPUArchState *env, uint8_t grp_index)
+{
+    RISCVEclicShadowState *shadow = &env->eclic_shadow;
+
+    for (int i = 0; i < SHADOW_GPR_COUNT; i++) {
+        uint8_t reg_idx = context_regs[i];
+
+        /* RV32E still stores a full bank image; only the inactive
+         * architectural registers remain ignored by the core itself.
+         */
+        env->gpr[reg_idx] = shadow->gpr_banks[grp_index][reg_idx];
+    }
+}
+
+static void riscv_shadow_save_fpr_bank(CPUArchState *env, uint8_t grp_index)
+{
+    RISCVEclicShadowState *shadow = &env->eclic_shadow;
+
+    for (int i = 0; i < SHADOW_FPR_COUNT; i++) {
+        uint8_t reg_idx = fpu_context_regs[i];
+
+        shadow->fpr_banks[grp_index][reg_idx] = env->fpr[reg_idx];
+    }
+    shadow->fcsr_banks[grp_index] =
+        (riscv_cpu_get_fflags(env) << FSR_AEXC_SHIFT) |
+        (env->frm << FSR_RD_SHIFT);
+}
+
+static void riscv_shadow_load_fpr_bank(CPUArchState *env, uint8_t grp_index)
+{
+    RISCVEclicShadowState *shadow = &env->eclic_shadow;
+    target_ulong fcsr = shadow->fcsr_banks[grp_index];
+
+    for (int i = 0; i < SHADOW_FPR_COUNT; i++) {
+        uint8_t reg_idx = fpu_context_regs[i];
+
+        env->fpr[reg_idx] = shadow->fpr_banks[grp_index][reg_idx];
+    }
+    env->frm = (fcsr & FSR_RD) >> FSR_RD_SHIFT;
+    riscv_cpu_set_fflags(env, (fcsr & FSR_AEXC) >> FSR_AEXC_SHIFT);
+}
+
 /* Switch to the specified register group */
-void riscv_shadow_gpr_switch_grp(CPUArchState *env, uint8_t grp_index)
+void riscv_shadow_gpr_switch_grp(CPUArchState *env, uint8_t gpr_grp_index,
+                                 uint8_t fpr_grp_index)
 {
     RISCVEclicShadowState *shadow;
-    target_ulong xeclic_ctl;
-    uint8_t old_grp;
+    uint8_t old_gpr_grp, old_fpr_grp;
 
     if (!env) {
         return;
     }
     shadow = &env->eclic_shadow;
+    old_gpr_grp = shadow->current_gpr_grp;
+    old_fpr_grp = shadow->current_fpr_grp;
 
-    if (grp_index == shadow->current_grp) {
+    if (gpr_grp_index == old_gpr_grp && fpr_grp_index == old_fpr_grp) {
         return;
     }
 
-    xeclic_ctl = (env->priv <= PRV_S) ? env->seclic_ctl : env->meclic_ctl;
-    old_grp = shadow->current_grp;
-    if (get_field(xeclic_ctl, XECLIC_CTL_SHADOW_EN)) {
-        for (int i = 0; i < SHADOW_GPR_COUNT; i++) {
-            uint8_t reg_idx = context_regs[i];
-
-            shadow->gpr_banks[old_grp][reg_idx] = env->gpr[reg_idx];
-        }
+    if (gpr_grp_index != old_gpr_grp) {
+        riscv_shadow_save_gpr_bank(env, old_gpr_grp);
     }
-    if (nuclei_eclic_float_shadow_enabled(env, xeclic_ctl)) {
-        for (int i = 0; i < SHADOW_FPR_COUNT; i++) {
-            uint8_t reg_idx = fpu_context_regs[i];
-
-            shadow->fpr_banks[old_grp][reg_idx] = env->fpr[reg_idx];
-        }
+    if (fpr_grp_index != old_fpr_grp) {
+        riscv_shadow_save_fpr_bank(env, old_fpr_grp);
     }
-    shadow->current_grp = grp_index;
-    if (get_field(xeclic_ctl, XECLIC_CTL_SHADOW_EN)) {
-        for (int i = 0; i < SHADOW_GPR_COUNT; i++) {
-            uint8_t reg_idx = context_regs[i];
-
-            /* RV32E still stores a full bank image; only the inactive
-             * architectural registers remain ignored by the core itself.
-             */
-            env->gpr[reg_idx] = shadow->gpr_banks[grp_index][reg_idx];
-        }
+    if (gpr_grp_index != old_gpr_grp) {
+        riscv_shadow_load_gpr_bank(env, gpr_grp_index);
     }
-    if (nuclei_eclic_float_shadow_enabled(env, xeclic_ctl)) {
-        for (int i = 0; i < SHADOW_FPR_COUNT; i++) {
-            uint8_t reg_idx = fpu_context_regs[i];
-
-            env->fpr[reg_idx] = shadow->fpr_banks[grp_index][reg_idx];
-        }
+    if (fpr_grp_index != old_fpr_grp) {
+        riscv_shadow_load_fpr_bank(env, fpr_grp_index);
     }
+    shadow->current_gpr_grp = gpr_grp_index;
+    shadow->current_fpr_grp = fpr_grp_index;
+    shadow->current_grp = MAX(gpr_grp_index, fpr_grp_index);
 }
 
 /* Backup shadow gpr for interrupt return use */
-void riscv_backup_shadow_gpr(CPUArchState *env, uint8_t grp_index)
+void riscv_backup_shadow_gpr(CPUArchState *env, uint8_t gpr_grp_index,
+                             uint8_t fpr_grp_index)
 {
-    RISCVEclicShadowState *shadow;
-    target_ulong xeclic_ctl;
-
-    shadow = &env->eclic_shadow;
-    xeclic_ctl = (env->priv <= PRV_S) ? env->seclic_ctl : env->meclic_ctl;
-    if (get_field(xeclic_ctl, XECLIC_CTL_SHADOW_EN)) {
-        for (int i = 0; i < SHADOW_GPR_COUNT; i++) {
-            uint8_t reg_idx = context_regs[i];
-
-            shadow->gpr_banks[grp_index][reg_idx] = env->gpr[reg_idx];
-        }
+    if (gpr_grp_index < TOTAL_GPR_GROUPS) {
+        riscv_shadow_save_gpr_bank(env, gpr_grp_index);
     }
-    if (nuclei_eclic_float_shadow_enabled(env, xeclic_ctl)) {
-        for (int i = 0; i < SHADOW_FPR_COUNT; i++) {
-            uint8_t reg_idx = fpu_context_regs[i];
-
-            shadow->fpr_banks[grp_index][reg_idx] = env->fpr[reg_idx];
-        }
+    if (fpr_grp_index < TOTAL_GPR_GROUPS) {
+        riscv_shadow_save_fpr_bank(env, fpr_grp_index);
     }
 }
 
@@ -1154,8 +1181,13 @@ static void nuclei_eclic_shadow_gpr_init(CPURISCVState *env)
     }
     memset(shadow->gpr_banks, 0, sizeof(shadow->gpr_banks));
     memset(shadow->fpr_banks, 0, sizeof(shadow->fpr_banks));
+    memset(shadow->fcsr_banks, 0, sizeof(shadow->fcsr_banks));
+    memset(shadow->shadow_grp_used, 0, sizeof(shadow->shadow_grp_used));
+    memset(shadow->grp_stack, 0, sizeof(shadow->grp_stack));
     /* The basic GPR group (Bank 0) is used by default. */
     shadow->current_grp = 0;
+    shadow->current_gpr_grp = 0;
+    shadow->current_fpr_grp = 0;
     shadow->grp_stack_top = -1;
 }
 
