@@ -1783,7 +1783,6 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     qemu_irq qspi0_irq = NULL;
     qemu_irq qspi2_irq = NULL;
     qemu_irq xec0_irq = NULL;
-    DeviceState *timer_eclic = NULL;
 
     qdev_prop_set_uint32(DEVICE(&s->cpus), "num-harts", ms->smp.cpus);
     qdev_prop_set_uint32(DEVICE(&s->cpus), "hartid-base", 0);
@@ -1943,10 +1942,9 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                            uart0_irq);
     }
 
-    timer_eclic = (ms->firmware == NULL) ? s->eclic : NULL;
     nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion.base,
                            memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus,
-                           timer_eclic, mst->timer_freq);
+                           s->eclic, mst->timer_freq);
 
     qdev_prop_set_uint32(DEVICE(&s->gpio), "ngpio", 32);
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->gpio), errp))
