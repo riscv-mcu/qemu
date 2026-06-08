@@ -138,9 +138,46 @@ static inline uint32_t evalsoc_eclic_num_sources(const EvalSoCState *s)
     return get_irq_number_alignment(max_eclic_irq + 1);
 }
 
-static inline uint32_t evalsoc_cidu_num_sources(const EvalSoCState *s)
+static inline uint32_t evalsoc_cidu_num_sources(uint32_t eclic_num_sources)
 {
-    return evalsoc_eclic_num_sources(s) - CIDU_EXT_INT_OFST;
+    return eclic_num_sources - CIDU_EXT_INT_OFST;
+}
+
+static bool evalsoc_hart0_has_smode(void)
+{
+    RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(0));
+
+    return cpu && riscv_has_ext(&cpu->env, RVS);
+}
+
+static uint32_t evalsoc_effective_eclic_num_sources(uint32_t num_sources)
+{
+    if (evalsoc_hart0_has_smode()) {
+        return MIN(num_sources,
+                   (uint32_t)EVALSOC_ECLIC_NUM_SOURCES_WITH_SMODE);
+    }
+
+    return num_sources;
+}
+
+static void evalsoc_validate_eclic_irq_layout(const EvalSoCState *s,
+                                              uint32_t eclic_num_sources)
+{
+    uint64_t max_irq = s->irqmax ? (s->irqmax - 1 + EVALSOC_DUAL_IRQ_DELTA) : 0;
+    uint64_t max_eclic_irq = PLIC_IRQ_TO_ECLIC_IRQ(max_irq);
+    uint64_t max_irqmax = eclic_num_sources -
+                          EVALSOC_DUAL_IRQ_DELTA -
+                          PLIC_IRQ_TO_ECLIC_IRQ(0);
+
+    if (max_eclic_irq >= eclic_num_sources) {
+        error_report("irqmax=%" PRIu64
+                     " exceeds ECLIC-visible range for the current CPU "
+                     "privilege configuration; max supported value is %" PRIu64
+                     " (num_sources=%u, hart0.s=%s)",
+                     s->irqmax, max_irqmax, eclic_num_sources,
+                     evalsoc_hart0_has_smode() ? "true" : "false");
+        exit(1);
+    }
 }
 
 static void evalsoc_validate_irq_layout(const EvalSoCState *s)
@@ -1451,6 +1488,8 @@ static void evalsoc_machine_instance_init(Object *obj)
     /* irqmax: max irq number for external irq
             1.eclic core irq:irq[0~18] external irq:irq[19...4095]
             2.plic  irq 0: wire 0 external irq:irq[1...1023]
+            3.when hart0 keeps S-mode enabled, board-level ECLIC wiring is
+              later capped to at most 1024 sources during SoC realize
     */
     s->irqmax = EVALSOC_DEFAULT_IRQMAX;
     /* Default to the Nuclei reset value unless soc-cfg overrides it. */
@@ -1738,8 +1777,8 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     hwaddr msi_addr;
     uint32_t guest_bits;
     uint32_t irqchip_num_sources = evalsoc_irqchip_num_sources(mst);
-    uint32_t eclic_num_sources = evalsoc_eclic_num_sources(mst);
-    uint32_t cidu_num_sources = evalsoc_cidu_num_sources(mst);
+    uint32_t eclic_num_sources;
+    uint32_t cidu_num_sources;
     qemu_irq uart0_irq = NULL;
     qemu_irq qspi0_irq = NULL;
     qemu_irq qspi2_irq = NULL;
@@ -1752,6 +1791,17 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     qdev_prop_set_uint64(DEVICE(&s->cpus), "resetvec", 0x1004);
 
     sysbus_realize(SYS_BUS_DEVICE(&s->cpus), &error_abort);
+
+    eclic_num_sources =
+        evalsoc_effective_eclic_num_sources(evalsoc_eclic_num_sources(mst));
+    cidu_num_sources = evalsoc_cidu_num_sources(eclic_num_sources);
+    if (mst->iregion.eclic_en || mst->iregion.cidu_en) {
+        /*
+         * Keep the board-level IRQ fanout within the source bank size selected
+         * from hart0's current S-mode capability.
+         */
+        evalsoc_validate_eclic_irq_layout(mst, eclic_num_sources);
+    }
 
     /*
      * The cluster must be realized after the RISC-V hart array container,
