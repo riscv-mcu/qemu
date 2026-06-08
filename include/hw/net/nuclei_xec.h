@@ -79,6 +79,7 @@ struct NucleiXECState {
     MemoryRegion *dma_mr;
     AddressSpace dma_as;
     NICState *nic;
+    NetClientState *drop_peer;
     NICConf conf;
     qemu_irq irq;
     uint8_t mac[6];

@@ -741,6 +741,18 @@ static NetClientInfo net_nuclei_xec_info = {
     .link_status_changed = nuclei_xec_set_link,
 };
 
+static ssize_t nuclei_xec_drop_peer_receive(NetClientState *nc,
+                                            const uint8_t *buf, size_t size)
+{
+    return size;
+}
+
+static NetClientInfo net_nuclei_xec_drop_peer_info = {
+    .type = NET_CLIENT_DRIVER_NONE,
+    .size = sizeof(NetClientState),
+    .receive = nuclei_xec_drop_peer_receive,
+};
+
 static void nuclei_xec_realize(DeviceState *dev, Error **errp)
 {
     NucleiXECState *s = NUCLEI_XEC(dev);
@@ -754,6 +766,30 @@ static void nuclei_xec_realize(DeviceState *dev, Error **errp)
     s->nic = qemu_new_nic(&net_nuclei_xec_info, &s->conf,
                           object_get_typename(OBJECT(dev)), dev->id,
                           &dev->mem_reentrancy_guard, s);
+    if (!qemu_get_queue(s->nic)->peer) {
+        /*
+         * Keep the NIC instantiated for the guest, but sink packets locally
+         * when the user did not provide a network backend.
+         */
+        s->drop_peer = qemu_new_net_control_client(
+            &net_nuclei_xec_drop_peer_info, qemu_get_queue(s->nic),
+            "nuclei-xec-drop", NULL);
+    }
+}
+
+static void nuclei_xec_unrealize(DeviceState *dev)
+{
+    NucleiXECState *s = NUCLEI_XEC(dev);
+
+    if (s->drop_peer) {
+        qemu_del_net_client(s->drop_peer);
+        s->drop_peer = NULL;
+    }
+    if (s->nic) {
+        qemu_del_nic(s->nic);
+        s->nic = NULL;
+    }
+    address_space_destroy(&s->dma_as);
 
 }
 
@@ -832,6 +868,7 @@ static void nuclei_xec_class_init(ObjectClass *klass, void *data)
     DeviceClass *dc = DEVICE_CLASS(klass);
 
     dc->realize = nuclei_xec_realize;
+    dc->unrealize = nuclei_xec_unrealize;
     dc->desc = "Nuclei Ethernet Controller (XEC)";
     device_class_set_props(dc, nuclei_xec_properties);
     dc->vmsd = &vmstate_nuclei_xec;
@@ -852,4 +889,3 @@ static void nuclei_xec_register_types(void)
 }
 
 type_init(nuclei_xec_register_types)
-
