@@ -72,11 +72,14 @@
         "application/baremetal/smphello": {
             "build_config" : { "SMP": "4"}
         },
+        "application/baremetal/demo_eclic_stress": {
+            "build_config" : { "INTSTACK": "1",  "ECLIC_HWCTX": "1",  "XLCFG_ECLIC": "2" }
+        },
         "application/freertos/smpdemo": {
             "build_config" : { "SMP": "4"}
         },
         "application/baremetal/demo_cidu": {
-            "build_config" : { "SMP": "4", "XLCFG_CIDU" : "1"}
+            "build_config" : { "SMP": "4", "XLCFG_CIDU" : "1", "ICOUNT_OPT": ""}
         },
         "application/freertos/demo_profiling": {
             "build_config" : { "DOWNLOAD": "sram"}
@@ -111,7 +114,7 @@
     "expected": {
         "application/baremetal/demo_nice": {"build": true, "run": true},
         "application/rtthread/msh" : {"build": true, "run": true},
-        "application/baremetal/demo_clint_timer" : {"build": true, "run": false},
+        "application/baremetal/demo_clint_timer" : {"build": true, "run": true},
         "application/baremetal/demo_spmp": {"build": true, "run": true},
         "application/baremetal/demo_smpu": {"build": true, "run": true},
         "application/baremetal/demo_smode_eclic": {"build": true, "run": true},
