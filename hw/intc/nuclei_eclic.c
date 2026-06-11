@@ -1191,6 +1191,59 @@ static void nuclei_eclic_shadow_gpr_init(CPURISCVState *env)
     shadow->grp_stack_top = -1;
 }
 
+static void nuclei_eclic_reset(DeviceState *dev)
+{
+    NucleiECLICState *eclic = NUCLEI_ECLIC(dev);
+    NucleiECLICExternalRoute *route;
+    int hartid;
+    int id;
+    int irq;
+
+    for (irq = 0; irq < eclic->num_sources; irq++) {
+        for (route = eclic->external_routes[irq]; route; route = route->next) {
+            if (route->asserted_hart >= 0) {
+                qemu_set_irq(nuclei_eclic_get_irq(route->dev, route->irq,
+                                                  route->asserted_hart), 0);
+            }
+            route->asserted_hart = -1;
+            route->level = false;
+        }
+    }
+
+    for (hartid = 0; hartid < eclic->num_harts; hartid++) {
+        RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(hartid));
+
+        eclic->cliccfg[hartid] = 0;
+        eclic->clicinfo[hartid] = 0;
+        eclic->mth[hartid] = 0;
+        eclic->sth[hartid] = 0;
+        eclic->exccode[hartid] = 0;
+        memset(eclic->clicintip[hartid], 0, sizeof(eclic->clicintip[hartid]));
+        memset(eclic->clicintie[hartid], 0, sizeof(eclic->clicintie[hartid]));
+        memset(eclic->clicintattr[hartid], 0,
+               sizeof(eclic->clicintattr[hartid]));
+        memset(eclic->clicintctl[hartid], 0,
+               sizeof(eclic->clicintctl[hartid]));
+        memset(eclic->clicintlist[hartid], 0,
+               sizeof(eclic->clicintlist[hartid]));
+        QLIST_INIT(&eclic->pending_list[hartid]);
+
+        for (id = 0; id < eclic->num_sources; id++) {
+            eclic->clicintlist[hartid][id].irq = id;
+            eclic->clicintattr[hartid][id] = PRV_M << 6;
+            update_eclic_int_info(eclic, id, hartid);
+        }
+
+        if (!cpu) {
+            continue;
+        }
+
+        cpu_reset_interrupt(CPU(cpu), CPU_INTERRUPT_ECLIC);
+        nuclei_eclic_sync_cpu_thresholds(eclic, hartid);
+        nuclei_eclic_shadow_gpr_init(&cpu->env);
+    }
+}
+
 static void nuclei_eclic_realize(DeviceState *dev, Error **errp)
 {
     NucleiECLICState *eclic = NUCLEI_ECLIC(dev);
@@ -1227,6 +1280,7 @@ static void nuclei_eclic_class_init(ObjectClass *klass, void *data)
 
     device_class_set_props(dc, nuclei_eclic_properties);
     dc->realize = nuclei_eclic_realize;
+    dc->reset = nuclei_eclic_reset;
     dc->desc = "nuclei type: eclic";
 }
 

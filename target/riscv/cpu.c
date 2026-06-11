@@ -1305,6 +1305,13 @@ static void riscv_cpu_reset_hold(Object *obj)
         mcc->parent_phases.hold(obj);
     }
 #ifndef CONFIG_USER_ONLY
+    env->mintstatus = 0;
+    env->msubm = 0;
+    env->ssubm = 0;
+    env->exccode = 0;
+    env->irq_pending = false;
+    cpu_reset_interrupt(cs, CPU_INTERRUPT_ECLIC);
+
     env->misa_mxl = mcc->misa_mxl_max;
     env->priv = PRV_M;
     env->mstatus &= ~(MSTATUS_MIE | MSTATUS_MPRV);
