@@ -1432,7 +1432,7 @@ static inline void do_dkslra16(CPURISCVState *env, void *vd, void *va,
                               void *vb, uint8_t i)
 {
     int16_t *d = vd, *a = va;
-    int32_t shift = sextract32((*(target_ulong *)vb), 0, 5);
+    int32_t shift = sextract32((*(uint32_t *)vb), 0, 5);
 
     if (shift >= 0) {
         do_ksll16(env, vd, va, vb, i);
@@ -4529,7 +4529,7 @@ static inline void do_ksll32(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
 {
     int32_t *d = vd, *a = va, result;
-    uint8_t shift = *(uint64_t *)vb & 0x1f;
+    uint8_t shift = *(uint32_t *)vb & 0x1f;
 
     result = a[i] << shift;
     if (shift > clrsb32(a[i])) {
@@ -4591,7 +4591,7 @@ static inline void do_dkslra32(CPURISCVState *env, void *vd, void *va,
                              void *vb, uint8_t i)
 {
     int32_t *d = vd, *a = va;
-    int64_t shift = sextract64(*(uint64_t *)vb, 0, 6);
+    int32_t shift = sextract32(*(uint32_t *)vb, 0, 6);
 
     if (shift >= 0) {
         do_ksll32(env, vd, va, vb, i);
