@@ -34,6 +34,33 @@
 #include <netdb.h>
 #include <sys/un.h>
 
+/*
+ * Older libc / kernel header combinations, such as the baseline shipped by
+ * CentOS 7, may miss newer Linux UAPI constants that linux-user uses.
+ * Keep the fallback definitions local to Linux hosts and only provide values
+ * whose ABI is stable and already used by QEMU elsewhere.
+ */
+#ifdef __linux__
+#ifndef MAP_FIXED_NOREPLACE
+#define MAP_FIXED_NOREPLACE 0x100000
+#endif
+#ifndef MAP_SHARED_VALIDATE
+#define MAP_SHARED_VALIDATE 0x03
+#endif
+#ifndef MADV_WIPEONFORK
+#define MADV_WIPEONFORK 18
+#endif
+#ifndef MADV_KEEPONFORK
+#define MADV_KEEPONFORK 19
+#endif
+#ifndef SOL_ALG
+#define SOL_ALG 279
+#endif
+#ifndef NETLINK_SMC
+#define NETLINK_SMC 22
+#endif
+#endif
+
 #ifdef CONFIG_SYSMACROS
 #include <sys/sysmacros.h>
 #endif
