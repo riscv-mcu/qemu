@@ -147,7 +147,10 @@ build_linux_qemu:
     - git checkout v4.9.1
     - meson setup build --prefix=$CI_PROJECT_DIR/libslirp_install --default-library=static
     - ninja -C build install
-    - ls -lh $CI_PROJECT_DIR/libslirp_install/lib/x86_64-linux-gnu/libslirp.a
+    - export SLIRP_LIBA=$(find "$CI_PROJECT_DIR/libslirp_install" -type f -name libslirp.a | head -n1)
+    - test -n "$SLIRP_LIBA"
+    - export SLIRP_LIBDIR=$(dirname "$SLIRP_LIBA")
+    - ls -lh "$SLIRP_LIBA"
     - ls -lh $CI_PROJECT_DIR/libslirp_install/include/slirp/
 
     # build
@@ -155,7 +158,7 @@ build_linux_qemu:
     - mkdir $CI_PROJECT_DIR/build -p
     - mkdir $CI_PROJECT_DIR/linux_qemu -p
     - cd build
-    - ../configure --prefix=$CI_PROJECT_DIR/linux_qemu --extra-cflags="-I${CI_PROJECT_DIR}/libslirp_install/include" --extra-ldflags="-L${CI_PROJECT_DIR}/libslirp_install/lib/x86_64-linux-gnu -lslirp -lglib-2.0" --disable-pa --disable-linux-aio --disable-rbd --disable-vnc --disable-sdl --disable-sdl-image --enable-slirp --target-list=riscv32-softmmu,riscv64-softmmu,riscv64-linux-user,riscv32-linux-user
+    - ../configure --prefix=$CI_PROJECT_DIR/linux_qemu --extra-cflags="-I${CI_PROJECT_DIR}/libslirp_install/include" --extra-ldflags="-L${SLIRP_LIBDIR} -lslirp -lglib-2.0" --disable-pa --disable-linux-aio --disable-rbd --disable-vnc --disable-sdl --disable-sdl-image --enable-slirp --target-list=riscv32-softmmu,riscv64-softmmu,riscv64-linux-user,riscv32-linux-user
     - make -j8
     - make install
     - echo "Linux qemu is successfully built, but not stripped"
