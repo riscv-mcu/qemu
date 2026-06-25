@@ -135,7 +135,7 @@ build_linux_qemu:
   tags:
     - os::linux
     - env::docker
-  image: rego.corp.nucleisys.com/software/build-linux-qemu:latest
+  image: rego.corp.nucleisys.com/software/build-linux-qemu:centos7
   script:
     # build Slirp lib first
     - pip3 install --upgrade meson>=0.60
