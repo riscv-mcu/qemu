@@ -589,6 +589,91 @@ static RISCVException pmp(CPURISCVState *env, int csrno)
     return RISCV_EXCP_ILLEGAL_INST;
 }
 
+static RISCVException smpu(CPURISCVState *env, int csrno)
+{
+    if (riscv_cpu_cfg(env)->smpu) {
+        if (csrno >= CSR_NUCLEI_SMPUCFG0 && csrno <= CSR_NUCLEI_SMPUCFG15) {
+            uint32_t reg_index = csrno - CSR_NUCLEI_SMPUCFG0;
+
+            if ((reg_index & 1) && (riscv_cpu_mxl(env) == MXL_RV64)) {
+                return RISCV_EXCP_ILLEGAL_INST;
+            }
+        }
+
+        return RISCV_EXCP_NONE;
+    }
+
+    return RISCV_EXCP_ILLEGAL_INST;
+}
+
+static RISCVException read_smpucfg(CPURISCVState *env, int csrno,
+                                   target_ulong *val)
+{
+    uint32_t reg_index = csrno - CSR_NUCLEI_SMPUCFG0;
+
+    *val = smpucfg_csr_read(env, reg_index);
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_smpucfg(CPURISCVState *env, int csrno,
+                                    target_ulong val)
+{
+    uint32_t reg_index = csrno - CSR_NUCLEI_SMPUCFG0;
+
+    smpucfg_csr_write(env, reg_index, val);
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_smpuaddr(CPURISCVState *env, int csrno,
+                                    target_ulong *val)
+{
+    uint32_t addr_index = csrno - CSR_NUCLEI_SMPUADDR0;
+
+    *val = smpuaddr_csr_read(env, addr_index);
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_smpuaddr(CPURISCVState *env, int csrno,
+                                     target_ulong val)
+{
+    uint32_t addr_index = csrno - CSR_NUCLEI_SMPUADDR0;
+
+    smpuaddr_csr_write(env, addr_index, val);
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_smpuswitch(CPURISCVState *env, int csrno,
+                                      target_ulong *val)
+{
+    uint32_t index = csrno - CSR_NUCLEI_SMPUSWITCH0;
+
+    *val = smpuswitch_csr_read(env, index);
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_smpuswitch(CPURISCVState *env, int csrno,
+                                       target_ulong val)
+{
+    uint32_t index = csrno - CSR_NUCLEI_SMPUSWITCH0;
+
+    smpuswitch_csr_write(env, index, val);
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException read_sdcause(CPURISCVState *env, int csrno,
+                                   target_ulong *val)
+{
+    *val = env->sdcause;
+    return RISCV_EXCP_NONE;
+}
+
+static RISCVException write_sdcause(CPURISCVState *env, int csrno,
+                                    target_ulong val)
+{
+    env->sdcause = val;
+    return RISCV_EXCP_NONE;
+}
+
 static RISCVException have_mseccfg(CPURISCVState *env, int csrno)
 {
     if (riscv_cpu_cfg(env)->ext_smepmp) {
@@ -6969,88 +7054,88 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_SCOUNTOVF]      = { "scountovf", sscofpmf,  read_scountovf,
                              .min_priv_ver = PRIV_VERSION_1_12_0 },
 
-    /* nuclei custom tee csr */
-    [CSR_NUCLEI_SMPUCFG0]       = { "smpucfg0",     any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUCFG1]       = { "smpucfg1",     any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUCFG2]       = { "smpucfg2",     any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUCFG3]       = { "smpucfg3",     any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUCFG4]       = { "smpucfg4",     any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUCFG5]       = { "smpucfg5",     any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUCFG6]       = { "smpucfg6",     any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUCFG7]       = { "smpucfg7",     any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUCFG8]       = { "smpucfg8",     any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUCFG9]       = { "smpucfg9",     any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUCFG10]      = { "smpucfg10",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUCFG11]      = { "smpucfg11",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUCFG12]      = { "smpucfg12",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUCFG13]      = { "smpucfg13",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUCFG14]      = { "smpucfg14",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUCFG15]      = { "smpucfg15",    any, read_zero, write_ignore },
+    /* nuclei custom smpu csr */
+    [CSR_NUCLEI_SMPUCFG0]       = { "smpucfg0",     smpu, read_smpucfg,  write_smpucfg  },
+    [CSR_NUCLEI_SMPUCFG1]       = { "smpucfg1",     smpu, read_smpucfg,  write_smpucfg  },
+    [CSR_NUCLEI_SMPUCFG2]       = { "smpucfg2",     smpu, read_smpucfg,  write_smpucfg  },
+    [CSR_NUCLEI_SMPUCFG3]       = { "smpucfg3",     smpu, read_smpucfg,  write_smpucfg  },
+    [CSR_NUCLEI_SMPUCFG4]       = { "smpucfg4",     smpu, read_smpucfg,  write_smpucfg  },
+    [CSR_NUCLEI_SMPUCFG5]       = { "smpucfg5",     smpu, read_smpucfg,  write_smpucfg  },
+    [CSR_NUCLEI_SMPUCFG6]       = { "smpucfg6",     smpu, read_smpucfg,  write_smpucfg  },
+    [CSR_NUCLEI_SMPUCFG7]       = { "smpucfg7",     smpu, read_smpucfg,  write_smpucfg  },
+    [CSR_NUCLEI_SMPUCFG8]       = { "smpucfg8",     smpu, read_smpucfg,  write_smpucfg  },
+    [CSR_NUCLEI_SMPUCFG9]       = { "smpucfg9",     smpu, read_smpucfg,  write_smpucfg  },
+    [CSR_NUCLEI_SMPUCFG10]      = { "smpucfg10",    smpu, read_smpucfg,  write_smpucfg  },
+    [CSR_NUCLEI_SMPUCFG11]      = { "smpucfg11",    smpu, read_smpucfg,  write_smpucfg  },
+    [CSR_NUCLEI_SMPUCFG12]      = { "smpucfg12",    smpu, read_smpucfg,  write_smpucfg  },
+    [CSR_NUCLEI_SMPUCFG13]      = { "smpucfg13",    smpu, read_smpucfg,  write_smpucfg  },
+    [CSR_NUCLEI_SMPUCFG14]      = { "smpucfg14",    smpu, read_smpucfg,  write_smpucfg  },
+    [CSR_NUCLEI_SMPUCFG15]      = { "smpucfg15",    smpu, read_smpucfg,  write_smpucfg  },
 
-    [CSR_NUCLEI_SMPUADDR0]      = { "smpuaddr0",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR1]      = { "smpuaddr1",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR2]      = { "smpuaddr2",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR3]      = { "smpuaddr3",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR4]      = { "smpuaddr4",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR5]      = { "smpuaddr5",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR6]      = { "smpuaddr6",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR7]      = { "smpuaddr7",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR8]      = { "smpuaddr8",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR9]      = { "smpuaddr9",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR10]     = { "smpuaddr10",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR11]     = { "smpuaddr11",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR12]     = { "smpuaddr12",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR13]     = { "smpuaddr13",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR14]     = { "smpuaddr14",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR15]     = { "smpuaddr15",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR16]     = { "smpuaddr16",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR17]     = { "smpuaddr17",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR18]     = { "smpuaddr18",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR19]     = { "smpuaddr19",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR20]     = { "smpuaddr20",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR21]     = { "smpuaddr21",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR22]     = { "smpuaddr22",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR23]     = { "smpuaddr23",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR24]     = { "smpuaddr24",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR25]     = { "smpuaddr25",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR26]     = { "smpuaddr26",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR27]     = { "smpuaddr27",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR28]     = { "smpuaddr28",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR29]     = { "smpuaddr29",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR30]     = { "smpuaddr30",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR31]     = { "smpuaddr31",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR32]     = { "smpuaddr32",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR33]     = { "smpuaddr33",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR34]     = { "smpuaddr34",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR35]     = { "smpuaddr35",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR36]     = { "smpuaddr36",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR37]     = { "smpuaddr37",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR38]     = { "smpuaddr38",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR39]     = { "smpuaddr39",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR40]     = { "smpuaddr40",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR41]     = { "smpuaddr41",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR42]     = { "smpuaddr42",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR43]     = { "smpuaddr43",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR44]     = { "smpuaddr44",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR45]     = { "smpuaddr45",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR46]     = { "smpuaddr46",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR47]     = { "smpuaddr47",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR48]     = { "smpuaddr48",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR49]     = { "smpuaddr49",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR50]     = { "smpuaddr50",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR51]     = { "smpuaddr51",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR52]     = { "smpuaddr52",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR53]     = { "smpuaddr53",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR54]     = { "smpuaddr54",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR55]     = { "smpuaddr55",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR56]     = { "smpuaddr56",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR57]     = { "smpuaddr57",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR58]     = { "smpuaddr58",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR59]     = { "smpuaddr59",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR60]     = { "smpuaddr60",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR61]     = { "smpuaddr61",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR62]     = { "smpuaddr62",   any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUADDR63]     = { "smpuaddr63",   any, read_zero, write_ignore },
+    [CSR_NUCLEI_SMPUADDR0]      = { "smpuaddr0",    smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR1]      = { "smpuaddr1",    smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR2]      = { "smpuaddr2",    smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR3]      = { "smpuaddr3",    smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR4]      = { "smpuaddr4",    smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR5]      = { "smpuaddr5",    smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR6]      = { "smpuaddr6",    smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR7]      = { "smpuaddr7",    smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR8]      = { "smpuaddr8",    smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR9]      = { "smpuaddr9",    smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR10]     = { "smpuaddr10",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR11]     = { "smpuaddr11",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR12]     = { "smpuaddr12",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR13]     = { "smpuaddr13",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR14]     = { "smpuaddr14",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR15]     = { "smpuaddr15",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR16]     = { "smpuaddr16",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR17]     = { "smpuaddr17",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR18]     = { "smpuaddr18",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR19]     = { "smpuaddr19",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR20]     = { "smpuaddr20",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR21]     = { "smpuaddr21",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR22]     = { "smpuaddr22",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR23]     = { "smpuaddr23",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR24]     = { "smpuaddr24",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR25]     = { "smpuaddr25",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR26]     = { "smpuaddr26",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR27]     = { "smpuaddr27",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR28]     = { "smpuaddr28",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR29]     = { "smpuaddr29",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR30]     = { "smpuaddr30",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR31]     = { "smpuaddr31",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR32]     = { "smpuaddr32",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR33]     = { "smpuaddr33",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR34]     = { "smpuaddr34",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR35]     = { "smpuaddr35",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR36]     = { "smpuaddr36",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR37]     = { "smpuaddr37",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR38]     = { "smpuaddr38",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR39]     = { "smpuaddr39",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR40]     = { "smpuaddr40",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR41]     = { "smpuaddr41",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR42]     = { "smpuaddr42",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR43]     = { "smpuaddr43",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR44]     = { "smpuaddr44",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR45]     = { "smpuaddr45",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR46]     = { "smpuaddr46",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR47]     = { "smpuaddr47",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR48]     = { "smpuaddr48",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR49]     = { "smpuaddr49",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR50]     = { "smpuaddr50",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR51]     = { "smpuaddr51",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR52]     = { "smpuaddr52",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR53]     = { "smpuaddr53",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR54]     = { "smpuaddr54",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR55]     = { "smpuaddr55",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR56]     = { "smpuaddr56",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR57]     = { "smpuaddr57",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR58]     = { "smpuaddr58",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR59]     = { "smpuaddr59",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR60]     = { "smpuaddr60",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR61]     = { "smpuaddr61",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR62]     = { "smpuaddr62",   smpu, read_smpuaddr, write_smpuaddr },
+    [CSR_NUCLEI_SMPUADDR63]     = { "smpuaddr63",   smpu, read_smpuaddr, write_smpuaddr },
 
     [CSR_NUCLEI_JALSNXTI]       = { "jalsnxti",     smode, NULL, NULL, rmw_jalsnxti },
     [CSR_NUCLEI_STVT2]          = { "stvt2",        smode, read_stvt2,write_stvt2 },
@@ -7101,9 +7186,9 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_CCM_UCOMMAND]   = { "ccm_ucommand",   any, read_zero, write_ignore },
     [CSR_NUCLEI_CCM_UDATA]      = { "ccm_udata",      any, read_zero, write_ignore },
     [CSR_NUCLEI_CCM_FPIPE]      = { "ccm_fpipe",      any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUSWITCH0]    = { "smpuswitch0",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SMPUSWITCH1]    = { "smpuswitch1",    any, read_zero, write_ignore },
-    [CSR_NUCLEI_SDCAUSE]        = { "sdcause",        any, read_zero, write_ignore },
+    [CSR_NUCLEI_SMPUSWITCH0]    = { "smpuswitch0",    smpu, read_smpuswitch, write_smpuswitch },
+    [CSR_NUCLEI_SMPUSWITCH1]    = { "smpuswitch1",    smpu, read_smpuswitch, write_smpuswitch },
+    [CSR_NUCLEI_SDCAUSE]        = { "sdcause",        smpu, read_sdcause, write_sdcause },
     [CSR_NUCLEI_MLWID]          = { "mlwid",          any, read_zero, write_ignore },
     [CSR_NUCLEI_MWIDDELEG]      = { "mwiddeleg",      any, read_zero, write_ignore },
     [CSR_NUCLEI_SLWID]          = { "slwid",          any, read_zero, write_ignore },

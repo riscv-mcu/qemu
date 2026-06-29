@@ -190,6 +190,7 @@ struct RISCVCPUConfig {
     uint16_t cboz_blocksize;
     bool mmu;
     bool pmp;
+    bool smpu;
     bool debug;
     bool misa_w;
 

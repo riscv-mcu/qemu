@@ -69,6 +69,64 @@ static const VMStateDescription vmstate_pmp = {
     }
 };
 
+static bool smpu_needed(void *opaque)
+{
+    RISCVCPU *cpu = opaque;
+    CPURISCVState *env = &cpu->env;
+    return env->smpu_state.num_rules > 0;
+}
+
+static int smpu_post_load(void *opaque, int version_id)
+{
+    RISCVCPU *cpu = opaque;
+    CPURISCVState *env = &cpu->env;
+
+    /* Reconstruct address ranges from addr_reg and cfg_reg */
+    for (int i = 0; i < MAX_RISCV_SMPUS; i++) {
+        smpu_update_rule_addr(env, i);
+    }
+    smpu_update_rule_nums(env);
+    return 0;
+}
+
+static const VMStateDescription vmstate_smpu_entry = {
+    .name = "cpu/smpu/entry",
+    .version_id = 1,
+    .minimum_version_id = 1,
+    .fields = (const VMStateField[]) {
+        VMSTATE_UINTTL(addr_reg, smpu_entry_t),
+        VMSTATE_UINT8(cfg_reg, smpu_entry_t),
+        VMSTATE_END_OF_LIST()
+    }
+};
+
+static const VMStateDescription vmstate_smpu_addr = {
+    .name = "cpu/smpu/addr",
+    .version_id = 1,
+    .minimum_version_id = 1,
+    .fields = (const VMStateField[]) {
+        VMSTATE_UINT64(sa, smpu_addr_t),
+        VMSTATE_UINT64(ea, smpu_addr_t),
+        VMSTATE_END_OF_LIST()
+    }
+};
+
+static const VMStateDescription vmstate_smpu = {
+    .name = "cpu/smpu",
+    .version_id = 1,
+    .minimum_version_id = 1,
+    .needed = smpu_needed,
+    .post_load = smpu_post_load,
+    .fields = (const VMStateField[]) {
+        VMSTATE_STRUCT_ARRAY(env.smpu_state.smpu, RISCVCPU, MAX_RISCV_SMPUS,
+                             0, vmstate_smpu_entry, smpu_entry_t),
+        VMSTATE_STRUCT_ARRAY(env.smpu_state.addr, RISCVCPU, MAX_RISCV_SMPUS,
+                             0, vmstate_smpu_addr, smpu_addr_t),
+        VMSTATE_UINT32(env.smpu_state.num_rules, RISCVCPU),
+        VMSTATE_END_OF_LIST()
+    }
+};
+
 static bool hyper_needed(void *opaque)
 {
     RISCVCPU *cpu = opaque;
@@ -407,11 +465,14 @@ const VMStateDescription vmstate_riscv_cpu = {
         VMSTATE_UINTTL(env.sscratch, RISCVCPU),
         VMSTATE_UINTTL(env.mscratch, RISCVCPU),
         VMSTATE_UINT64(env.stimecmp, RISCVCPU),
+        VMSTATE_UINTTL_ARRAY(env.smpuswitch, RISCVCPU, 2),
+        VMSTATE_UINTTL(env.sdcause, RISCVCPU),
 
         VMSTATE_END_OF_LIST()
     },
     .subsections = (const VMStateDescription * const []) {
         &vmstate_pmp,
+        &vmstate_smpu,
         &vmstate_hyper,
         &vmstate_vector,
         &vmstate_pointermasking,

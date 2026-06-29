@@ -826,6 +826,10 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         cpu->env.mcfg_info |= (1 << 25);
     }
 
+    if (cpu->cfg.smpu) {
+        cpu->env.mcfg_info |= (1 << 0);
+    }
+
     if (cpu->cfg.ext_xxlcz) {
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczpstinc), true);
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlczbmrk), true);

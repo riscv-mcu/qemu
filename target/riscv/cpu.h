@@ -121,6 +121,7 @@ enum {
     TRANSLATE_SUCCESS,
     TRANSLATE_FAIL,
     TRANSLATE_PMP_FAIL,
+    TRANSLATE_SMPU_FAIL,
     TRANSLATE_G_STAGE_FAIL
 };
 
@@ -138,6 +139,7 @@ typedef enum {
 
 #if !defined(CONFIG_USER_ONLY)
 #include "pmp.h"
+#include "smpu.h"
 #include "debug.h"
 #endif
 
@@ -483,6 +485,11 @@ struct CPUArchState {
     /* physical memory protection */
     pmp_table_t pmp_state;
     target_ulong mseccfg;
+
+    /* supervisor physical memory protection */
+    smpu_table_t smpu_state;
+    target_ulong smpuswitch[2];
+    target_ulong sdcause;
 
     /* trigger module */
     target_ulong trigger_cur;

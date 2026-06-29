@@ -625,6 +625,7 @@ static void rv64imacu_nuclei_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = false;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -641,6 +642,7 @@ static void rv64imafcu_nuclei_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = false;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -657,6 +659,7 @@ static void rv64imafdcu_nuclei_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = false;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -673,6 +676,7 @@ static void rv64imacu_nuclei_u_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = true;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -689,6 +693,7 @@ static void rv64imafcu_nuclei_u_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = true;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -705,6 +710,7 @@ static void rv64imafdcu_nuclei_u_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = true;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -850,6 +856,7 @@ static void rv32icu_nuclei_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = false;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -866,6 +873,7 @@ static void rv32ecu_nuclei_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = false;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -882,6 +890,7 @@ static void rv32iacu_nuclei_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = false;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -898,6 +907,7 @@ static void rv32eacu_nuclei_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = false;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -914,6 +924,7 @@ static void rv32imcu_nuclei_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = false;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -930,6 +941,7 @@ static void rv32emcu_nuclei_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = false;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -946,6 +958,7 @@ static void rv32icu_zmmul_nuclei_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = false;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zmmul = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
@@ -963,6 +976,7 @@ static void rv32ecu_zmmul_nuclei_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = false;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zmmul = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
@@ -980,6 +994,7 @@ static void rv32imacu_nuclei_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = false;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -996,6 +1011,7 @@ static void rv32emacu_nuclei_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = false;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -1012,6 +1028,7 @@ static void rv32imafcu_nuclei_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = false;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -1028,6 +1045,7 @@ static void rv32imafdcu_nuclei_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = false;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -1044,6 +1062,7 @@ static void rv32imacu_nuclei_u_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = true;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -1060,6 +1079,7 @@ static void rv32imafcu_nuclei_u_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = true;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -1076,6 +1096,7 @@ static void rv32imafdcu_nuclei_u_cpu_init(Object *obj)
     env->priv_ver = PRIV_VERSION_1_12_0;
     cpu->cfg.mmu = true;
     cpu->cfg.pmp = true;
+    cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
 #ifndef CONFIG_USER_ONLY
@@ -2178,6 +2199,32 @@ static const PropertyInfo prop_pmp = {
     .set = prop_pmp_set,
 };
 
+static void prop_smpu_set(Object *obj, Visitor *v, const char *name,
+                          void *opaque, Error **errp)
+{
+    RISCVCPU *cpu = RISCV_CPU(obj);
+    bool value;
+
+    visit_type_bool(v, name, &value, errp);
+
+    cpu_option_add_user_setting(name, value);
+    cpu->cfg.smpu = value;
+}
+
+static void prop_smpu_get(Object *obj, Visitor *v, const char *name,
+                          void *opaque, Error **errp)
+{
+    bool value = RISCV_CPU(obj)->cfg.smpu;
+
+    visit_type_bool(v, name, &value, errp);
+}
+
+static const PropertyInfo prop_smpu = {
+    .name = "smpu",
+    .get = prop_smpu_get,
+    .set = prop_smpu_set,
+};
+
 static int priv_spec_from_str(const char *priv_spec_str)
 {
     int priv_version = -1;
@@ -2688,6 +2735,7 @@ static Property riscv_cpu_properties[] = {
 
     {.name = "mmu", .info = &prop_mmu},
     {.name = "pmp", .info = &prop_pmp},
+    {.name = "smpu", .info = &prop_smpu},
 
     {.name = "priv_spec", .info = &prop_priv_spec},
     {.name = "vext_spec", .info = &prop_vext_spec},
