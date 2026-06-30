@@ -39,6 +39,7 @@
 #include "hw/net/nuclei_xec.h"
 #include "hw/sysbus.h"
 #include "hw/sd/sd.h"
+#include "hw/char/nuclei_usart.h"
 
 #include "hw/riscv/sifive_cpu.h"
 #include "hw/misc/sifive_u_otp.h"
@@ -49,6 +50,8 @@
 #define CLINT_TIMEBASE_FREQ 1000000
 
 #define XEC_REVISION        0x00010000
+#define NUCLEI_UART_VERSION_LEGACY   0x00000000U
+#define NUCLEI_UART_DEFAULT_VERSION  NUCLEI_UART_VERSION_LEGACY
 
 #define TYPE_EVALSOC_SOC "riscv.evalsoc.soc"
 

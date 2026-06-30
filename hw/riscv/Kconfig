@@ -107,6 +107,7 @@ config NUCLEI_EVALSOC
     select NUCLEI_XEC
     select NUCLEI_SPI
     select NUCLEI_UART
+    select NUCLEI_USART
     select NUCLEI_SYSTIMER
     select NUCLEI_ECLIC
     select NUCLEI_CIDU

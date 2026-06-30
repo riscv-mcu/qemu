@@ -882,6 +882,7 @@ static void parse_json_config(MachineState *machine)
         {"size",    &s->uart0.size,     "uart0.size"},
         {"irq",     &s->uart0.irq,      "uart0.irq"},
         {"enable",  &s->uart0.enable,   "uart0.enable"},
+        {"version", &s->uart0.version,  "uart0.version"},
     };
     const JsonFieldMapping qspi0_mappings[] = {
         {"base",    &s->qspi0.base,     "qspi0.base"},
@@ -1343,8 +1344,9 @@ static void evalsoc_machine_init(MachineState *machine)
     DEBUGF("mrom    : base:0x%lx, size:0x%lx\n", (long)s->mrom.base,(long)s->mrom.size);
     DEBUGF("test    : base:0x%lx, size:0x%lx\n", (long)s->test.base,(long)s->test.size);
     DEBUGF("gpio    : base:0x%lx, size:0x%lx\n", (long)s->gpio.base,(long)s->gpio.size);
-    DEBUGF("uart0   : base:0x%lx, size:0x%lx, irq:%d/+32\n",
-           (long)s->uart0.base, (long)s->uart0.size, (int)s->uart0.irq);
+    DEBUGF("uart0   : base:0x%lx, size:0x%lx, irq:%d/+32, version:0x%lx\n",
+           (long)s->uart0.base, (long)s->uart0.size, (int)s->uart0.irq,
+           (long)s->uart0.version);
     DEBUGF("aplic_m : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->aplic_m.base, (long)s->aplic_m.size, (int)s->aplic_m.enable);
     DEBUGF("aplic_s : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->aplic_s.base, (long)s->aplic_s.size, (int)s->aplic_s.enable);
     DEBUGF("imsic_m : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->imsic_m.base, (long)s->imsic_m.size, (int)s->imsic_m.enable);
@@ -1532,6 +1534,7 @@ static void evalsoc_machine_instance_init(Object *obj)
     s->uart0.size = memmap[EVALSOC_UART0].size;
     s->uart0.irq = EVALSOC_UART0_IRQ_BASE;
     s->uart0.enable = 1;
+    s->uart0.version = NUCLEI_UART_DEFAULT_VERSION;
     s->qspi0.base = memmap[EVALSOC_QSPI0].base;
     s->qspi0.size = memmap[EVALSOC_QSPI0].size;
     s->qspi0.irq = EVALSOC_QSPI0_IRQ_BASE;
@@ -1936,10 +1939,18 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
 
     if (mst->uart0.enable) {
         uart0_irq = evalsoc_create_irq_fanout(s, &mst->uart0);
-        nuclei_uart_create(mst->uart0.base,
-                           memmap[EVALSOC_UART0].size,
-                           serial_hd(0),
-                           uart0_irq);
+        if (mst->uart0.version >= NUCLEI_USART_VERSION_3_1_0) {
+            nuclei_usart_create(mst->uart0.base,
+                                memmap[EVALSOC_UART0].size,
+                                serial_hd(0),
+                                uart0_irq,
+                                mst->uart0.version);
+        } else {
+            nuclei_uart_create(mst->uart0.base,
+                               memmap[EVALSOC_UART0].size,
+                               serial_hd(0),
+                               uart0_irq);
+        }
     }
 
     nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion.base,
