@@ -24,6 +24,9 @@ config XLNX_ZDMA
 config STP2000
     bool
 
+config NUCLEI_UDMA
+    bool
+
 config SIFIVE_PDMA
     bool
 
