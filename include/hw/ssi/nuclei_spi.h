@@ -22,7 +22,10 @@
 #define HW_NUCLEI_SPI_H
 
 #include "qemu/fifo8.h"
+#include "qemu/timer.h"
 #include "hw/sysbus.h"
+
+typedef struct NucleiUDMAState NucleiUDMAState;
 
 #define TYPE_NUCLEI_SPI "nuclei.spi"
 #define NUCLEI_SPI(obj) OBJECT_CHECK(NucleiSPIState, (obj), TYPE_NUCLEI_SPI)
@@ -30,6 +33,7 @@
 #define NUCLEI_SPI_REG_NUM  (0x88 / 4)
 
 #define NUCLEI_SPI_VERSION_1_1_0     0x00010100
+#define NUCLEI_SPI_VERSION_1_2_8     0x00010208
 #define NUCLEI_SPI_DEFAULT_VERSION   NUCLEI_SPI_VERSION_1_1_0
 #define NUCLEI_SPI_DEFAULT_XIP_SIZE  0x04000000ULL
 
@@ -170,6 +174,15 @@
                                FFMT1_MODE_CNT_MASK)
 
 #define FIFO_CAPACITY   8
+#define NUCLEI_SPI_DMA_CHANNEL_DISABLED 0xffffffffU
+/*
+ * Keep the QSPI DMA requester defaults aligned with the only supported
+ * phase8 regression profile so evalsoc no longer needs dedicated board-level
+ * tuning knobs just to exercise logical outstanding and mid-transfer stop.
+ */
+#define NUCLEI_SPI_DMA_REQUEST_BATCH_DEFAULT 4U
+#define NUCLEI_SPI_DMA_REQUEST_WINDOW_DEFAULT 9U
+#define NUCLEI_SPI_DMA_SERVICE_BEATS_DEFAULT 1U
 
 typedef struct NucleiSPIState {
     SysBusDevice parent_obj;
@@ -182,6 +195,16 @@ typedef struct NucleiSPIState {
     uint32_t version;
     uint64_t xip_size;
     qemu_irq *cs_lines;
+    NucleiUDMAState *udma;
+    uint32_t dma_tx_channel;
+    uint32_t dma_rx_channel;
+    uint32_t dma_request_batch;
+    uint32_t dma_request_window;
+    uint32_t dma_service_beats;
+    uint32_t dma_tx_queued_beats;
+    uint32_t dma_rx_queued_beats;
+    bool dma_inflight;
+    QEMUTimer *dma_timer;
 
     SSIBus *spi;
 

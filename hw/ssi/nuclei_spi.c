@@ -23,10 +23,13 @@
 #include "hw/qdev-properties.h"
 #include "hw/sysbus.h"
 #include "hw/ssi/ssi.h"
+#include "hw/dma/nuclei_udma.h"
+#include "qapi/error.h"
 #include "qemu/bitops.h"
 #include "qemu/fifo8.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
+#include "qemu/timer.h"
 #include "hw/ssi/nuclei_spi.h"
 
 #define XIP_READ_CMD              0x03
@@ -40,10 +43,16 @@
 #define XIP_WREN_CMD              0x06
 #define XIP_PP_CMD                0x02
 #define XIP_PP4_CMD               0x12
+#define NUCLEI_SPI_DMA_SERVICE_DELAY_NS 1000ULL
 
 static int nuclei_spi_selected_cs(NucleiSPIState *s);
 static void nuclei_spi_set_cs_active(NucleiSPIState *s, bool active);
+static void nuclei_spi_update_cs(NucleiSPIState *s);
 static void nuclei_spi_update_irq(NucleiSPIState *s);
+static void nuclei_spi_dma_stop(NucleiSPIState *s);
+static bool nuclei_spi_run_dma(NucleiSPIState *s);
+static void nuclei_spi_dma_maybe_run(NucleiSPIState *s);
+static void nuclei_spi_dma_timer_cb(void *opaque);
 
 static uint32_t nuclei_spi_mask_to_shift(uint32_t mask)
 {
@@ -58,6 +67,154 @@ static uint32_t nuclei_spi_field(uint32_t value, uint32_t mask)
 static void nuclei_spi_set_cfgerr(NucleiSPIState *s)
 {
     s->regs[NUCLEI_SPI_STATUS] |= STATUS_CFGERR;
+}
+
+static uint32_t nuclei_spi_fmt_bits_per_transaction(NucleiSPIState *s)
+{
+    uint32_t len = nuclei_spi_field(s->regs[NUCLEI_SPI_FMT], FMT_LEN_MASK);
+
+    return len ? len : 8;
+}
+
+static bool nuclei_spi_dma_mode_enabled(NucleiSPIState *s)
+{
+    uint32_t cr = s->regs[NUCLEI_SPI_CR];
+
+    return (cr & CR_DMA_EN) &&
+           ((cr & (CR_ST_DMA_TX_EN | CR_ST_DMA_RX_EN)) != 0);
+}
+
+static bool nuclei_spi_dma_supported(NucleiSPIState *s)
+{
+    return s->version > NUCLEI_SPI_VERSION_1_1_0;
+}
+
+static bool nuclei_spi_dma_contract_ok(NucleiSPIState *s)
+{
+    if (!nuclei_spi_dma_mode_enabled(s)) {
+        return false;
+    }
+
+    /*
+     * Match the existing version compatibility split used by
+     * nuclei_spi_rx_enabled(): legacy v1.1.0 keeps the old controller
+     * semantics, while only newer guest-visible versions may enter the DMA
+     * path.  This preserves the legacy default without silently exposing newer
+     * DMA behavior behind an old VERSION register value.
+     */
+    if (!nuclei_spi_dma_supported(s)) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    if (!s->udma) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    if (!(s->regs[NUCLEI_SPI_CR] & CR_MSTR)) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    /*
+     * Phase 7 only models one-shot ST-DMA transfers.  The controller-visible
+     * RX/TX continuous extension bits are kept guest-visible in CR, but they
+     * are not yet backed by a stable data-path contract in QEMU.
+     */
+    if (s->regs[NUCLEI_SPI_CR] & (CR_ST_DMA_RCONT | CR_ST_DMA_TCONT)) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    if (s->regs[NUCLEI_SPI_CR] & CR_DDR_EN) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    if (s->regs[NUCLEI_SPI_FMT] & (FMT_DIR | FMT_ENDIAN | FMT_PROTO_HI)) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    if (nuclei_spi_field(s->regs[NUCLEI_SPI_FMT], FMT_PROTO_MASK) != 0) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    if (nuclei_spi_fmt_bits_per_transaction(s) != 8) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    if (s->regs[NUCLEI_SPI_CSMODE] == CSMODE_OFF ||
+        nuclei_spi_selected_cs(s) < 0) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    if ((s->regs[NUCLEI_SPI_CR] & CR_ST_DMA_TX_EN) &&
+        s->dma_tx_channel == NUCLEI_SPI_DMA_CHANNEL_DISABLED) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    if ((s->regs[NUCLEI_SPI_CR] & CR_ST_DMA_RX_EN) &&
+        s->dma_rx_channel == NUCLEI_SPI_DMA_CHANNEL_DISABLED) {
+        nuclei_spi_set_cfgerr(s);
+        return false;
+    }
+
+    return true;
+}
+
+static void nuclei_spi_dma_mark_idle(NucleiSPIState *s)
+{
+    s->regs[NUCLEI_SPI_STATUS] &= ~STATUS_BUSY;
+    if (s->regs[NUCLEI_SPI_CSMODE] == CSMODE_AUTO) {
+        nuclei_spi_set_cs_active(s, false);
+    } else {
+        nuclei_spi_update_cs(s);
+    }
+}
+
+static void nuclei_spi_dma_reset_runtime(NucleiSPIState *s)
+{
+    s->dma_tx_queued_beats = 0;
+    s->dma_rx_queued_beats = 0;
+    s->dma_inflight = false;
+    if (s->dma_timer) {
+        timer_del(s->dma_timer);
+    }
+}
+
+static void nuclei_spi_dma_finish_transfer(NucleiSPIState *s, bool tx_done,
+                                           bool rx_done)
+{
+    if (tx_done) {
+        s->regs[NUCLEI_SPI_STATUS] |= STATUS_TXDONE;
+    }
+    if (rx_done) {
+        s->regs[NUCLEI_SPI_STATUS] |= STATUS_RXDONE;
+    }
+    if (tx_done && (!(s->regs[NUCLEI_SPI_CR] & CR_ST_DMA_RX_EN) || rx_done)) {
+        s->regs[NUCLEI_SPI_STATUS] |= STATUS_DONE;
+    }
+
+    nuclei_spi_dma_mark_idle(s);
+    nuclei_spi_dma_reset_runtime(s);
+}
+
+static bool nuclei_spi_dma_has_pending_work(NucleiSPIState *s)
+{
+    bool tx_enabled = s->regs[NUCLEI_SPI_CR] & CR_ST_DMA_TX_EN;
+    bool rx_enabled = s->regs[NUCLEI_SPI_CR] & CR_ST_DMA_RX_EN;
+    bool tx_ready = tx_enabled && s->regs[NUCLEI_SPI_TSIZE] != UINT32_MAX &&
+                    s->regs[NUCLEI_SPI_TSIZE] != 0;
+    bool rx_ready = rx_enabled && s->regs[NUCLEI_SPI_RSIZE] != UINT32_MAX &&
+                    s->regs[NUCLEI_SPI_RSIZE] != 0;
+
+    return tx_ready || rx_ready;
 }
 
 static uint32_t nuclei_spi_xip_addr_len(NucleiSPIState *s)
@@ -498,6 +655,208 @@ static void nuclei_spi_update_irq(NucleiSPIState *s)
     qemu_set_irq(s->irq, level);
 }
 
+static void nuclei_spi_dma_stop(NucleiSPIState *s)
+{
+    nuclei_spi_dma_reset_runtime(s);
+
+    if (s->udma) {
+        if (s->dma_tx_channel != NUCLEI_SPI_DMA_CHANNEL_DISABLED) {
+            nuclei_udma_pa_stop(s->udma, s->dma_tx_channel);
+        }
+        if (s->dma_rx_channel != NUCLEI_SPI_DMA_CHANNEL_DISABLED &&
+            s->dma_rx_channel != s->dma_tx_channel) {
+            nuclei_udma_pa_stop(s->udma, s->dma_rx_channel);
+        }
+    }
+
+    nuclei_spi_dma_mark_idle(s);
+}
+
+static uint32_t nuclei_spi_dma_request_batch(const NucleiSPIState *s)
+{
+    return MAX(1u, s->dma_request_batch);
+}
+
+static uint32_t nuclei_spi_dma_request_window(const NucleiSPIState *s)
+{
+    return MAX(1u, s->dma_request_window);
+}
+
+static bool nuclei_spi_dma_topoff_requests(NucleiSPIState *s, uint32_t channel,
+                                           NucleiUDMAPADirection direction,
+                                           uint32_t remaining_beats,
+                                           uint32_t *queued_beats)
+{
+    uint32_t batch = nuclei_spi_dma_request_batch(s);
+    uint32_t window = nuclei_spi_dma_request_window(s);
+
+    if (remaining_beats == 0) {
+        return true;
+    }
+
+    /*
+     * The requester only tracks its own submitted beat budget.  uDMA may clamp
+     * a final oversized req_len to the transfer tail, but the SPI side still
+     * terminates on its own TSIZE/RSIZE counters, so this over-approximation is
+     * sufficient for the first logical-outstanding model.
+     */
+    while (*queued_beats < window) {
+        if (!nuclei_udma_pa_req(s->udma, channel, direction, batch)) {
+            break;
+        }
+
+        *queued_beats += batch;
+    }
+
+    return *queued_beats != 0;
+}
+
+static uint32_t nuclei_spi_dma_service_beats(const NucleiSPIState *s)
+{
+    return s->dma_service_beats;
+}
+
+static void nuclei_spi_dma_schedule_next(NucleiSPIState *s)
+{
+    if (s->dma_timer && nuclei_spi_dma_service_beats(s) != 0) {
+        /*
+         * Leave a visible virtual-time gap between slices so guest software can
+         * observe partial progress and reliably land a mid-transfer control
+         * write before the next req_len window is consumed.
+         */
+        timer_mod(s->dma_timer, qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) +
+                                NUCLEI_SPI_DMA_SERVICE_DELAY_NS);
+    }
+}
+
+static bool nuclei_spi_run_dma(NucleiSPIState *s)
+{
+    uint32_t tx_remaining = s->regs[NUCLEI_SPI_TSIZE];
+    uint32_t rx_remaining = s->regs[NUCLEI_SPI_RSIZE];
+    uint32_t steps = 0;
+    uint32_t max_steps = nuclei_spi_dma_service_beats(s);
+    bool tx_enabled = s->regs[NUCLEI_SPI_CR] & CR_ST_DMA_TX_EN;
+    bool rx_enabled = s->regs[NUCLEI_SPI_CR] & CR_ST_DMA_RX_EN;
+    bool tx_done = !tx_enabled || tx_remaining == 0;
+    bool rx_done = !rx_enabled || rx_remaining == 0;
+
+    if (!nuclei_spi_dma_contract_ok(s)) {
+        nuclei_spi_dma_stop(s);
+        return false;
+    }
+
+    if (!s->dma_inflight) {
+        s->regs[NUCLEI_SPI_STATUS] |= STATUS_BUSY;
+        nuclei_spi_set_cs_active(s, true);
+        s->dma_inflight = true;
+    }
+
+    while (!tx_done || !rx_done) {
+        uint32_t tx_word = 0;
+        uint8_t tx_width = 1;
+        uint8_t rx_byte;
+        bool issue_tx_req = tx_enabled && tx_remaining != 0;
+        bool issue_rx_req = rx_enabled && rx_remaining != 0;
+
+        if (issue_tx_req) {
+            if (!nuclei_spi_dma_topoff_requests(s, s->dma_tx_channel,
+                                                NUCLEI_UDMA_PA_DIR_TX,
+                                                tx_remaining,
+                                                &s->dma_tx_queued_beats) ||
+                !nuclei_udma_pa_tx_pull_data(s->udma, s->dma_tx_channel,
+                                             &tx_word, &tx_width)) {
+                nuclei_spi_dma_stop(s);
+                return false;
+            }
+
+            if (tx_width != 1) {
+                nuclei_spi_set_cfgerr(s);
+                nuclei_spi_dma_stop(s);
+                return false;
+            }
+
+            s->dma_tx_queued_beats--;
+            tx_remaining--;
+            s->regs[NUCLEI_SPI_TSIZE] = tx_remaining;
+            if (tx_remaining == 0) {
+                tx_done = true;
+            }
+        }
+
+        rx_byte = ssi_transfer(s->spi, tx_word & 0xff);
+
+        if (issue_rx_req) {
+            if (!nuclei_spi_dma_topoff_requests(s, s->dma_rx_channel,
+                                                NUCLEI_UDMA_PA_DIR_RX,
+                                                rx_remaining,
+                                                &s->dma_rx_queued_beats) ||
+                !nuclei_udma_pa_rx_push_data(s->udma, s->dma_rx_channel,
+                                             rx_byte, 1)) {
+                nuclei_spi_dma_stop(s);
+                return false;
+            }
+
+            s->dma_rx_queued_beats--;
+            rx_remaining--;
+            s->regs[NUCLEI_SPI_RSIZE] = rx_remaining;
+            if (rx_remaining == 0) {
+                rx_done = true;
+            }
+        }
+
+        if (!issue_tx_req && !issue_rx_req) {
+            break;
+        }
+
+        if (max_steps != 0 && ++steps >= max_steps) {
+            break;
+        }
+    }
+
+    if (tx_done && rx_done) {
+        nuclei_spi_dma_finish_transfer(s, tx_done, rx_done);
+    } else if (max_steps != 0 && s->dma_inflight) {
+        nuclei_spi_dma_schedule_next(s);
+    }
+
+    return true;
+}
+
+static void nuclei_spi_dma_maybe_run(NucleiSPIState *s)
+{
+    if (!nuclei_spi_dma_mode_enabled(s)) {
+        return;
+    }
+
+    if (!nuclei_spi_dma_has_pending_work(s)) {
+        return;
+    }
+
+    if (nuclei_spi_dma_service_beats(s) == 0) {
+        nuclei_spi_run_dma(s);
+    } else {
+        nuclei_spi_dma_schedule_next(s);
+    }
+}
+
+static void nuclei_spi_dma_timer_cb(void *opaque)
+{
+    NucleiSPIState *s = opaque;
+
+    if (!nuclei_spi_dma_mode_enabled(s) || !nuclei_spi_dma_has_pending_work(s)) {
+        return;
+    }
+
+    nuclei_spi_run_dma(s);
+    /*
+     * Chunked DMA service completes outside the MMIO write path, so no caller
+     * will automatically re-evaluate the SPI IRQ line after DONE/TXDONE/
+     * RXDONE or CFGERR changes.  Refresh the visible IRQ level here to keep
+     * paced requesters consistent with the immediate service path.
+     */
+    nuclei_spi_update_irq(s);
+}
+
 static void nuclei_spi_reset(DeviceState *d)
 {
     NucleiSPIState *s = NUCLEI_SPI(d);
@@ -528,6 +887,7 @@ static void nuclei_spi_reset(DeviceState *d)
 
     nuclei_spi_txfifo_reset(s);
     nuclei_spi_rxfifo_reset(s);
+    nuclei_spi_dma_stop(s);
 
     nuclei_spi_update_cs(s);
     nuclei_spi_update_irq(s);
@@ -569,12 +929,7 @@ static void nuclei_spi_flush_txfifo(NucleiSPIState *s)
         }
     }
 
-    s->regs[NUCLEI_SPI_STATUS] &= ~STATUS_BUSY;
-    if (s->regs[NUCLEI_SPI_CSMODE] == CSMODE_AUTO) {
-        nuclei_spi_set_cs_active(s, false);
-    } else {
-        nuclei_spi_update_cs(s);
-    }
+    nuclei_spi_dma_mark_idle(s);
 }
 
 static bool nuclei_spi_is_bad_reg(hwaddr addr, bool allow_reserved)
@@ -705,7 +1060,9 @@ static void nuclei_spi_write(void *opaque, hwaddr addr,
         break;
 
     case NUCLEI_SPI_TXDATA:
-        if (!fifo8_is_full(&s->tx_fifo)) {
+        if (nuclei_spi_dma_mode_enabled(s)) {
+            nuclei_spi_run_dma(s);
+        } else if (!fifo8_is_full(&s->tx_fifo)) {
             fifo8_push(&s->tx_fifo, (uint8_t)value);
             nuclei_spi_flush_txfifo(s);
         } else {
@@ -733,6 +1090,12 @@ static void nuclei_spi_write(void *opaque, hwaddr addr,
         }
         break;
 
+    case NUCLEI_SPI_TSIZE:
+    case NUCLEI_SPI_RSIZE:
+        s->regs[addr] = value;
+        nuclei_spi_dma_maybe_run(s);
+        break;
+
     case NUCLEI_SPI_FCTRL:
         s->regs[addr] = value & FCTRL_MASK;
         break;
@@ -748,6 +1111,7 @@ static void nuclei_spi_write(void *opaque, hwaddr addr,
     case NUCLEI_SPI_FMT:
         s->regs[addr] = value & (FMT_PROTO_MASK | FMT_ENDIAN | FMT_DIR |
                                  FMT_PROTO_HI | FMT_LEN_MASK);
+        nuclei_spi_dma_maybe_run(s);
         break;
 
     case NUCLEI_SPI_IE:
@@ -759,12 +1123,21 @@ static void nuclei_spi_write(void *opaque, hwaddr addr,
         break;
 
     case NUCLEI_SPI_CR:
+        if ((s->regs[NUCLEI_SPI_CR] & CR_DMA_EN) &&
+            !(value & CR_DMA_EN)) {
+            nuclei_spi_dma_stop(s);
+        }
         s->regs[addr] = value & CR_MASK;
+        if (!(s->regs[addr] & CR_DMA_EN) ||
+            !(s->regs[addr] & (CR_ST_DMA_TX_EN | CR_ST_DMA_RX_EN))) {
+            nuclei_spi_dma_stop(s);
+        }
         if (!(s->regs[addr] & CR_CSOE)) {
             nuclei_spi_set_cs_active(s, false);
         } else {
             nuclei_spi_update_cs(s);
         }
+        nuclei_spi_dma_maybe_run(s);
         break;
 
     case NUCLEI_SPI_STATUS:
@@ -773,6 +1146,7 @@ static void nuclei_spi_write(void *opaque, hwaddr addr,
 
     default:
         s->regs[addr] = value;
+        nuclei_spi_dma_maybe_run(s);
         break;
     }
 
@@ -805,6 +1179,16 @@ static void nuclei_spi_realize(DeviceState *dev, Error **errp)
     NucleiSPIState *s = NUCLEI_SPI(dev);
     int i;
 
+    if (s->dma_request_batch == 0) {
+        error_setg(errp, "nuclei_spi: dma-request-batch must be at least 1");
+        return;
+    }
+
+    if (s->dma_request_window == 0) {
+        error_setg(errp, "nuclei_spi: dma-request-window must be at least 1");
+        return;
+    }
+
     s->spi = ssi_create_bus(dev, "spi");
     sysbus_init_irq(sbd, &s->irq);
 
@@ -822,6 +1206,17 @@ static void nuclei_spi_realize(DeviceState *dev, Error **errp)
 
     fifo8_create(&s->tx_fifo, FIFO_CAPACITY);
     fifo8_create(&s->rx_fifo, FIFO_CAPACITY);
+    s->dma_timer = timer_new_ns(QEMU_CLOCK_VIRTUAL, nuclei_spi_dma_timer_cb, s);
+}
+
+static void nuclei_spi_unrealize(DeviceState *dev)
+{
+    NucleiSPIState *s = NUCLEI_SPI(dev);
+
+    if (s->dma_timer) {
+        timer_free(s->dma_timer);
+        s->dma_timer = NULL;
+    }
 }
 
 static Property nuclei_spi_properties[] = {
@@ -830,6 +1225,21 @@ static Property nuclei_spi_properties[] = {
                        NUCLEI_SPI_DEFAULT_VERSION),
     DEFINE_PROP_UINT64("xip-size", NucleiSPIState, xip_size,
                        NUCLEI_SPI_DEFAULT_XIP_SIZE),
+    DEFINE_PROP_LINK("udma", NucleiSPIState, udma,
+                     TYPE_NUCLEI_UDMA, NucleiUDMAState *),
+    DEFINE_PROP_UINT32("dma-tx-channel", NucleiSPIState, dma_tx_channel,
+                       NUCLEI_SPI_DMA_CHANNEL_DISABLED),
+    DEFINE_PROP_UINT32("dma-rx-channel", NucleiSPIState, dma_rx_channel,
+                       NUCLEI_SPI_DMA_CHANNEL_DISABLED),
+    DEFINE_PROP_UINT32("dma-request-batch", NucleiSPIState,
+                       dma_request_batch,
+                       NUCLEI_SPI_DMA_REQUEST_BATCH_DEFAULT),
+    DEFINE_PROP_UINT32("dma-request-window", NucleiSPIState,
+                       dma_request_window,
+                       NUCLEI_SPI_DMA_REQUEST_WINDOW_DEFAULT),
+    DEFINE_PROP_UINT32("dma-service-beats", NucleiSPIState,
+                       dma_service_beats,
+                       NUCLEI_SPI_DMA_SERVICE_BEATS_DEFAULT),
     DEFINE_PROP_END_OF_LIST(),
 };
 
@@ -840,6 +1250,7 @@ static void nuclei_spi_class_init(ObjectClass *klass, void *data)
     device_class_set_props(dc, nuclei_spi_properties);
     dc->reset = nuclei_spi_reset;
     dc->realize = nuclei_spi_realize;
+    dc->unrealize = nuclei_spi_unrealize;
 }
 
 static const TypeInfo nuclei_spi_info = {
