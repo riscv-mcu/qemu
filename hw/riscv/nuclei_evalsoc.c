@@ -84,6 +84,7 @@ static const struct MemmapEntry
     [EVALSOC_GPIO]    = { EVALSOC_GPIO_BASE,              EVALSOC_GPIO_SIZE,    "GPIO" },
     [EVALSOC_UART0]   = { EVALSOC_UART0_BASE,             EVALSOC_UART0_SIZE,   "UART0"},
     [EVALSOC_QSPI0]   = { EVALSOC_QSPI0_BASE,             EVALSOC_QSPI0_SIZE,   "QSPI0"},
+    [EVALSOC_UDMA]    = { EVALSOC_UDMA_BASE,              EVALSOC_UDMA_SIZE,    "UDMA"},
     [EVALSOC_QSPI1]   = { EVALSOC_QSPI1_BASE,             EVALSOC_QSPI1_SIZE,   "QSPI1"},
     [EVALSOC_QSPI2]   = { EVALSOC_QSPI2_BASE,             EVALSOC_QSPI2_SIZE,   "QSPI2"},
     [EVALSOC_XIP]     = { EVALSOC_XIP_BASE,               EVALSOC_XIP_SIZE,     "XIP"  },
@@ -187,6 +188,7 @@ static void evalsoc_validate_irq_layout(const EvalSoCState *s)
         const evalsoc_device_info *dev;
     } devices[] = {
         { "uart0", &s->uart0 },
+        { "udma",  &s->udma  },
         { "qspi0", &s->qspi0 },
         { "qspi2", &s->qspi2 },
         { "xec0",  &s->xec0  },
@@ -702,6 +704,18 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     qemu_fdt_setprop_cells(fdt, nodename, "disable-wp", 0);
     g_free(nodename);
 
+    nodename = g_strdup_printf("/soc/dma@%lx",
+                               (long)s->udma.base);
+    qemu_fdt_add_subnode(fdt, nodename);
+    qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,udma");
+    qemu_fdt_setprop_cells(fdt, nodename, "reg",
+                           0x0, (hwaddr)s->udma.base,
+                           0x0, s->udma.size);
+    qemu_fdt_setprop_cell(fdt, nodename, "interrupt-parent", plic_phandle);
+    qemu_fdt_setprop_cell(fdt, nodename, "interrupts", s->udma.irq);
+    qemu_fdt_setprop_string(fdt, nodename, "status", "disabled");
+    g_free(nodename);
+
     uart_phandle = phandle++;
     qemu_fdt_add_subnode(fdt, "/aliases");
     nodename = g_strdup_printf("/soc/serial@%lx",
@@ -894,6 +908,13 @@ static void parse_json_config(MachineState *machine)
         {"xip_size",   &s->qspi0_xip.size,   "qspi0.xip_size"},
         {"xip_enable", &s->qspi0_xip.enable, "qspi0.xip_enable"},
     };
+    const JsonFieldMapping udma_mappings[] = {
+        {"base",    &s->udma.base,     "udma.base"},
+        {"size",    &s->udma.size,     "udma.size"},
+        {"irq",     &s->udma.irq,      "udma.irq"},
+        {"enable",  &s->udma.enable,   "udma.enable"},
+        {"version", &s->udma.version,  "udma.version"},
+    };
     const JsonFieldMapping qspi1_mappings[] = {
         {"base",    &s->qspi1.base,     "qspi1.base"},
         {"size",    &s->qspi1.size,     "qspi1.size"},
@@ -1015,6 +1036,8 @@ static void parse_json_config(MachineState *machine)
                                 parse_json_keys_and_values(options_page2, uart0_mappings, ARRAY_SIZE(uart0_mappings));
                             } else if (!strcmp(page1->key, "qspi0")) {
                                 parse_json_keys_and_values(options_page2, qspi0_mappings, ARRAY_SIZE(qspi0_mappings));
+                            } else if (!strcmp(page1->key, "udma")) {
+                                parse_json_keys_and_values(options_page2, udma_mappings, ARRAY_SIZE(udma_mappings));
                             } else if (!strcmp(page1->key, "qspi1")) {
                                 parse_json_keys_and_values(options_page2, qspi1_mappings, ARRAY_SIZE(qspi1_mappings));
                             } else if (!strcmp(page1->key, "qspi2")) {
@@ -1088,6 +1111,8 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
     memoryRegion[EVALSOC_UART0].size = s->uart0.size;
     memoryRegion[EVALSOC_QSPI0].base = s->qspi0.base;
     memoryRegion[EVALSOC_QSPI0].size = s->qspi0.size;
+    memoryRegion[EVALSOC_UDMA].base = s->udma.base;
+    memoryRegion[EVALSOC_UDMA].size = s->udma.size;
     memoryRegion[EVALSOC_QSPI1].base = s->qspi1.base;
     memoryRegion[EVALSOC_QSPI1].size = s->qspi1.size;
     memoryRegion[EVALSOC_QSPI2].base = s->qspi2.base;
@@ -1137,6 +1162,7 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
             || (i == EVALSOC_GPIO && !s->gpio.enable)
             || (i == EVALSOC_UART0 && !s->uart0.enable)
             || (i == EVALSOC_QSPI0 && !s->qspi0.enable)
+            || (i == EVALSOC_UDMA && !s->udma.enable)
             || (i == EVALSOC_QSPI1 && !s->qspi1.enable)
             || (i == EVALSOC_QSPI2 && !s->qspi2.enable)
             || (i == EVALSOC_APLIC_M && !aplic_m_enable)
@@ -1158,6 +1184,7 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
                 || (j == EVALSOC_GPIO && !s->gpio.enable)
                 || (j == EVALSOC_UART0 && !s->uart0.enable)
                 || (j == EVALSOC_QSPI0 && !s->qspi0.enable)
+                || (j == EVALSOC_UDMA && !s->udma.enable)
                 || (j == EVALSOC_QSPI1 && !s->qspi1.enable)
                 || (j == EVALSOC_QSPI2 && !s->qspi2.enable)
                 || (j == EVALSOC_APLIC_M && !aplic_m_enable)
@@ -1236,6 +1263,8 @@ static void evalsoc_machine_init(MachineState *machine)
                              s->qspi0.version, &error_abort);
     object_property_set_uint(OBJECT(&s->soc.spi0), "xip-size",
                              s->qspi0_xip.size, &error_abort);
+    object_property_set_uint(OBJECT(&s->soc.udma), "version",
+                             s->udma.version, &error_abort);
     object_property_set_uint(OBJECT(&s->soc.spi2), "version",
                              s->qspi2.version, &error_abort);
     qdev_realize(DEVICE(&s->soc), NULL, &error_abort);
@@ -1354,6 +1383,9 @@ static void evalsoc_machine_init(MachineState *machine)
     DEBUGF("qspi0   : base:0x%lx, size:0x%lx, irq:%d/+32, version:0x%lx\n",
            (long)s->qspi0.base, (long)s->qspi0.size, (int)s->qspi0.irq,
            (long)s->qspi0.version);
+    DEBUGF("udma    : base:0x%lx, size:0x%lx, irq:%d/+32, version:0x%lx\n",
+           (long)s->udma.base, (long)s->udma.size, (int)s->udma.irq,
+           (long)s->udma.version);
     DEBUGF("qspi0_xip: base:0x%lx, size:0x%lx, enable:%ld\n", (long)s->qspi0_xip.base, (long)s->qspi0_xip.size, (long)s->qspi0_xip.enable);
     DEBUGF("qspi1   : base:0x%lx, size:0x%lx, irq:%d/+32, version:0x%lx\n",
            (long)s->qspi1.base, (long)s->qspi1.size, (int)s->qspi1.irq,
@@ -1540,6 +1572,11 @@ static void evalsoc_machine_instance_init(Object *obj)
     s->qspi0.irq = EVALSOC_QSPI0_IRQ_BASE;
     s->qspi0.enable = 1;
     s->qspi0.version = NUCLEI_SPI_DEFAULT_VERSION;
+    s->udma.base = memmap[EVALSOC_UDMA].base;
+    s->udma.size = memmap[EVALSOC_UDMA].size;
+    s->udma.irq = EVALSOC_UDMA_IRQ_BASE;
+    s->udma.enable = 1;
+    s->udma.version = NUCLEI_UDMA_DEFAULT_VERSION;
     s->qspi0_xip.base = EVALSOC_QSPI0_XIP_BASE;
     s->qspi0_xip.size = EVALSOC_QSPI0_XIP_SIZE;
     s->qspi0_xip.enable = 1;
@@ -1755,6 +1792,7 @@ static void riscv_evalsoc_soc_init(Object *obj)
     object_initialize_child(obj, "xec0", &s->xec0, TYPE_NUCLEI_XEC);
     object_initialize_child(obj, "spi0", &s->spi0, TYPE_NUCLEI_SPI);
     object_initialize_child(obj, "spi2", &s->spi2, TYPE_NUCLEI_SPI);
+    object_initialize_child(obj, "udma", &s->udma, TYPE_NUCLEI_UDMA);
 }
 
 static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
@@ -1783,6 +1821,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     uint32_t eclic_num_sources;
     uint32_t cidu_num_sources;
     qemu_irq uart0_irq = NULL;
+    qemu_irq udma_irq = NULL;
     qemu_irq qspi0_irq = NULL;
     qemu_irq qspi2_irq = NULL;
     qemu_irq xec0_irq = NULL;
@@ -1978,6 +2017,10 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         }
     }
 
+    object_property_set_link(OBJECT(&s->spi0), "udma",
+                             OBJECT(&s->udma), &error_abort);
+    qdev_prop_set_uint32(DEVICE(&s->spi0), "dma-tx-channel", 0);
+    qdev_prop_set_uint32(DEVICE(&s->spi0), "dma-rx-channel", 1);
     sysbus_realize(SYS_BUS_DEVICE(&s->spi0), errp);
     if (mst->qspi0.enable) {
         qspi0_irq = evalsoc_create_irq_fanout(s, &mst->qspi0);
@@ -1996,6 +2039,15 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi2), 0,
                         mst->qspi2.base);
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi2), 0, qspi2_irq);
+    }
+
+    if (!sysbus_realize(SYS_BUS_DEVICE(&s->udma), errp)) {
+        return;
+    }
+    if (mst->udma.enable) {
+        udma_irq = evalsoc_create_irq_fanout(s, &mst->udma);
+        sysbus_mmio_map(SYS_BUS_DEVICE(&s->udma), 0, mst->udma.base);
+        sysbus_connect_irq(SYS_BUS_DEVICE(&s->udma), 0, udma_irq);
     }
 
     object_property_set_int(OBJECT(&s->xec0), "revision", XEC_REVISION,

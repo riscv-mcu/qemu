@@ -21,6 +21,7 @@
 #define HW_NUCLEI_EVALSOC_H
 
 #include "hw/dma/sifive_pdma.h"
+#include "hw/dma/nuclei_udma.h"
 #include "hw/riscv/riscv_hart.h"
 #include "hw/riscv/sifive_cpu.h"
 #include "hw/misc/sifive_u_otp.h"
@@ -91,6 +92,7 @@ typedef struct EvalSoCSoCState {
     NucleiGPIOState gpio;
     NucleiSPIState spi0;
     NucleiSPIState spi2;
+    NucleiUDMAState udma;
     NucleiXECState xec0;
 
     uint32_t serial;
@@ -146,6 +148,7 @@ typedef struct
     evalsoc_device_info gpio;
     evalsoc_device_info uart0;
     evalsoc_device_info qspi0;
+    evalsoc_device_info udma;
     evalsoc_device_info qspi0_xip;
     evalsoc_device_info qspi1;
     evalsoc_device_info qspi2;
@@ -187,6 +190,7 @@ enum {
     EVALSOC_GPIO,
     EVALSOC_UART0,
     EVALSOC_QSPI0,
+    EVALSOC_UDMA,
     EVALSOC_QSPI1,
     EVALSOC_QSPI2,
     EVALSOC_XEC0,
@@ -244,6 +248,7 @@ enum
 };
 
 #define EVALSOC_UART0_IRQ_BASE                    1
+#define EVALSOC_UDMA_IRQ_BASE                     2
 #define EVALSOC_QSPI0_IRQ_BASE                    3
 #define EVALSOC_QSPI1_IRQ_BASE                    4
 #define EVALSOC_QSPI2_IRQ_BASE                    5
@@ -293,6 +298,8 @@ enum
 #define EVALSOC_UART0_SIZE          (0x1000)
 #define EVALSOC_QSPI0_BASE          (0x10014000)
 #define EVALSOC_QSPI0_SIZE          (0x1000)
+#define EVALSOC_UDMA_BASE           (0x10015000)
+#define EVALSOC_UDMA_SIZE           (0x1000)
 #define EVALSOC_QSPI1_BASE          (0x10024000)
 #define EVALSOC_QSPI1_SIZE          (0x1000)
 #define EVALSOC_QSPI2_BASE          (0x10034000)

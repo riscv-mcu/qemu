@@ -92,6 +92,7 @@ config NUCLEI_EVALSOC
     bool
     select CADENCE
     select MSI_NONBROKEN
+    select NUCLEI_UDMA
     select RISCV_ACLINT
     select RISCV_APLIC
     select RISCV_IMSIC
