@@ -801,6 +801,7 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
     }
 
     if (cpu->cfg.ext_zicfiss) {
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zimop), true);
         if (!cpu->cfg.ext_zicsr) {
             error_setg(errp, "zicfiss extension requires zicsr extension");
             return;
