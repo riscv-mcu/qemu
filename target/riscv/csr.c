@@ -5170,8 +5170,9 @@ static int rmw_mscratchcswl(CPURISCVState *env, int csrno, target_ulong *ret_val
                 target_ulong new_value, target_ulong write_mask)
 {
     target_ulong t;
-    if( (get_field(env->mcause, MCAUSE_MPIL) == 0)
-        != (get_field(env->mintstatus, MINTSTATUS_MIL) == 0))
+    if ((get_field(env->msubm, XSUBM_TYP) == SUBM_INT) &&
+        ((get_field(env->mcause, MCAUSE_MPIL) == 0) !=
+         (get_field(env->mintstatus, MINTSTATUS_MIL) == 0)))
     {
         t = new_value;
         if (ret_value) {
@@ -5209,8 +5210,9 @@ static int rmw_sscratchcswl(CPURISCVState *env, int csrno, target_ulong *ret_val
                 target_ulong new_value, target_ulong write_mask)
 {
     target_ulong t;
-    if( (get_field(env->scause, SCAUSE_SPIL) == 0)
-        != (get_field(env->mintstatus, MINTSTATUS_SIL) == 0))
+    if ((get_field(env->ssubm, XSUBM_TYP) == SUBM_INT) &&
+        ((get_field(env->scause, SCAUSE_SPIL) == 0) !=
+         (get_field(env->mintstatus, MINTSTATUS_SIL) == 0)))
     {
         t = new_value;
         if (ret_value) {
@@ -7194,8 +7196,8 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     /* Supervisor Mode Core Level Interrupt Controller */
     [CSR_SINTSTATUS]            = {"sintstatus",      smode, read_sintstatus, write_ignore },
     [CSR_SINTTHRESH]            = {"sintthresh",      smode, read_sintthresh, write_sintthresh },
-    [CSR_SSCRATCHCSW]           = {"sscratchcsw",     any, NULL, NULL, rmw_sscratchcsw },
-    [CSR_SSCRATCHCSWL]          = {"sscratchcswl",    any, NULL, NULL, rmw_sscratchcswl },
+    [CSR_SSCRATCHCSW]           = {"sscratchcsw",     smode, NULL, NULL, rmw_sscratchcsw },
+    [CSR_SSCRATCHCSWL]          = {"sscratchcswl",    smode, NULL, NULL, rmw_sscratchcswl },
     /* Supervisor Mode Core Level Interrupt Controller */
     [CSR_STVT]                  = { "stvt",           smode, read_stvt, write_stvt },
     [CSR_SNXTI]                 = { "snxti",          smode, NULL, NULL, rmw_snxti },

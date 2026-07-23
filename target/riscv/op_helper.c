@@ -291,8 +291,11 @@ target_ulong helper_sret(CPURISCVState *env)
     }
 
     if (riscv_intc_is_clic_mode(env)) {
-        target_ulong spil = get_field(env->scause, SCAUSE_SPIL);
-        env->mintstatus = set_field(env->mintstatus, MINTSTATUS_SIL, spil);
+        /* Only interrupt returns restore the previous active interrupt level. */
+        if (env->scause >> (TARGET_LONG_BITS - 1)) {
+            target_ulong spil = get_field(env->scause, SCAUSE_SPIL);
+            env->mintstatus = set_field(env->mintstatus, MINTSTATUS_SIL, spil);
+        }
 
         /*
          * In Nuclei ECLIC v2 flow, popxret restores the saved scause frame
@@ -367,8 +370,11 @@ target_ulong helper_mret(CPURISCVState *env)
 
     /* if ECLIC mode */
     if (riscv_intc_is_clic_mode(env)) {
-        target_ulong mpil = get_field(env->mcause, MCAUSE_MPIL);
-        env->mintstatus = set_field(env->mintstatus, MINTSTATUS_MIL, mpil);
+        /* Only interrupt returns restore the previous active interrupt level. */
+        if (env->mcause >> (TARGET_LONG_BITS - 1)) {
+            target_ulong mpil = get_field(env->mcause, MCAUSE_MPIL);
+            env->mintstatus = set_field(env->mintstatus, MINTSTATUS_MIL, mpil);
+        }
 
         /*
          * In Nuclei ECLIC v2 flow, popxret restores the saved mcause frame
