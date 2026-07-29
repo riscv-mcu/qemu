@@ -3784,7 +3784,7 @@ static float16 frsqrt7_h(float16 f, float_status *s)
 
 static bfloat16 frsqrt7_h_bf16(bfloat16 f, float_status *s)
 {
-    int exp_size = 5, frac_size = 10;
+    int exp_size = 8, frac_size = 7;
     bool sign = bfloat16_is_neg(f);
 
     /*
@@ -3809,17 +3809,17 @@ static bfloat16 frsqrt7_h_bf16(bfloat16 f, float_status *s)
     /* frsqrt7(+-0) = +-inf */
     if (bfloat16_is_zero(f)) {
         s->float_exception_flags |= float_flag_divbyzero;
-        return bfloat16_set_sign(float16_infinity, sign);
+        return bfloat16_set_sign(bfloat16_infinity, sign);
     }
 
     /* frsqrt7(+inf) = +0 */
     if (bfloat16_is_infinity(f) && !sign) {
-        return bfloat16_set_sign(float16_zero, sign);
+        return bfloat16_set_sign(bfloat16_zero, sign);
     }
 
     /* +normal, +subnormal */
     uint64_t val = frsqrt7(f, exp_size, frac_size);
-    return make_float16(val);
+    return val;
 }
 
 static float32 frsqrt7_s(float32 f, float_status *s)
@@ -4031,18 +4031,18 @@ static float16 frec7_h(float16 f, float_status *s)
 
 static bfloat16 frec7_h_bf16(bfloat16 f, float_status *s)
 {
-    int exp_size = 5, frac_size = 10;
+    int exp_size = 8, frac_size = 7;
     bool sign = bfloat16_is_neg(f);
 
     /* frec7(+-inf) = +-0 */
     if (bfloat16_is_infinity(f)) {
-        return bfloat16_set_sign(float16_zero, sign);
+        return bfloat16_set_sign(bfloat16_zero, sign);
     }
 
     /* frec7(+-0) = +-inf */
     if (bfloat16_is_zero(f)) {
         s->float_exception_flags |= float_flag_divbyzero;
-        return bfloat16_set_sign(float16_infinity, sign);
+        return bfloat16_set_sign(bfloat16_infinity, sign);
     }
 
     /* frec7(sNaN) = canonical NaN */
@@ -4058,7 +4058,7 @@ static bfloat16 frec7_h_bf16(bfloat16 f, float_status *s)
 
     /* +-normal, +-subnormal */
     uint64_t val = frec7(f, exp_size, frac_size, s);
-    return make_float16(val);
+    return val;
 }
 
 static float32 frec7_s(float32 f, float_status *s)
