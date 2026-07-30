@@ -147,6 +147,7 @@ struct SDState {
     bool enable;
     uint8_t dat_lines;
     bool cmd_line;
+    bool crc_on;
 };
 
 static void sd_realize(DeviceState *dev, Error **errp);
@@ -302,6 +303,18 @@ static uint8_t sd_crc7(const void *message, size_t width)
         }
 
     return shift_reg;
+}
+
+void sd_req_init(SDRequest *req, uint8_t cmd, uint32_t arg)
+{
+    uint8_t buffer[5];
+
+    req->cmd = cmd;
+    req->arg = arg;
+    buffer[0] = 0x40 | cmd;
+    stl_be_p(&buffer[1], arg);
+    req->crc = sd_crc7(buffer, sizeof(buffer));
+    req->has_crc = true;
 }
 
 #define OCR_POWER_DELAY_NS      500000 /* 0.5ms */
@@ -543,10 +556,24 @@ static void sd_set_sdstatus(SDState *sd)
 static int sd_req_crc_validate(SDRequest *req)
 {
     uint8_t buffer[5];
+
+    if (!req->has_crc) {
+        return 1;
+    }
+
     buffer[0] = 0x40 | req->cmd;
     stl_be_p(&buffer[1], req->arg);
-    return 0;
-    return sd_crc7(buffer, 5) != req->crc;  /* TODO */
+    return sd_crc7(buffer, sizeof(buffer)) != req->crc;
+}
+
+static bool sd_cmd_crc_validation_enabled(SDState *sd)
+{
+    return sd->crc_on;
+}
+
+static bool sd_data_crc_validation_enabled(SDState *sd)
+{
+    return sd->crc_on;
 }
 
 static void sd_response_r1_make(SDState *sd, uint8_t *response)
@@ -601,6 +628,7 @@ static void sd_reset(DeviceState *dev)
     sect = sd_addr_to_wpnum(size) + 1;
 
     sd->state = sd_idle_state;
+    sd->crc_on = false;
     sd->rca = 0x0000;
     sd->size = size;
     sd_set_ocr(sd);
@@ -1566,6 +1594,7 @@ static sd_rsp_type_t sd_normal_command(SDState *sd, SDRequest req)
         return sd_r3;
 
     case 59:    /* CMD59:   CRC_ON_OFF (SPI) */
+        sd->crc_on = (req.arg & 1) != 0;
         return sd_r1;
 
     default:
@@ -1749,9 +1778,9 @@ int sd_do_command(SDState *sd, SDRequest *req,
         return 0;
     }
 
-    if (sd_req_crc_validate(req)) {
+    if (sd_cmd_crc_validation_enabled(sd) && sd_req_crc_validate(req)) {
         sd->card_status |= COM_CRC_ERROR;
-        rtype = sd_illegal;
+        rtype = sd_r1;
         goto send_response;
     }
 
@@ -2129,6 +2158,40 @@ static bool sd_receive_ready(SDState *sd)
     return sd->state == sd_receivingdata_state;
 }
 
+static uint32_t sd_write_data_len(SDState *sd)
+{
+    if (sd->state != sd_receivingdata_state) {
+        return 0;
+    }
+
+    switch (sd->current_cmd) {
+    case 24:  /* CMD24: WRITE_SINGLE_BLOCK */
+    case 25:  /* CMD25: WRITE_MULTIPLE_BLOCK */
+    case 42:  /* CMD42: LOCK_UNLOCK */
+    case 56:  /* CMD56: GEN_CMD */
+        return sd->blk_len;
+    case 26:  /* CMD26: PROGRAM_CID */
+        return sizeof(sd->cid);
+    case 27:  /* CMD27: PROGRAM_CSD */
+        return sizeof(sd->csd);
+    default:
+        return 0;
+    }
+}
+
+static void sd_data_crc_error(SDState *sd)
+{
+    if (sd->state != sd_receivingdata_state) {
+        return;
+    }
+
+    sd->card_status |= COM_CRC_ERROR;
+    sd->data_offset = 0;
+    if (sd->current_cmd != 25) {
+        sd->state = sd_transfer_state;
+    }
+}
+
 static bool sd_data_ready(SDState *sd)
 {
     return sd->state == sd_sendingdata_state;
@@ -2272,6 +2335,9 @@ static void sd_class_init(ObjectClass *klass, void *data)
     sc->read_byte = sd_read_byte;
     sc->receive_ready = sd_receive_ready;
     sc->data_ready = sd_data_ready;
+    sc->crc_enabled = sd_data_crc_validation_enabled;
+    sc->write_data_len = sd_write_data_len;
+    sc->data_crc_error = sd_data_crc_error;
     sc->enable = sd_enable;
     sc->get_inserted = sd_get_inserted;
     sc->get_readonly = sd_get_readonly;

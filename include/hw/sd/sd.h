@@ -87,7 +87,10 @@ typedef struct {
     uint8_t cmd;
     uint32_t arg;
     uint8_t crc;
+    bool has_crc;
 } SDRequest;
+
+void sd_req_init(SDRequest *req, uint8_t cmd, uint32_t arg);
 
 
 #define TYPE_SD_CARD "sd-card"
@@ -127,6 +130,9 @@ struct SDCardClass {
     void (*enable)(SDState *sd, bool enable);
     bool (*get_inserted)(SDState *sd);
     bool (*get_readonly)(SDState *sd);
+    bool (*crc_enabled)(SDState *sd);
+    uint32_t (*write_data_len)(SDState *sd);
+    void (*data_crc_error)(SDState *sd);
 
     const struct SDProto *proto;
 };
@@ -195,6 +201,9 @@ void sdbus_write_data(SDBus *sdbus, const void *buf, size_t length);
 void sdbus_read_data(SDBus *sdbus, void *buf, size_t length);
 bool sdbus_receive_ready(SDBus *sd);
 bool sdbus_data_ready(SDBus *sd);
+bool sdbus_crc_enabled(SDBus *sd);
+uint32_t sdbus_write_data_len(SDBus *sd);
+void sdbus_data_crc_error(SDBus *sd);
 bool sdbus_get_inserted(SDBus *sd);
 bool sdbus_get_readonly(SDBus *sd);
 /**

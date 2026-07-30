@@ -186,6 +186,49 @@ bool sdbus_data_ready(SDBus *sdbus)
     return false;
 }
 
+bool sdbus_crc_enabled(SDBus *sdbus)
+{
+    SDState *card = get_card(sdbus);
+
+    if (card) {
+        SDCardClass *sc = SD_CARD_GET_CLASS(card);
+
+        if (sc->crc_enabled) {
+            return sc->crc_enabled(card);
+        }
+    }
+
+    return false;
+}
+
+uint32_t sdbus_write_data_len(SDBus *sdbus)
+{
+    SDState *card = get_card(sdbus);
+
+    if (card) {
+        SDCardClass *sc = SD_CARD_GET_CLASS(card);
+
+        if (sc->write_data_len) {
+            return sc->write_data_len(card);
+        }
+    }
+
+    return 0;
+}
+
+void sdbus_data_crc_error(SDBus *sdbus)
+{
+    SDState *card = get_card(sdbus);
+
+    if (card) {
+        SDCardClass *sc = SD_CARD_GET_CLASS(card);
+
+        if (sc->data_crc_error) {
+            sc->data_crc_error(card);
+        }
+    }
+}
+
 bool sdbus_get_inserted(SDBus *sdbus)
 {
     SDState *card = get_card(sdbus);
