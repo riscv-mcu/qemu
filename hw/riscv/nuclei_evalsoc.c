@@ -81,7 +81,7 @@ static const struct MemmapEntry
     [EVALSOC_MROM]    = { EVALSOC_MROM_BASE,              EVALSOC_MROM_SIZE,    "MROM" },
     [EVALSOC_XEC0]    = { EVALSOC_XEC0_BASE,              EVALSOC_XEC0_SIZE,    "XEC0"},
     [EVALSOC_TEST]    = { EVALSOC_TEST_BASE,              EVALSOC_TEST_SIZE,    "TEST" },
-    [EVALSOC_GPIO]    = { EVALSOC_GPIO_BASE,              EVALSOC_GPIO_SIZE,    "GPIO" },
+    [EVALSOC_MISC]    = { EVALSOC_MISC_BASE,              EVALSOC_MISC_SIZE,    "MISC" },
     [EVALSOC_UART0]   = { EVALSOC_UART0_BASE,             EVALSOC_UART0_SIZE,   "UART0"},
     [EVALSOC_QSPI0]   = { EVALSOC_QSPI0_BASE,             EVALSOC_QSPI0_SIZE,   "QSPI0"},
     [EVALSOC_UDMA]    = { EVALSOC_UDMA_BASE,              EVALSOC_UDMA_SIZE,    "UDMA"},
@@ -183,6 +183,14 @@ static void evalsoc_validate_eclic_irq_layout(const EvalSoCState *s,
 
 static void evalsoc_validate_irq_layout(const EvalSoCState *s)
 {
+    evalsoc_device_info misc_counter0 = {
+        .irq = s->misc.counter0_irq,
+        .enable = s->misc.enable,
+    };
+    evalsoc_device_info misc_counter1 = {
+        .irq = s->misc.counter1_irq,
+        .enable = s->misc.enable,
+    };
     struct {
         const char *name;
         const evalsoc_device_info *dev;
@@ -192,6 +200,8 @@ static void evalsoc_validate_irq_layout(const EvalSoCState *s)
         { "qspi0", &s->qspi0 },
         { "qspi2", &s->qspi2 },
         { "xec0",  &s->xec0  },
+        { "misc.counter0", &misc_counter0 },
+        { "misc.counter1", &misc_counter1 },
     };
     uint64_t max_base_irq;
     uint64_t max_irq;
@@ -274,11 +284,11 @@ static void evalsoc_irq_fanout_handler(void *opaque, int n, int level)
     }
 }
 
-static qemu_irq evalsoc_create_irq_fanout(EvalSoCSoCState *soc,
-                                          const evalsoc_device_info *dev)
+static qemu_irq evalsoc_create_irq_fanout_by_id(EvalSoCSoCState *soc,
+                                                uint64_t irq)
 {
     EvalSoCIrqFanout *fanout;
-    uint64_t companion_irq = dev->irq + EVALSOC_DUAL_IRQ_DELTA;
+    uint64_t companion_irq = irq + EVALSOC_DUAL_IRQ_DELTA;
 
     fanout = g_new0(EvalSoCIrqFanout, 1);
 
@@ -289,18 +299,26 @@ static qemu_irq evalsoc_create_irq_fanout(EvalSoCSoCState *soc,
 
     if (soc->irqchip) {
         fanout->targets[fanout->count++] =
-            qdev_get_gpio_in(DEVICE(soc->irqchip), dev->irq);
+            qdev_get_gpio_in(DEVICE(soc->irqchip), irq);
         fanout->targets[fanout->count++] =
             qdev_get_gpio_in(DEVICE(soc->irqchip), companion_irq);
     }
     if (soc->eclic) {
         fanout->targets[fanout->count++] =
-            evalsoc_get_eclic_external_sink(soc, dev->irq);
+            evalsoc_get_eclic_external_sink(soc, irq);
         fanout->targets[fanout->count++] =
             evalsoc_get_eclic_external_sink(soc, companion_irq);
     }
 
     return qemu_allocate_irq(evalsoc_irq_fanout_handler, fanout, 0);
+}
+
+static void evalsoc_misc_nmi_irq(void *opaque, int n, int level)
+{
+    RISCVCPU *cpu = opaque;
+
+    (void)n;
+    riscv_cpu_nuclei_nmi_interrupt(cpu, level);
 }
 
 static target_ulong evalsoc_compose_mcfg_info(const EvalSoCState *s,
@@ -325,7 +343,7 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     int cpu;
     uint32_t *cells;
     char *nodename;
-    uint32_t plic_phandle, uart_phandle, gpio_phandle, phy_phandle, phandle = 1;
+    uint32_t plic_phandle, uart_phandle, phy_phandle, phandle = 1;
     uint32_t aplic_m_phandle, aplic_s_phandle;
     uint32_t msi_m_phandle, msi_s_phandle;
     uint32_t hfclk_phandle,test_phandle;
@@ -590,33 +608,15 @@ static void create_fdt(EvalSoCState *s, const struct MemmapEntry *memmap,
     qemu_fdt_setprop_cell(fdt, nodename, "value", FINISHER_PASS);
     g_free(nodename);
 
-    gpio_phandle = phandle++;
-    nodename = g_strdup_printf("/soc/gpio@%lx",
-                               (long)memmap[EVALSOC_GPIO].base);
+    nodename = g_strdup_printf("/soc/misc@%lx", (long)s->misc.base);
     qemu_fdt_add_subnode(fdt, nodename);
-    qemu_fdt_setprop_cell(fdt, nodename, "clocks", hfclk_phandle);
-    qemu_fdt_setprop_cell(fdt, nodename, "#interrupt-cells", 2);
-    qemu_fdt_setprop(fdt, nodename, "interrupt-controller", NULL, 0);
-    qemu_fdt_setprop_cell(fdt, nodename, "#gpio-cells", 2);
-    qemu_fdt_setprop(fdt, nodename, "gpio-controller", NULL, 0);
+    qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,misc");
     qemu_fdt_setprop_cells(fdt, nodename, "reg",
-                           0x0, memmap[EVALSOC_GPIO].base,
-                           0x0, memmap[EVALSOC_GPIO].size);
-    qemu_fdt_setprop_cells(fdt, nodename, "interrupts", EVALSOC_PLIC_GPIO_IRQ0,
-                           EVALSOC_PLIC_GPIO_IRQ1, EVALSOC_PLIC_GPIO_IRQ2, EVALSOC_PLIC_GPIO_IRQ3,
-                           EVALSOC_PLIC_GPIO_IRQ4, EVALSOC_PLIC_GPIO_IRQ5, EVALSOC_PLIC_GPIO_IRQ6,
-                           EVALSOC_PLIC_GPIO_IRQ8, EVALSOC_PLIC_GPIO_IRQ9,
-                           EVALSOC_PLIC_GPIO_IRQ10, EVALSOC_PLIC_GPIO_IRQ11, EVALSOC_PLIC_GPIO_IRQ12,
-                           EVALSOC_PLIC_GPIO_IRQ13, EVALSOC_PLIC_GPIO_IRQ14, EVALSOC_PLIC_GPIO_IRQ15,
-                           EVALSOC_PLIC_GPIO_IRQ16, EVALSOC_PLIC_GPIO_IRQ17, EVALSOC_PLIC_GPIO_IRQ18,
-                           EVALSOC_PLIC_GPIO_IRQ19, EVALSOC_PLIC_GPIO_IRQ20, EVALSOC_PLIC_GPIO_IRQ21,
-                           EVALSOC_PLIC_GPIO_IRQ22, EVALSOC_PLIC_GPIO_IRQ23, EVALSOC_PLIC_GPIO_IRQ24,
-                           EVALSOC_PLIC_GPIO_IRQ25, EVALSOC_PLIC_GPIO_IRQ26, EVALSOC_PLIC_GPIO_IRQ27,
-                           EVALSOC_PLIC_GPIO_IRQ28, EVALSOC_PLIC_GPIO_IRQ29, EVALSOC_PLIC_GPIO_IRQ30,
-                           EVALSOC_PLIC_GPIO_IRQ31);
+                            0x0, (hwaddr)s->misc.base,
+                            0x0, (hwaddr)s->misc.size);
     qemu_fdt_setprop_cell(fdt, nodename, "interrupt-parent", plic_phandle);
-    qemu_fdt_setprop_string(fdt, nodename, "compatible", "nuclei,gpio0");
-    qemu_fdt_setprop_cell(fdt, nodename, "phandle", gpio_phandle);
+    qemu_fdt_setprop_cells(fdt, nodename, "interrupts",
+                            s->misc.counter0_irq, s->misc.counter1_irq);
     qemu_fdt_setprop_string(fdt, nodename, "status", "disabled");
     g_free(nodename);
 
@@ -886,10 +886,13 @@ static void parse_json_config(MachineState *machine)
         {"size",    &s->test.size,     "test.size"},
         {"enable",  &s->test.enable,   "test.enable"},
     };
-    const JsonFieldMapping gpio_mappings[] = {
-        {"base",    &s->gpio.base,     "gpio.base"},
-        {"size",    &s->gpio.size,     "gpio.size"},
-        {"enable",  &s->gpio.enable,   "gpio.enable"},
+    const JsonFieldMapping misc_mappings[] = {
+        {"base",    &s->misc.base,     "misc.base"},
+        {"size",    &s->misc.size,     "misc.size"},
+        {"counter0_irq", &s->misc.counter0_irq, "misc.counter0_irq"},
+        {"counter1_irq", &s->misc.counter1_irq, "misc.counter1_irq"},
+        {"enable",  &s->misc.enable,   "misc.enable"},
+        {"version", &s->misc.version,  "misc.version"},
     };
     const JsonFieldMapping uart0_mappings[] = {
         {"base",    &s->uart0.base,     "uart0.base"},
@@ -1030,8 +1033,8 @@ static void parse_json_config(MachineState *machine)
                                 parse_json_keys_and_values(options_page2, mrom_mappings, ARRAY_SIZE(mrom_mappings));
                             } else if (!strcmp(page1->key, "test")) {
                                 parse_json_keys_and_values(options_page2, test_mappings, ARRAY_SIZE(test_mappings));
-                            } else if (!strcmp(page1->key, "gpio")) {
-                                parse_json_keys_and_values(options_page2, gpio_mappings, ARRAY_SIZE(gpio_mappings));
+                            } else if (!strcmp(page1->key, "misc")) {
+                                parse_json_keys_and_values(options_page2, misc_mappings, ARRAY_SIZE(misc_mappings));
                             } else if (!strcmp(page1->key, "uart0")) {
                                 parse_json_keys_and_values(options_page2, uart0_mappings, ARRAY_SIZE(uart0_mappings));
                             } else if (!strcmp(page1->key, "qspi0")) {
@@ -1105,8 +1108,8 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
     memoryRegion[EVALSOC_MROM].size = s->mrom.size;
     memoryRegion[EVALSOC_TEST].base = s->test.base;
     memoryRegion[EVALSOC_TEST].size = s->test.size;
-    memoryRegion[EVALSOC_GPIO].base = s->gpio.base;
-    memoryRegion[EVALSOC_GPIO].size = s->gpio.size;
+    memoryRegion[EVALSOC_MISC].base = s->misc.base;
+    memoryRegion[EVALSOC_MISC].size = s->misc.size;
     memoryRegion[EVALSOC_UART0].base = s->uart0.base;
     memoryRegion[EVALSOC_UART0].size = s->uart0.size;
     memoryRegion[EVALSOC_QSPI0].base = s->qspi0.base;
@@ -1159,7 +1162,7 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
             || (i == EVALSOC_CIDU && !s->iregion.cidu_en)
             || (i == EVALSOC_PLIC && !s->iregion.plic_en)
             || (i == EVALSOC_TEST && !s->test.enable)
-            || (i == EVALSOC_GPIO && !s->gpio.enable)
+            || (i == EVALSOC_MISC && !s->misc.enable)
             || (i == EVALSOC_UART0 && !s->uart0.enable)
             || (i == EVALSOC_QSPI0 && !s->qspi0.enable)
             || (i == EVALSOC_UDMA && !s->udma.enable)
@@ -1181,7 +1184,7 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
                 || (j == EVALSOC_CIDU && !s->iregion.cidu_en)
                 || (j == EVALSOC_PLIC && !s->iregion.plic_en)
                 || (j == EVALSOC_TEST && !s->test.enable)
-                || (j == EVALSOC_GPIO && !s->gpio.enable)
+                || (j == EVALSOC_MISC && !s->misc.enable)
                 || (j == EVALSOC_UART0 && !s->uart0.enable)
                 || (j == EVALSOC_QSPI0 && !s->qspi0.enable)
                 || (j == EVALSOC_UDMA && !s->udma.enable)
@@ -1225,6 +1228,7 @@ static void evalsoc_machine_init(MachineState *machine)
     BlockBackend *blk;
     DeviceState *flash_dev, *sd_dev, *card_dev;
     qemu_irq flash_cs, sd_cs;
+    qemu_irq misc_nmi_irq;
 
     parse_json_config(machine);
     evalsoc_validate_irq_layout(s);
@@ -1372,7 +1376,10 @@ static void evalsoc_machine_init(MachineState *machine)
     DEBUGF("dlm     : base:0x%lx, size:0x%lx\n", (long)s->dlm.base,(long)s->dlm.size);
     DEBUGF("mrom    : base:0x%lx, size:0x%lx\n", (long)s->mrom.base,(long)s->mrom.size);
     DEBUGF("test    : base:0x%lx, size:0x%lx\n", (long)s->test.base,(long)s->test.size);
-    DEBUGF("gpio    : base:0x%lx, size:0x%lx\n", (long)s->gpio.base,(long)s->gpio.size);
+    DEBUGF("misc    : base:0x%lx, size:0x%lx, irq0:%ld, irq1:%ld, version:0x%lx\n",
+           (long)s->misc.base, (long)s->misc.size,
+           (long)s->misc.counter0_irq, (long)s->misc.counter1_irq,
+           (long)s->misc.version);
     DEBUGF("uart0   : base:0x%lx, size:0x%lx, irq:%d/+32, version:0x%lx\n",
            (long)s->uart0.base, (long)s->uart0.size, (int)s->uart0.irq,
            (long)s->uart0.version);
@@ -1498,6 +1505,10 @@ static void evalsoc_machine_init(MachineState *machine)
 
     sd_cs = qdev_get_gpio_in_named(sd_dev, SSI_GPIO_CS, 0);
     sysbus_connect_irq(SYS_BUS_DEVICE(&s->soc.spi2), 1, sd_cs);
+    /* Keep MISC NMI as a dedicated core input instead of routing it through IRQ fanout. */
+    misc_nmi_irq = qemu_allocate_irq(evalsoc_misc_nmi_irq,
+                                     &s->soc.cpus.harts[0], 0);
+    qdev_connect_gpio_out_named(DEVICE(&s->soc.misc), "nmi", 0, misc_nmi_irq);
 
     dinfo = drive_get(IF_SD, 0, 0);
     blk = dinfo ? blk_by_legacy_dinfo(dinfo) : NULL;
@@ -1517,7 +1528,7 @@ static void evalsoc_machine_instance_init(Object *obj)
     EvalSoCState *s = RISCV_EVALSOC_MACHINE(obj);
     const struct MemmapEntry *memmap = evalsoc_memmap;
 
-    s->cpu_freq = -1; //qemu no use
+    s->cpu_freq = EVALSOC_CPU_FREQ;
     s->timer_freq = EVALSOC_TIMEBASE_FREQ;
     /* irqmax: max irq number for external irq
             1.eclic core irq:irq[0~18] external irq:irq[19...4095]
@@ -1559,9 +1570,12 @@ static void evalsoc_machine_instance_init(Object *obj)
     s->test.base = memmap[EVALSOC_TEST].base;
     s->test.size = memmap[EVALSOC_TEST].size;
     s->test.enable = 1;
-    s->gpio.base = memmap[EVALSOC_GPIO].base;
-    s->gpio.size = memmap[EVALSOC_GPIO].size;
-    s->gpio.enable = 1;
+    s->misc.base = memmap[EVALSOC_MISC].base;
+    s->misc.size = memmap[EVALSOC_MISC].size;
+    s->misc.counter0_irq = EVALSOC_PLIC_COUNTER0_IRQ;
+    s->misc.counter1_irq = EVALSOC_PLIC_COUNTER1_IRQ;
+    s->misc.enable = 1;
+    s->misc.version = 0;
     s->uart0.base = memmap[EVALSOC_UART0].base;
     s->uart0.size = memmap[EVALSOC_UART0].size;
     s->uart0.irq = EVALSOC_UART0_IRQ_BASE;
@@ -1788,7 +1802,7 @@ static void riscv_evalsoc_soc_init(Object *obj)
     object_initialize_child(OBJECT(&s->u_cluster), "cpus", &s->cpus,
                             TYPE_RISCV_HART_ARRAY);
 
-    object_initialize_child(obj, "gpio", &s->gpio, TYPE_NUCLEI_GPIO);
+    object_initialize_child(obj, "misc", &s->misc, TYPE_NUCLEI_MISC);
     object_initialize_child(obj, "xec0", &s->xec0, TYPE_NUCLEI_XEC);
     object_initialize_child(obj, "spi0", &s->spi0, TYPE_NUCLEI_SPI);
     object_initialize_child(obj, "spi2", &s->spi2, TYPE_NUCLEI_SPI);
@@ -1977,7 +1991,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                     s->eclic) : NULL;
 
     if (mst->uart0.enable) {
-        uart0_irq = evalsoc_create_irq_fanout(s, &mst->uart0);
+        uart0_irq = evalsoc_create_irq_fanout_by_id(s, mst->uart0.irq);
         if (mst->uart0.version >= NUCLEI_USART_VERSION_3_1_0) {
             nuclei_usart_create(mst->uart0.base,
                                 memmap[EVALSOC_UART0].size,
@@ -1996,25 +2010,18 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                            memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus,
                            s->eclic, mst->timer_freq);
 
-    qdev_prop_set_uint32(DEVICE(&s->gpio), "ngpio", 32);
-    if (!sysbus_realize(SYS_BUS_DEVICE(&s->gpio), errp))
-    {
+    qdev_prop_set_uint32(DEVICE(&s->misc), "version", mst->misc.version);
+    qdev_prop_set_uint32(DEVICE(&s->misc), "tick-hz", (uint32_t)mst->cpu_freq);
+    if (!sysbus_realize(SYS_BUS_DEVICE(&s->misc), errp)) {
         return;
     }
-    if (mst->gpio.enable) {
-        sysbus_mmio_map(SYS_BUS_DEVICE(&s->gpio), 0, memmap[EVALSOC_GPIO].base);
-
-        /* Pass all GPIOs to the SOC layer so they are available to the board */
-        qdev_pass_gpios(DEVICE(&s->gpio), dev, NULL);
-        /* GPIO still exposes one irqchip source per pin. */
-        if (s->irqchip) {
-            for (i = 0; i < 32; i++)
-            {
-                sysbus_connect_irq(SYS_BUS_DEVICE(&s->gpio), i,
-                                qdev_get_gpio_in(DEVICE(s->irqchip),
-                                                    EVALSOC_PLIC_GPIO_IRQ0 + i));
-            }
-        }
+    if (mst->misc.enable) {
+        sysbus_mmio_map(SYS_BUS_DEVICE(&s->misc), 0, mst->misc.base);
+        /* Only Counter0/1 use the shared external interrupt fanout path. */
+        sysbus_connect_irq(SYS_BUS_DEVICE(&s->misc), 0,
+                evalsoc_create_irq_fanout_by_id(s, mst->misc.counter0_irq));
+        sysbus_connect_irq(SYS_BUS_DEVICE(&s->misc), 1,
+                evalsoc_create_irq_fanout_by_id(s, mst->misc.counter1_irq));
     }
 
     object_property_set_link(OBJECT(&s->spi0), "udma",
@@ -2023,7 +2030,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     qdev_prop_set_uint32(DEVICE(&s->spi0), "dma-rx-channel", 1);
     sysbus_realize(SYS_BUS_DEVICE(&s->spi0), errp);
     if (mst->qspi0.enable) {
-        qspi0_irq = evalsoc_create_irq_fanout(s, &mst->qspi0);
+        qspi0_irq = evalsoc_create_irq_fanout_by_id(s, mst->qspi0.irq);
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi0), 0,
                         mst->qspi0.base);
         if (mst->qspi0_xip.enable) {
@@ -2035,7 +2042,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
 
     sysbus_realize(SYS_BUS_DEVICE(&s->spi2), errp);
     if (mst->qspi2.enable) {
-        qspi2_irq = evalsoc_create_irq_fanout(s, &mst->qspi2);
+        qspi2_irq = evalsoc_create_irq_fanout_by_id(s, mst->qspi2.irq);
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi2), 0,
                         mst->qspi2.base);
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi2), 0, qspi2_irq);
@@ -2045,7 +2052,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         return;
     }
     if (mst->udma.enable) {
-        udma_irq = evalsoc_create_irq_fanout(s, &mst->udma);
+        udma_irq = evalsoc_create_irq_fanout_by_id(s, mst->udma.irq);
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->udma), 0, mst->udma.base);
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->udma), 0, udma_irq);
     }
@@ -2056,7 +2063,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         return;
     }
     if (mst->xec0.enable) {
-        xec0_irq = evalsoc_create_irq_fanout(s, &mst->xec0);
+        xec0_irq = evalsoc_create_irq_fanout_by_id(s, mst->xec0.irq);
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->xec0), 0,
                         mst->xec0.base);
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->xec0), 0, xec0_irq);

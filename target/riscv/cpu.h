@@ -746,8 +746,12 @@ bool riscv_cpu_option_set(const char *optname);
  */
 static inline target_ulong riscv_cpu_nuclei_mnvec(CPURISCVState *env)
 {
+#ifdef CONFIG_USER_ONLY
+    return env->mnvec;
+#else
     return (env->mmisc_ctl & MMISC_CTL_NMI_CAUSE_FFF) ?
            env->mtvec : env->resetvec;
+#endif
 }
 
 static inline target_ulong riscv_cpu_nuclei_nmi_cause(CPURISCVState *env)

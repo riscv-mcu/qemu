@@ -33,7 +33,7 @@
 #include "hw/cpu/cluster.h"
 #include "hw/riscv/riscv_hart.h"
 #include "hw/char/nuclei_uart.h"
-#include "hw/gpio/nuclei_gpio.h"
+#include "hw/misc/nuclei_misc.h"
 #include "hw/intc/nuclei_eclic.h"
 #include "hw/intc/nuclei_cidu.h"
 #include "hw/smpcc/nuclei_smpcc.h"
@@ -49,6 +49,7 @@
 
 /* CLINT timebase frequency */
 #define CLINT_TIMEBASE_FREQ 1000000
+#define EVALSOC_CPU_FREQ    16000000ULL
 
 #define XEC_REVISION        0x00010000
 #define NUCLEI_UART_VERSION_LEGACY   0x00000000U
@@ -89,7 +90,7 @@ typedef struct EvalSoCSoCState {
     MemoryRegion smp;
 
     NucleiSYSTIMERState timer;
-    NucleiGPIOState gpio;
+    NucleiMiscState misc;
     NucleiSPIState spi0;
     NucleiSPIState spi2;
     NucleiUDMAState udma;
@@ -114,6 +115,15 @@ typedef struct {
     uint64_t enable;
     uint64_t version;
 } evalsoc_device_info;
+
+typedef struct {
+    uint64_t base;
+    uint64_t size;
+    uint64_t counter0_irq;
+    uint64_t counter1_irq;
+    uint64_t enable;
+    uint64_t version;
+} evalsoc_misc_info;
 
 typedef struct {
     uint64_t base;
@@ -145,7 +155,7 @@ typedef struct
     evalsoc_device_info flash;
     evalsoc_device_info mrom;
     evalsoc_device_info test;
-    evalsoc_device_info gpio;
+    evalsoc_misc_info misc;
     evalsoc_device_info uart0;
     evalsoc_device_info qspi0;
     evalsoc_device_info udma;
@@ -187,7 +197,7 @@ enum {
     EVALSOC_IMSIC_S,
     EVALSOC_ECLIC,
     EVALSOC_CIDU,
-    EVALSOC_GPIO,
+    EVALSOC_MISC,
     EVALSOC_UART0,
     EVALSOC_QSPI0,
     EVALSOC_UDMA,
@@ -292,8 +302,8 @@ enum
 #define EVALSOC_TEST_SIZE           (0x10000)
 #define EVALSOC_XEC0_BASE           (0x10002000)
 #define EVALSOC_XEC0_SIZE           (0x1000)
-#define EVALSOC_GPIO_BASE           (0x10012000)
-#define EVALSOC_GPIO_SIZE           (0x1000)
+#define EVALSOC_MISC_BASE           (0x10012000)
+#define EVALSOC_MISC_SIZE           (0x1000)
 #define EVALSOC_UART0_BASE          (0x10013000)
 #define EVALSOC_UART0_SIZE          (0x1000)
 #define EVALSOC_QSPI0_BASE          (0x10014000)

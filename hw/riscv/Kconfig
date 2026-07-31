@@ -115,5 +115,5 @@ config NUCLEI_EVALSOC
     select NUCLEI_UART
     select NUCLEI_SMPCC
     select NUCLEI_IREGION
+    select NUCLEI_MISC
     select NUCLEI_TEST
-    select NUCLEI_GPIO
