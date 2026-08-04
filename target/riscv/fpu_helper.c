@@ -697,7 +697,7 @@ target_ulong helper_feq_h(CPURISCVState *env, uint64_t rs1, uint64_t rs2)
 target_ulong helper_fclass_h(CPURISCVState *env, uint64_t rs1)
 {
     float16 frs1 = check_nanbox_h(env, rs1);
-    return fclass_h(frs1);
+    return (env->mmisc_ctl1 & 0x1) ? fclass_h_bf16(frs1) : fclass_h(frs1);
 }
 
 uint64_t helper_fround_h(CPURISCVState *env, uint64_t rs1)

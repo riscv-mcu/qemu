@@ -468,7 +468,9 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
 
     if (cpu->cfg.ext_xxlvfbf) {
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_xxlfbf), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvfh), true);
         cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvfbfmin), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zvfbfwma), true);
     }
 
     if (cpu->cfg.ext_xxlfbf) {
