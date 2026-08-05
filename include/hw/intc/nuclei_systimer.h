@@ -51,7 +51,8 @@ enum {
 #define MTIMECTL_CMPCLREN   (1 << 1)
 #define MTIMECTL_TIMESTOP   (1 << 0)
 #define MTIMECTL_HDBG       (1 << 3)
-#define MTIMECTL_RW_MASK    (MTIMECTL_CMPCLREN | MTIMECTL_TIMESTOP)
+#define MTIMECTL_RW_MASK    (MTIMECTL_CMPCLREN | MTIMECTL_TIMESTOP | \
+                             MTIMECTL_HDBG)
 
 #define MSFTRST_MAGIC       0x80000a5f
 

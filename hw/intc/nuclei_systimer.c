@@ -478,8 +478,7 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
         return;
     case REG_MTIMECTL:
         if (!srw_blocked) {
-            uint32_t new_mtimectl = MTIMECTL_HDBG |
-                                    (value & MTIMECTL_RW_MASK);
+            uint32_t new_mtimectl = value & MTIMECTL_RW_MASK;
             uint64_t mtime;
 
             if ((s->mtimectl ^ new_mtimectl) & MTIMECTL_TIMESTOP) {
