@@ -1,0 +1,202 @@
+{
+    "run_config": {
+        "target": "qemu",
+        "xlspike": {
+            "timeout": 240
+        },
+        "qemu": {
+            "timeout": 30
+        }
+    },
+    "parallel": "-j",
+    "build_target": "clean all",
+    "build_config": {
+        "SOC": "evalsoc",
+        "BOARD": "nuclei_fpga_eval"
+    },
+    "build_configs": {
+        "n200": {"DOWNLOAD": "sram", "CORE": "n200", "ARCH_EXT": ""},
+        "n200e": {"DOWNLOAD": "flashxip", "CORE": "n200e", "ARCH_EXT": ""},
+        "n300": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": ""},
+        "n300-zfinx": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zfinx"},
+        "n300-zfinx-zdinx": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zfinx_zdinx"},
+        "n300bp": {"DOWNLOAD": "flash", "CORE": "n300", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldspn1x"},
+        "n300fdbp": {"DOWNLOAD": "ilm", "CORE": "n300fd", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldspn1x"},
+        "ux600": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": ""},
+        "ux600-zfinx": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "_zfinx"},
+        "ux600-zfinx-zdinx": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "_zfinx_zdinx"},
+        "ux600fbp": {"DOWNLOAD": "flashxip", "CORE": "ux600f", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldsp"},
+        "ux600fdbp": {"DOWNLOAD": "sram", "CORE": "ux600fd", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldsp"}
+    },
+    "appdirs": [
+        "application/baremetal/demo_vnice",
+        "application/baremetal/demo_pma",
+        "application/baremetal/demo_cache",
+        "application/baremetal/demo_clint_timer",
+        "application/baremetal/cpuinfo",
+        "application/baremetal/demo_smpcc",
+        "application/baremetal/demo_plic",
+        "application/baremetal/helloworld",
+        "application/baremetal/smphello",
+        "application/baremetal/demo_ecc",
+        "application/baremetal/demo_profiling",
+        "application/baremetal/demo_backtrace",
+        "application/baremetal/benchmark/dhrystone",
+        "application/baremetal/benchmark/coremark",
+        "application/baremetal/benchmark/whetstone_v1.2",
+        "application/baremetal/benchmark/whetstone",
+        "application/baremetal/benchmark/dhrystone_v2.2",
+        "application/baremetal/demo_smode_clint",
+        "application/baremetal/demo_smode_plic",
+        "application/baremetal/demo_nice",
+        "application/baremetal/empty",
+        "application/baremetal/demo_stack_check",
+        "application/baremetal/demo_smpu",
+        "test/core"
+    ],
+    "appconfig": {
+        "application/baremetal/demo_plic": {
+            "build_config": {
+                "XLCFG_PLIC": "1"
+            }
+        },
+        "application/baremetal/demo_smode_plic": {
+            "build_config": {
+                "XLCFG_PLIC": "1"
+            }
+        },
+        "application/baremetal/demo_cache": {
+            "build_config": {
+                "XLCFG_CCM": "1",
+                "XLCFG_HPM": "1",
+                "DOWNLOAD": "ddr"
+            }
+        },
+        "application/baremetal/demo_pma": {
+            "build_config": {
+                "XLCFG_CCM": "1",
+                "XLCFG_HPM": "1"
+            }
+        },
+        "application/baremetal/benchmark/whetstone_v1.2": {
+            "run_config": {
+                "qemu": {
+                    "timeout": 60
+                }
+            }
+        },
+        "application/baremetal/benchmark/whetstone": {
+            "run_config": {
+                "qemu": {
+                    "timeout": 60
+                }
+            }
+        },
+        "application/baremetal/demo_profiling": {
+            "build_config": {
+                "DOWNLOAD": "sram"
+            }
+        },
+        "application/baremetal/demo_smpu": {
+            "build_config": {
+                "XLCFG_SMPU": "1"
+            },
+            "build_configs": {
+                "n300-chk0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "CHK_MODE": "0"},
+                "n300-chk1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "CHK_MODE": "1"},
+                "n300-chk2": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "CHK_MODE": "2"},
+                "n300-chk3": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "CHK_MODE": "3"},
+                "n300-chk4": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "CHK_MODE": "4"},
+                "n300-chk5": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "CHK_MODE": "5"},
+                "ux600-chk0": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "CHK_MODE": "0"},
+                "ux600-chk1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "CHK_MODE": "1"},
+                "ux600-chk2": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "CHK_MODE": "2"},
+                "ux600-chk3": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "CHK_MODE": "3"},
+                "ux600-chk4": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "CHK_MODE": "4"},
+                "ux600-chk5": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "CHK_MODE": "5"}
+            },
+            "checks": {
+                "PASS": [
+                    "SMPU fault occurs"
+                ]
+            }
+        },
+        "application/baremetal/smphello": {
+            "build_config": {
+                "SMP": "4",
+                "ICOUNT_OPT": ""
+            }
+        },
+        "application/baremetal/demo_vnice": {
+            "merge_global": false,
+            "build_config": {
+                "SOC": "evalsoc",
+                "BOARD": "nuclei_fpga_eval"
+            },
+            "build_target": "clean all",
+            "parallel": "-j",
+            "run_config": {
+                "target": "qemu",
+                "qemu": {
+                    "timeout": 30
+                }
+            },
+            "build_configs": {
+                "n200": {"DOWNLOAD": "sram", "CORE": "n900f", "ARCH_EXT": "_zve32f_xxlcz"},
+                "n200e": {"DOWNLOAD": "flashxip", "CORE": "n900fd", "ARCH_EXT": "_zve32f_zfh"},
+                "n300": {"DOWNLOAD": "ilm", "CORE": "n900fd", "ARCH_EXT": "_zve32f_zba_zbb_zbc_zbs_zfh_xxldsp"},
+                "n300bp": {"DOWNLOAD": "flash", "CORE": "n900f", "ARCH_EXT": "_zca_zcb_zcf_zcmp_zba_zbb_zbc_zbs_zve32f_xxldspn1x_xxlcz"},
+                "n300fdbp": {"DOWNLOAD": "ilm", "CORE": "n900fd", "ARCH_EXT": "_zca_zcb_zcf_zcmp_zba_zbb_zbc_zbs_zicond_zve32f_xxldspn3x"},
+                "ux600": {"DOWNLOAD": "sram", "CORE": "ux900fd", "ARCH_EXT": "v"},
+                "ux600fbp": {"DOWNLOAD": "flashxip", "CORE": "ux900f", "ARCH_EXT": "_zve64f_zba_zbb_zbc_zbs_xxldsp"},
+                "ux600fdbp": {"DOWNLOAD": "sram", "CORE": "ux900fd", "ARCH_EXT": "v_zba_zbb_zbc_zbs_zca_zcb_zcmp_zcmt_xxldsp"}
+            }
+        },
+        "test/core": {
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "ux600-eclicv2-hwctx0": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "ux600-eclicv2-hwctx1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        }
+    },
+    "expecteds": {
+        "application/baremetal/smphello": {
+            "n200": {
+                "build": false,
+                "run": false
+            },
+            "n200e": {
+                "build": false,
+                "run": false
+            }
+        }
+    },
+    "expected": {
+        "application/baremetal/demo_nice": {
+            "build": true,
+            "run": true
+        },
+        "application/baremetal/demo_clint_timer": {
+            "build": true,
+            "run": true
+        },
+        "application/baremetal/demo_smpu": {
+            "build": true,
+            "run": true
+        },
+        "application/baremetal/demo_cache": {
+            "build": true,
+            "run": true
+        },
+        "application/baremetal/demo_pma": {
+            "build": true,
+            "run": true
+        },
+        "test/core": {
+            "build": true,
+            "run": true
+        }
+    }
+}

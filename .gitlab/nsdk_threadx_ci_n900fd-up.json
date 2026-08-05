@@ -1,0 +1,10 @@
+{
+    "skip_cases": {
+        "regression_up": ["threadx_thread_wait_abort_and_isr_test"]
+    },
+    "threadx_regressions": [
+        { "suite": "regression_up", "core": "n900fd", "smp": 1, "eclic": 1, "eclic_hwctx": 0, "matrix_name": "n900fd-eclicv1" },
+        { "suite": "regression_up", "core": "n900fd", "smp": 1, "eclic": 2, "eclic_hwctx": 0, "matrix_name": "n900fd-eclicv2-hwctx0" },
+        { "suite": "regression_up", "core": "n900fd", "smp": 1, "eclic": 2, "eclic_hwctx": 1, "matrix_name": "n900fd-eclicv2-hwctx1" }
+    ]
+}

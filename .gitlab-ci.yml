@@ -223,9 +223,16 @@ build_windows_qemu:
 
 test_sdk:
   stage: test
-  timeout: 1h
+  timeout: 30min
   #when: manual
   interruptible: true
+  parallel:
+    matrix:
+      - SDK_APPCFG_GROUP:
+        - "baremetal"
+        - "dsp"
+        - "eclic"
+        - "rtos"
   script:
     # find qemu and gcc
     - cd $CI_PROJECT_DIR
@@ -239,20 +246,68 @@ test_sdk:
     - pip3 install -r tools/scripts/requirements.txt
     - export NUCLEI_SDK_ROOT=$(readlink -f $CI_PROJECT_DIR/prebuilt/nuclei-sdk)
     - |
-      HWCFG=${CI_PROJECT_DIR}/.gitlab/nsdk_ci.json
-      if [ ! -f ${HWCFG} ] ; then
-        HWCFG=${NUCLEI_SDK_ROOT}/tools/scripts/nsdk_cli/configs/nuclei_fpga_eval_ci_bpv.json
+      SDK_CI_CONFIG=${CI_PROJECT_DIR}/.gitlab/nsdk_ci_${SDK_APPCFG_GROUP}.json
+      if [ ! -f "${SDK_CI_CONFIG}" ] ; then
+        echo "Missing SDK CI config=${SDK_CI_CONFIG}"
+        exit 1
       fi
-      echo "Using HWCFG=${HWCFG}"
+      echo "Using SDK_CI_CONFIG=${SDK_CI_CONFIG}"
     - echo "Nuclei SDK Version $(cat build.txt)"
-    - python3 tools/scripts/nsdk_cli/nsdk_bench.py --appcfg tools/scripts/nsdk_cli/configs/application.json --hwcfg ${HWCFG} --parallel=-j --logdir logs/nuclei_fpga_eval_qemu_ci --run --run_target "qemu"
+    - export SDK_APPCFG=tools/scripts/nsdk_cli/configs/application_qemu_ci_${SDK_APPCFG_GROUP}.json
+    - python3 ${CI_PROJECT_DIR}/.gitlab/prepare_nsdk_appcfg.py --input tools/scripts/nsdk_cli/configs/application.json --output ${SDK_APPCFG} --selection-config ${SDK_CI_CONFIG}
+    - python3 tools/scripts/nsdk_cli/nsdk_bench.py --appcfg ${SDK_APPCFG} --hwcfg ${SDK_CI_CONFIG} --parallel=-j --logdir logs/nuclei_fpga_eval_qemu_ci/${SDK_APPCFG_GROUP} --run --run_target "qemu"
   tags:
     - os::linux
     - env::docker
   image: $IMAGE:$IMAGE_TAG
   #allow_failure: true
   artifacts:
-    name: "qemu_test_sdk_job${CI_JOB_ID}_${CI_COMMIT_SHA::8}"
+    name: "qemu_test_sdk_${SDK_APPCFG_GROUP}_job${CI_JOB_ID}_${CI_COMMIT_SHA::8}"
+    when: always
+    paths:
+      - $CI_PROJECT_DIR/prebuilt/nuclei-sdk/logs/
+
+test_sdk_threadx:
+  stage: test
+  timeout: 30min
+  #when: manual
+  interruptible: true
+  parallel:
+    matrix:
+      - THREADX_GROUP:
+        - "n900fd-up"
+        - "nx900fd-up"
+        - "n900fd-smp"
+        - "nx900fd-smp"
+  script:
+    # find qemu and gcc
+    - cd $CI_PROJECT_DIR
+    - export QEMU_PATH_LINUX=$(readlink -f linux_qemu/bin)
+    - export PATH=$QEMU_PATH_LINUX:$PATH
+    #- export PATH=$CI_PROJECT_DIR/prebuilt/gcc/gcc/bin:$PATH
+    - qemu-system-riscv32 --version
+    - riscv64-unknown-elf-gcc -v
+    ################################################
+    - cd $CI_PROJECT_DIR/prebuilt/nuclei-sdk
+    - pip3 install -r tools/scripts/requirements.txt
+    - export NUCLEI_SDK_ROOT=$(readlink -f $CI_PROJECT_DIR/prebuilt/nuclei-sdk)
+    - export THREADX_TIMEOUT=${THREADX_TIMEOUT:-240}
+    - echo "Nuclei SDK Version $(cat build.txt)"
+    - |
+      THREADX_CONFIG=${CI_PROJECT_DIR}/.gitlab/nsdk_threadx_ci_${THREADX_GROUP}.json
+      if [ ! -f "${THREADX_CONFIG}" ] ; then
+        echo "Missing ThreadX config=${THREADX_CONFIG}"
+        exit 1
+      fi
+      echo "Using THREADX_CONFIG=${THREADX_CONFIG}"
+    - python3 ${CI_PROJECT_DIR}/.gitlab/run_sdk_threadx_regression.py --config ${THREADX_CONFIG} --log-root logs/nuclei_threadx_qemu_ci/${THREADX_GROUP}
+  tags:
+    - os::linux
+    - env::docker
+  image: $IMAGE:$IMAGE_TAG
+  #allow_failure: true
+  artifacts:
+    name: "qemu_test_sdk_threadx_${THREADX_GROUP}_job${CI_JOB_ID}_${CI_COMMIT_SHA::8}"
     when: always
     paths:
       - $CI_PROJECT_DIR/prebuilt/nuclei-sdk/logs/

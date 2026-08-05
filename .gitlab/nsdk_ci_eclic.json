@@ -1,0 +1,203 @@
+{
+    "run_config": {
+        "target": "qemu",
+        "xlspike": {
+            "timeout": 240
+        },
+        "qemu": {
+            "timeout": 30
+        }
+    },
+    "parallel": "-j",
+    "build_target": "clean all",
+    "build_config": {
+        "SOC": "evalsoc",
+        "BOARD": "nuclei_fpga_eval"
+    },
+    "build_configs": {
+        "n200": {"DOWNLOAD": "sram", "CORE": "n200", "ARCH_EXT": ""},
+        "n200e": {"DOWNLOAD": "flashxip", "CORE": "n200e", "ARCH_EXT": ""},
+        "n300": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": ""},
+        "n300-zfinx": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zfinx"},
+        "n300-zfinx-zdinx": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zfinx_zdinx"},
+        "n300bp": {"DOWNLOAD": "flash", "CORE": "n300", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldspn1x"},
+        "n300fdbp": {"DOWNLOAD": "ilm", "CORE": "n300fd", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldspn1x"},
+        "ux600": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": ""},
+        "ux600-zfinx": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "_zfinx"},
+        "ux600-zfinx-zdinx": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "_zfinx_zdinx"},
+        "ux600fbp": {"DOWNLOAD": "flashxip", "CORE": "ux600f", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldsp"},
+        "ux600fdbp": {"DOWNLOAD": "sram", "CORE": "ux600fd", "ARCH_EXT": "_zba_zbb_zbc_zbs_xxldsp"}
+    },
+    "appdirs": [
+        "application/baremetal/demo_eclic",
+        "application/baremetal/demo_smode_eclic",
+        "application/baremetal/demo_eclic_umode",
+        "application/baremetal/demo_pmp",
+        "application/baremetal/demo_eclic_stress",
+        "application/baremetal/exception_mmode",
+        "application/baremetal/exception_smode",
+        "application/baremetal/exception_umode",
+        "application/baremetal/demo_cidu",
+        "application/baremetal/demo_timer",
+        "application/baremetal/demo_sstc",
+        "application/baremetal/lowpower"
+    ],
+    "appdirs_ignore": [],
+    "appconfig": {
+        "application/baremetal/demo_eclic": {
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "ux600-eclicv2-hwctx0": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "ux600-eclicv2-hwctx1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/demo_smode_eclic": {
+            "build_config": {
+                "XLCFG_SMODE": "1"
+            },
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "ux600-eclicv2-hwctx0": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "ux600-eclicv2-hwctx1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/demo_eclic_umode": {
+            "build_config": {
+                "XLCFG_SMPU": "1"
+            },
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "ux600-eclicv2-hwctx0": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "ux600-eclicv2-hwctx1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/demo_pmp": {
+            "build_configs": {
+                "n300-M-only": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_SMODE": "0"},
+                "ux600-M-only": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_SMODE": "0"},
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "ux600-eclicv2-hwctx0": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "ux600-eclicv2-hwctx1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/demo_eclic_stress": {
+            "build_configs": {
+                "n300-smode1-eclicv1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_SMODE": "1", "XLCFG_SSTC": "1"},
+                "n300-smode0-eclicv1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_SMODE": "0", "XLCFG_SSTC": "0"},
+                "n300-smode1-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_SMODE": "1", "XLCFG_SSTC": "1", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-smode1-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_SMODE": "1", "XLCFG_SSTC": "1", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "n300-smode1-eclicv2-hwctx1-intstack1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_SMODE": "1", "XLCFG_SSTC": "1", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1", "INTSTACK": "1"},
+                "n300-smode0-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_SMODE": "0", "XLCFG_SSTC": "0", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-smode0-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_SMODE": "0", "XLCFG_SSTC": "0", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "n300-smode0-eclicv2-hwctx1-intstack1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_SMODE": "0", "XLCFG_SSTC": "0", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1", "INTSTACK": "1"},
+                "ux600-smode1-eclicv1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_SMODE": "1", "XLCFG_SSTC": "1"},
+                "ux600-smode0-eclicv1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_SMODE": "0", "XLCFG_SSTC": "0"},
+                "ux600-smode1-eclicv2-hwctx0": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_SMODE": "1", "XLCFG_SSTC": "1", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "ux600-smode1-eclicv2-hwctx1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_SMODE": "1", "XLCFG_SSTC": "1", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "ux600-smode1-eclicv2-hwctx1-intstack1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_SMODE": "1", "XLCFG_SSTC": "1", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1", "INTSTACK": "1"},
+                "ux600-smode0-eclicv2-hwctx0": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_SMODE": "0", "XLCFG_SSTC": "0", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "ux600-smode0-eclicv2-hwctx1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_SMODE": "0", "XLCFG_SSTC": "0", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "ux600-smode0-eclicv2-hwctx1-intstack1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_SMODE": "0", "XLCFG_SSTC": "0", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1", "INTSTACK": "1"}
+            }
+        },
+        "application/baremetal/exception_mmode": {
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "ux600-eclicv2-hwctx0": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "ux600-eclicv2-hwctx1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/exception_smode": {
+            "build_config": {
+                "XLCFG_SMODE": "1"
+            },
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "ux600-eclicv2-hwctx0": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "ux600-eclicv2-hwctx1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/exception_umode": {
+            "build_config": {
+                "XLCFG_SMODE": "1"
+            },
+            "build_configs": {
+                "n300-smpu1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_SMPU": "1"},
+                "ux600-smpu1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_SMPU": "1"},
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "ux600-eclicv2-hwctx0": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "ux600-eclicv2-hwctx1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "n300-eclicv2-hwctx0-smpu1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0", "XLCFG_SMPU": "1"},
+                "n300-eclicv2-hwctx1-smpu1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1", "XLCFG_SMPU": "1"},
+                "ux600-eclicv2-hwctx0-smpu1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0", "XLCFG_SMPU": "1"},
+                "ux600-eclicv2-hwctx1-smpu1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1", "XLCFG_SMPU": "1"}
+            }
+        },
+        "application/baremetal/demo_cidu": {
+            "build_config": {
+                "SMP": "4",
+                "XLCFG_CIDU": "1",
+                "ICOUNT_OPT": ""
+            },
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "sram", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "sram", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "ux600-eclicv2-hwctx0": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "ux600-eclicv2-hwctx1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/demo_timer": {
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "ux600-eclicv2-hwctx0": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "ux600-eclicv2-hwctx1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/demo_sstc": {
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "ux600-eclicv2-hwctx0": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "ux600-eclicv2-hwctx1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/lowpower": {
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "ux600-eclicv2-hwctx0": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "ux600-eclicv2-hwctx1": {"DOWNLOAD": "sram", "CORE": "ux600", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        }
+    },
+    "expecteds": {
+        "application/baremetal/demo_cidu": {
+            "n200": {
+                "build": false,
+                "run": false
+            },
+            "n200e": {
+                "build": false,
+                "run": false
+            }
+        }
+    },
+    "expected": {
+        "application/baremetal/demo_smode_eclic": {
+            "build": true,
+            "run": true
+        },
+        "application/baremetal/demo_cidu": {
+            "build": true,
+            "run": true
+        }
+    }
+}
