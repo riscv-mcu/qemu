@@ -46,6 +46,39 @@ void helper_raise_exception(CPURISCVState *env, uint32_t exception)
     riscv_raise_exception(env, exception, 0);
 }
 
+void helper_nuclei_mstack_check(CPURISCVState *env, target_ulong sp)
+{
+    target_ulong ctl = env->mstack_ctl;
+
+    if (env->nuclei_mstack_trap_depth) {
+        return;
+    }
+
+    if (ctl & MSTACK_CTL_MODE) {
+        if ((ctl & MSTACK_CTL_OVF_TRACK_EN) && sp < env->mstack_bound) {
+            env->mstack_bound = sp;
+        }
+        return;
+    }
+
+    if ((ctl & MSTACK_CTL_OVF_TRACK_EN) && sp < env->mstack_bound) {
+        riscv_raise_exception(env, RISCV_EXCP_STACK_OVERFLOW, 0);
+    }
+
+    if ((ctl & MSTACK_CTL_UDF_EN) && sp > env->mstack_base) {
+        riscv_raise_exception(env, RISCV_EXCP_STACK_UNDERFLOW, 0);
+    }
+}
+
+#ifndef CONFIG_USER_ONLY
+static void nuclei_mstack_trap_return(CPURISCVState *env)
+{
+    if (env->nuclei_mstack_trap_depth) {
+        env->nuclei_mstack_trap_depth--;
+    }
+}
+#endif
+
 target_ulong helper_csrr(CPURISCVState *env, int csr)
 {
     /*
@@ -354,6 +387,7 @@ target_ulong helper_sret(CPURISCVState *env)
         bql_unlock();
     }
 
+    nuclei_mstack_trap_return(env);
     return retpc;
 }
 
@@ -429,6 +463,7 @@ target_ulong helper_mret(CPURISCVState *env)
         bql_unlock();
     }
 
+    nuclei_mstack_trap_return(env);
     return retpc;
 }
 

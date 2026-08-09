@@ -2465,6 +2465,8 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         }
     }
 
+    env->nuclei_mstack_trap_depth++;
+
     /*
      * NOTE: it is not necessary to yield load reservations here. It is only
      * necessary for an SC from "another hart" to cause a load reservation

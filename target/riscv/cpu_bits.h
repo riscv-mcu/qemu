@@ -588,6 +588,13 @@
 #define CSR_NUCLEI_MICFG_INFO          0xfc0
 #define CSR_NUCLEI_MDCFG_INFO          0xfc1
 #define CSR_NUCLEI_MCFG_INFO           0xfc2
+
+/* Nuclei stack check control bits */
+#define MSTACK_CTL_OVF_TRACK_EN        0x1
+#define MSTACK_CTL_UDF_EN              0x2
+#define MSTACK_CTL_MODE                0x4
+#define MSTACK_CTL_MASK                0x7
+
 #define CSR_NUCLEI_MTLBCFG_INFO        0xfc3
 
 /* === Nuclei CCM Registers === */
@@ -974,6 +981,8 @@ typedef enum RISCVException {
     RISCV_EXCP_LOAD_GUEST_ACCESS_FAULT = 0x15,
     RISCV_EXCP_VIRT_INSTRUCTION_FAULT = 0x16,
     RISCV_EXCP_STORE_GUEST_AMO_ACCESS_FAULT = 0x17,
+    RISCV_EXCP_STACK_OVERFLOW = 0x18,
+    RISCV_EXCP_STACK_UNDERFLOW = 0x19,
 } RISCVException;
 
 // CLIC AND ECLIC

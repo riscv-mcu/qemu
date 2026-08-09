@@ -1,5 +1,6 @@
 /* Exceptions */
 DEF_HELPER_2(raise_exception, noreturn, env, i32)
+DEF_HELPER_2(nuclei_mstack_check, void, env, tl)
 
 /* Custom RISC-V instructions (plugin-handled, opcode custom-0/1/2/3) */
 DEF_HELPER_2(nice, void, env, i32)

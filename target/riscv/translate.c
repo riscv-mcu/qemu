@@ -311,6 +311,14 @@ static void gen_goto_tb(DisasContext *ctx, int n, target_long diff)
     }
 }
 
+static void gen_nuclei_mstack_check(DisasContext *ctx, int reg_num)
+{
+    if (reg_num == 2) {
+        gen_update_pc(ctx, ctx->cur_insn_len);
+        gen_helper_nuclei_mstack_check(tcg_env, cpu_gpr[2]);
+    }
+}
+
 /*
  * Wrappers for getting reg values.
  *
@@ -396,6 +404,8 @@ static void gen_set_gpr(DisasContext *ctx, int reg_num, TCGv t)
         if (get_xl_max(ctx) == MXL_RV128) {
             tcg_gen_sari_tl(cpu_gprh[reg_num], cpu_gpr[reg_num], 63);
         }
+
+        gen_nuclei_mstack_check(ctx, reg_num);
     }
 }
 
@@ -417,6 +427,8 @@ static void gen_set_gpri(DisasContext *ctx, int reg_num, target_long imm)
         if (get_xl_max(ctx) == MXL_RV128) {
             tcg_gen_movi_tl(cpu_gprh[reg_num], -(imm < 0));
         }
+
+        gen_nuclei_mstack_check(ctx, reg_num);
     }
 }
 
@@ -426,6 +438,7 @@ static void gen_set_gpr128(DisasContext *ctx, int reg_num, TCGv rl, TCGv rh)
     if (reg_num != 0) {
         tcg_gen_mov_tl(cpu_gpr[reg_num], rl);
         tcg_gen_mov_tl(cpu_gprh[reg_num], rh);
+        gen_nuclei_mstack_check(ctx, reg_num);
     }
 }
 

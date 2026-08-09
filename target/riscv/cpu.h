@@ -608,6 +608,7 @@ struct CPUArchState {
     target_ulong mstack_ctl;
     target_ulong mstack_bound;
     target_ulong mstack_base;
+    uint32_t nuclei_mstack_trap_depth;
     target_ulong micfg_info;
     target_ulong mdcfg_info;
     target_ulong mtlbcfg_info;

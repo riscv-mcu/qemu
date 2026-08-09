@@ -6240,7 +6240,7 @@ static int read_mstack_ctl(CPURISCVState *env, int csrno, target_ulong *val)
 
 static int write_mstack_ctl(CPURISCVState *env, int csrno, target_ulong val)
 {
-    env->mstack_ctl = val;
+    env->mstack_ctl = val & MSTACK_CTL_MASK;
     return RISCV_EXCP_NONE;
 }
 
