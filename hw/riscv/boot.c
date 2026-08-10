@@ -18,6 +18,7 @@
  */
 
 #include "qemu/osdep.h"
+#include "qemu/bswap.h"
 #include "qemu/datadir.h"
 #include "qemu/units.h"
 #include "qemu/error-report.h"
@@ -223,6 +224,7 @@ target_ulong riscv_load_kernel(MachineState *machine,
     const char *kernel_filename = machine->kernel_filename;
     uint64_t kernel_load_base, kernel_entry;
     void *fdt = machine->fdt;
+    const bool big_endian = harts->harts[0].cfg.big_endian;
 
     g_assert(kernel_filename != NULL);
 
@@ -234,7 +236,7 @@ target_ulong riscv_load_kernel(MachineState *machine,
      * separate SBI and ELF entry points (used by FreeBSD, for example).
      */
     if (load_elf_ram_sym(kernel_filename, NULL, NULL, NULL,
-                         NULL, &kernel_load_base, NULL, NULL, 0,
+                         NULL, &kernel_load_base, NULL, NULL, big_endian,
                          EM_RISCV, 1, 0, NULL, true, sym_cb) > 0) {
         kernel_entry = kernel_load_base;
         goto out;
@@ -342,23 +344,34 @@ void riscv_load_fdt(hwaddr fdt_addr, void *fdt)
                         rom_ptr_for_as(&address_space_memory, fdt_addr, fdtsize));
 }
 
-void riscv_rom_copy_firmware_info(MachineState *machine, hwaddr rom_base,
-                                  hwaddr rom_size, uint32_t reset_vec_size,
+void riscv_rom_copy_firmware_info(MachineState *machine,
+                                  RISCVHartArrayState *harts,
+                                  hwaddr rom_base, hwaddr rom_size,
+                                  uint32_t reset_vec_size,
                                   uint64_t kernel_entry)
 {
     struct fw_dynamic_info dinfo;
     size_t dinfo_len;
+    const bool be = harts->harts[0].cfg.big_endian;
 
     if (sizeof(dinfo.magic) == 4) {
-        dinfo.magic = cpu_to_le32(FW_DYNAMIC_INFO_MAGIC_VALUE);
-        dinfo.version = cpu_to_le32(FW_DYNAMIC_INFO_VERSION);
-        dinfo.next_mode = cpu_to_le32(FW_DYNAMIC_INFO_NEXT_MODE_S);
-        dinfo.next_addr = cpu_to_le32(kernel_entry);
+        dinfo.magic = be ? cpu_to_be32(FW_DYNAMIC_INFO_MAGIC_VALUE)
+                         : cpu_to_le32(FW_DYNAMIC_INFO_MAGIC_VALUE);
+        dinfo.version = be ? cpu_to_be32(FW_DYNAMIC_INFO_VERSION)
+                           : cpu_to_le32(FW_DYNAMIC_INFO_VERSION);
+        dinfo.next_mode = be ? cpu_to_be32(FW_DYNAMIC_INFO_NEXT_MODE_S)
+                             : cpu_to_le32(FW_DYNAMIC_INFO_NEXT_MODE_S);
+        dinfo.next_addr = be ? cpu_to_be32(kernel_entry)
+                             : cpu_to_le32(kernel_entry);
     } else {
-        dinfo.magic = cpu_to_le64(FW_DYNAMIC_INFO_MAGIC_VALUE);
-        dinfo.version = cpu_to_le64(FW_DYNAMIC_INFO_VERSION);
-        dinfo.next_mode = cpu_to_le64(FW_DYNAMIC_INFO_NEXT_MODE_S);
-        dinfo.next_addr = cpu_to_le64(kernel_entry);
+        dinfo.magic = be ? cpu_to_be64(FW_DYNAMIC_INFO_MAGIC_VALUE)
+                         : cpu_to_le64(FW_DYNAMIC_INFO_MAGIC_VALUE);
+        dinfo.version = be ? cpu_to_be64(FW_DYNAMIC_INFO_VERSION)
+                           : cpu_to_le64(FW_DYNAMIC_INFO_VERSION);
+        dinfo.next_mode = be ? cpu_to_be64(FW_DYNAMIC_INFO_NEXT_MODE_S)
+                             : cpu_to_le64(FW_DYNAMIC_INFO_NEXT_MODE_S);
+        dinfo.next_addr = be ? cpu_to_be64(kernel_entry)
+                             : cpu_to_le64(kernel_entry);
     }
     dinfo.options = 0;
     dinfo.boot_hart = 0;
@@ -386,13 +399,8 @@ void riscv_setup_rom_reset_vec(MachineState *machine, RISCVHartArrayState *harts
                                uint64_t fdt_load_addr)
 {
     int i;
-    uint32_t start_addr_hi32 = 0x00000000;
-    uint32_t fdt_load_addr_hi32 = 0x00000000;
-
-    if (!riscv_is_32bit(harts)) {
-        start_addr_hi32 = start_addr >> 32;
-        fdt_load_addr_hi32 = fdt_load_addr >> 32;
-    }
+    const bool rv32 = riscv_is_32bit(harts);
+    const bool big_endian = harts->harts[0].cfg.big_endian;
     /* reset vector */
     uint32_t reset_vec[10] = {
         0x00000297,                  /* 1:  auipc  t0, %pcrel_hi(fw_dyn) */
@@ -401,15 +409,19 @@ void riscv_setup_rom_reset_vec(MachineState *machine, RISCVHartArrayState *harts
         0,
         0,
         0x00028067,                  /*     jr     t0 */
-        start_addr,                  /* start: .dword */
-        start_addr_hi32,
-        fdt_load_addr,               /* fdt_laddr: .dword */
-        fdt_load_addr_hi32,
+        0,                           /* start: .dword */
+        0,
+        0,                           /* fdt_laddr: .dword */
+        0,
                                      /* fw_dyn: */
     };
-    if (riscv_is_32bit(harts)) {
-        reset_vec[3] = 0x0202a583;   /*     lw     a1, 32(t0) */
-        reset_vec[4] = 0x0182a283;   /*     lw     t0, 24(t0) */
+    if (rv32) {
+        reset_vec[3] = big_endian ?
+                       0x0242a583 :  /*     lw     a1, 36(t0) */
+                       0x0202a583;   /*     lw     a1, 32(t0) */
+        reset_vec[4] = big_endian ?
+                       0x01c2a283 :  /*     lw     t0, 28(t0) */
+                       0x0182a283;   /*     lw     t0, 24(t0) */
     } else {
         reset_vec[3] = 0x0202b583;   /*     ld     a1, 32(t0) */
         reset_vec[4] = 0x0182b283;   /*     ld     t0, 24(t0) */
@@ -424,14 +436,21 @@ void riscv_setup_rom_reset_vec(MachineState *machine, RISCVHartArrayState *harts
         reset_vec[2] = 0x00000013;   /*     addi   x0, x0, 0 */
     }
 
-    /* copy in the reset vector in little_endian byte order */
-    for (i = 0; i < ARRAY_SIZE(reset_vec); i++) {
+    /* RISC-V instructions are always little-endian. */
+    for (i = 0; i < 6; i++) {
         reset_vec[i] = cpu_to_le32(reset_vec[i]);
+    }
+    if (big_endian) {
+        stq_be_p(&reset_vec[6], start_addr);
+        stq_be_p(&reset_vec[8], fdt_load_addr);
+    } else {
+        stq_le_p(&reset_vec[6], start_addr);
+        stq_le_p(&reset_vec[8], fdt_load_addr);
     }
     rom_add_blob_fixed_as("mrom.reset", reset_vec, sizeof(reset_vec),
                           rom_base, &address_space_memory);
-    riscv_rom_copy_firmware_info(machine, rom_base, rom_size, sizeof(reset_vec),
-                                 kernel_entry);
+    riscv_rom_copy_firmware_info(machine, harts, rom_base, rom_size,
+                                 sizeof(reset_vec), kernel_entry);
 }
 
 void riscv_setup_direct_kernel(hwaddr kernel_addr, hwaddr fdt_addr)
