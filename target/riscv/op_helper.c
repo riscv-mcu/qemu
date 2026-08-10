@@ -583,7 +583,7 @@ target_ulong helper_hyp_hlv_hu(CPURISCVState *env, target_ulong addr)
 {
     uintptr_t ra = GETPC();
     int mmu_idx = check_access_hlsv(env, false, ra);
-    MemOpIdx oi = make_memop_idx(MO_TEUW, mmu_idx);
+    MemOpIdx oi = make_memop_idx(MO_UW | mo_endian_env(env), mmu_idx);
 
     return cpu_ldw_mmu(env, addr, oi, ra);
 }
@@ -592,7 +592,7 @@ target_ulong helper_hyp_hlv_wu(CPURISCVState *env, target_ulong addr)
 {
     uintptr_t ra = GETPC();
     int mmu_idx = check_access_hlsv(env, false, ra);
-    MemOpIdx oi = make_memop_idx(MO_TEUL, mmu_idx);
+    MemOpIdx oi = make_memop_idx(MO_UL | mo_endian_env(env), mmu_idx);
 
     return cpu_ldl_mmu(env, addr, oi, ra);
 }
@@ -601,7 +601,7 @@ target_ulong helper_hyp_hlv_d(CPURISCVState *env, target_ulong addr)
 {
     uintptr_t ra = GETPC();
     int mmu_idx = check_access_hlsv(env, false, ra);
-    MemOpIdx oi = make_memop_idx(MO_TEUQ, mmu_idx);
+    MemOpIdx oi = make_memop_idx(MO_UQ | mo_endian_env(env), mmu_idx);
 
     return cpu_ldq_mmu(env, addr, oi, ra);
 }
@@ -619,7 +619,7 @@ void helper_hyp_hsv_h(CPURISCVState *env, target_ulong addr, target_ulong val)
 {
     uintptr_t ra = GETPC();
     int mmu_idx = check_access_hlsv(env, false, ra);
-    MemOpIdx oi = make_memop_idx(MO_TEUW, mmu_idx);
+    MemOpIdx oi = make_memop_idx(MO_UW | mo_endian_env(env), mmu_idx);
 
     cpu_stw_mmu(env, addr, val, oi, ra);
 }
@@ -628,7 +628,7 @@ void helper_hyp_hsv_w(CPURISCVState *env, target_ulong addr, target_ulong val)
 {
     uintptr_t ra = GETPC();
     int mmu_idx = check_access_hlsv(env, false, ra);
-    MemOpIdx oi = make_memop_idx(MO_TEUL, mmu_idx);
+    MemOpIdx oi = make_memop_idx(MO_UL | mo_endian_env(env), mmu_idx);
 
     cpu_stl_mmu(env, addr, val, oi, ra);
 }
@@ -637,7 +637,7 @@ void helper_hyp_hsv_d(CPURISCVState *env, target_ulong addr, target_ulong val)
 {
     uintptr_t ra = GETPC();
     int mmu_idx = check_access_hlsv(env, false, ra);
-    MemOpIdx oi = make_memop_idx(MO_TEUQ, mmu_idx);
+    MemOpIdx oi = make_memop_idx(MO_UQ | mo_endian_env(env), mmu_idx);
 
     cpu_stq_mmu(env, addr, val, oi, ra);
 }
@@ -653,7 +653,7 @@ target_ulong helper_hyp_hlvx_hu(CPURISCVState *env, target_ulong addr)
 {
     uintptr_t ra = GETPC();
     int mmu_idx = check_access_hlsv(env, true, ra);
-    MemOpIdx oi = make_memop_idx(MO_TEUW, mmu_idx);
+    MemOpIdx oi = make_memop_idx(MO_UW | mo_endian_env(env), mmu_idx);
 
     return cpu_ldw_code_mmu(env, addr, oi, GETPC());
 }
@@ -662,7 +662,7 @@ target_ulong helper_hyp_hlvx_wu(CPURISCVState *env, target_ulong addr)
 {
     uintptr_t ra = GETPC();
     int mmu_idx = check_access_hlsv(env, true, ra);
-    MemOpIdx oi = make_memop_idx(MO_TEUL, mmu_idx);
+    MemOpIdx oi = make_memop_idx(MO_UL | mo_endian_env(env), mmu_idx);
 
     return cpu_ldl_code_mmu(env, addr, oi, ra);
 }

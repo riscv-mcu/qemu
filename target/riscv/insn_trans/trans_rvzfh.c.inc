@@ -57,7 +57,8 @@ static bool trans_flh(DisasContext *ctx, arg_flh *a)
     }
 
     dest = cpu_fpr[a->rd];
-    tcg_gen_qemu_ld_i64(dest, t0, ctx->mem_idx, MO_TEUW);
+    tcg_gen_qemu_ld_i64(dest, t0, ctx->mem_idx,
+                        MO_UW | ctx->mo_endianness);
     gen_nanbox_h(dest, dest);
 
     mark_fs_dirty(ctx);
@@ -79,7 +80,8 @@ static bool trans_fsh(DisasContext *ctx, arg_fsh *a)
         t0 = temp;
     }
 
-    tcg_gen_qemu_st_i64(cpu_fpr[a->rs2], t0, ctx->mem_idx, MO_TEUW);
+    tcg_gen_qemu_st_i64(cpu_fpr[a->rs2], t0, ctx->mem_idx,
+                        MO_UW | ctx->mo_endianness);
 
     return true;
 }

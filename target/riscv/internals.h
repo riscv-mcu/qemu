@@ -20,6 +20,7 @@
 #define RISCV_CPU_INTERNALS_H
 
 #include "hw/registerfields.h"
+#include "exec/memop.h"
 
 /*
  * The current MMU Modes are:
@@ -57,6 +58,33 @@ static inline bool mmuidx_sum(int mmu_idx)
 static inline bool mmuidx_2stage(int mmu_idx)
 {
     return mmu_idx & MMU_2STAGE_BIT;
+}
+
+/*
+ * Return the data endianness for the current privilege level, based on
+ * MSTATUS MBE/SBE/UBE. Instruction fetch remains little-endian.
+ */
+static inline MemOp mo_endian_env(CPURISCVState *env)
+{
+    bool be = false;
+
+#if !defined(CONFIG_USER_ONLY)
+    switch (env->priv) {
+    case PRV_M:
+        be = env->mstatus & MSTATUS_MBE;
+        break;
+    case PRV_S:
+        be = env->mstatus & MSTATUS_SBE;
+        break;
+    case PRV_U:
+        be = env->mstatus & MSTATUS_UBE;
+        break;
+    default:
+        g_assert_not_reached();
+    }
+#endif
+
+    return be ? MO_BE : MO_LE;
 }
 
 /* share data between vector helpers and decode code */

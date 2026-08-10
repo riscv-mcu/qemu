@@ -224,6 +224,8 @@ void cpu_get_tb_cpu_state(CPURISCVState *env, vaddr *pc,
     vs = EXT_STATUS_DIRTY;
 #else
     flags = FIELD_DP32(flags, TB_FLAGS, PRIV, env->priv);
+    flags = FIELD_DP32(flags, TB_FLAGS, BIG_ENDIAN,
+                       mo_endian_env(env) == MO_BE);
 
     flags |= riscv_env_mmu_index(env, 0);
     fs = get_field(env->mstatus, MSTATUS_FS);

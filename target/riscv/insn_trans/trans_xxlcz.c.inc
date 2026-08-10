@@ -71,6 +71,7 @@ static bool gen_load_pstinc(DisasContext *ctx, arg_lb *a, MemOp memop, int shift
     TCGv dest = dest_gpr(ctx, a->rd);
     TCGv addr = get_address(ctx, a->rs1, 0);
 
+    memop |= ctx->mo_endianness;
     tcg_gen_qemu_ld_tl(dest, addr, ctx->mem_idx, memop);
     tcg_gen_addi_tl(src1, src1, a->imm << shift);
     gen_set_gpr(ctx, a->rs1, src1);
@@ -120,6 +121,7 @@ static bool gen_store_pstinc(DisasContext *ctx, arg_sb *a, MemOp memop, int shif
     TCGv src1 = get_gpr(ctx, a->rs1, EXT_NONE);
     TCGv addr = get_address(ctx, a->rs1, 0);
 
+    memop |= ctx->mo_endianness;
     tcg_gen_qemu_st_tl(data, addr, ctx->mem_idx, memop);
     tcg_gen_addi_tl(src1, src1, a->imm << shift);
     gen_set_gpr(ctx, a->rs1, src1);
@@ -151,7 +153,8 @@ static bool gen_load_gp(DisasContext *ctx, arg_xl_lgp *a, int shift, MemOp memop
     REQUIRE_XXLCZGP(ctx);
     TCGv t0 = get_address(ctx, 3, a->imm << shift);
     TCGv t1 = tcg_temp_new();
-    
+
+    memop |= ctx->mo_endianness;
     tcg_gen_qemu_ld_tl(t1, t0, ctx->mem_idx, memop);
     gen_set_gpr(ctx, a->rd, t1);
     return true;
@@ -199,6 +202,7 @@ static bool gen_store_gp(DisasContext *ctx, arg_xl_sgp *a, int shift, MemOp memo
     TCGv t0 = get_address(ctx, 3, a->imm << shift);
     TCGv data = get_gpr(ctx, a->rs2, EXT_NONE);
 
+    memop |= ctx->mo_endianness;
     tcg_gen_qemu_st_tl(data, t0, ctx->mem_idx, memop);
     return true;
 }
@@ -504,7 +508,8 @@ static bool trans_xl_flh(DisasContext *ctx, arg_xl_flh *a)
     t0 = get_gpr(ctx, a->rs1, EXT_NONE);
 
     dest = cpu_fpr[a->rd];
-    tcg_gen_qemu_ld_i64(dest, t0, ctx->mem_idx, MO_TEUW);
+    tcg_gen_qemu_ld_i64(dest, t0, ctx->mem_idx,
+                        MO_UW | ctx->mo_endianness);
     gen_nanbox_h(dest, dest);
 
     tcg_gen_addi_tl(t0, t0, a->imm << 1);
@@ -526,7 +531,8 @@ static bool trans_xl_flw(DisasContext *ctx, arg_xl_flw *a)
     decode_save_opc(ctx, 0);
     addr = get_address(ctx, a->rs1, 0);
     dest = cpu_fpr[a->rd];
-    tcg_gen_qemu_ld_i64(dest, addr, ctx->mem_idx, MO_TEUL);
+    tcg_gen_qemu_ld_i64(dest, addr, ctx->mem_idx,
+                        MO_UL | ctx->mo_endianness);
     gen_nanbox_s(dest, dest);
 
     tcg_gen_addi_tl(addr, addr, a->imm << 2);
@@ -546,7 +552,8 @@ static bool trans_xl_fld(DisasContext *ctx, arg_xl_fld *a)
 
     decode_save_opc(ctx, 0);
     addr = get_address(ctx, a->rs1, 0);
-    tcg_gen_qemu_ld_i64(cpu_fpr[a->rd], addr, ctx->mem_idx, MO_TEUQ);
+    tcg_gen_qemu_ld_i64(cpu_fpr[a->rd], addr, ctx->mem_idx,
+                        MO_UQ | ctx->mo_endianness);
 
     tcg_gen_addi_tl(addr, addr, a->imm << 3);
     gen_set_gpr(ctx, a->rs1, addr);
@@ -566,7 +573,8 @@ static bool trans_xl_fsh(DisasContext *ctx, arg_xl_fsh *a)
     decode_save_opc(ctx, 0);
     t0 = get_gpr(ctx, a->rs1, EXT_NONE);
 
-    tcg_gen_qemu_st_i64(cpu_fpr[a->rs2], t0, ctx->mem_idx, MO_TEUW);
+    tcg_gen_qemu_st_i64(cpu_fpr[a->rs2], t0, ctx->mem_idx,
+                        MO_UW | ctx->mo_endianness);
 
     tcg_gen_addi_tl(t0, t0, a->imm << 1);
     gen_set_gpr(ctx, a->rs1, t0);
@@ -584,7 +592,8 @@ static bool trans_xl_fsw(DisasContext *ctx, arg_xl_fsw *a)
 
     decode_save_opc(ctx, 0);
     addr = get_address(ctx, a->rs1, 0);
-    tcg_gen_qemu_st_i64(cpu_fpr[a->rs2], addr, ctx->mem_idx, MO_TEUL);
+    tcg_gen_qemu_st_i64(cpu_fpr[a->rs2], addr, ctx->mem_idx,
+                        MO_UL | ctx->mo_endianness);
 
     tcg_gen_addi_tl(addr, addr, a->imm << 2);
     gen_set_gpr(ctx, a->rs1, addr);
@@ -602,7 +611,8 @@ static bool trans_xl_fsd(DisasContext *ctx, arg_xl_fsd *a)
 
     decode_save_opc(ctx, 0);
     addr = get_address(ctx, a->rs1, a->imm);
-    tcg_gen_qemu_st_i64(cpu_fpr[a->rs2], addr, ctx->mem_idx, MO_TEUQ);
+    tcg_gen_qemu_st_i64(cpu_fpr[a->rs2], addr, ctx->mem_idx,
+                        MO_UQ | ctx->mo_endianness);
 
     tcg_gen_addi_tl(addr, addr, a->imm << 3);
     gen_set_gpr(ctx, a->rs1, addr);

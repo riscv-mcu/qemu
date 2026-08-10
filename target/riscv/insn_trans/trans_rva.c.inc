@@ -36,6 +36,7 @@ static bool gen_lr(DisasContext *ctx, arg_atomic *a, MemOp mop)
 
     decode_save_opc(ctx, 0);
     src1 = get_address(ctx, a->rs1, 0);
+    mop |= ctx->mo_endianness;
     if (a->rl) {
         tcg_gen_mb(TCG_MO_ALL | TCG_BAR_STRL);
     }
@@ -71,6 +72,7 @@ static bool gen_sc(DisasContext *ctx, arg_atomic *a, MemOp mop)
      */
     dest = dest_gpr(ctx, a->rd);
     src2 = get_gpr(ctx, a->rs2, EXT_NONE);
+    mop |= ctx->mo_endianness;
     tcg_gen_atomic_cmpxchg_tl(dest, load_res, load_val, src2,
                               ctx->mem_idx, mop);
     tcg_gen_setcond_tl(TCG_COND_NE, dest, dest, load_val);
@@ -105,6 +107,7 @@ static bool gen_amo(DisasContext *ctx, arg_atomic *a,
 
     decode_save_opc(ctx, RISCV_UW2_ALWAYS_STORE_AMO);
     src1 = get_address(ctx, a->rs1, 0);
+    mop |= ctx->mo_endianness;
     func(dest, src1, src2, ctx->mem_idx, mop);
 
     gen_set_gpr(ctx, a->rd, dest);
