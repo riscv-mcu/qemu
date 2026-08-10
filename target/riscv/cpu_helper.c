@@ -18,6 +18,7 @@
  */
 
 #include "qemu/osdep.h"
+#include "qemu/bswap.h"
 #include "qemu/log.h"
 #include "qemu/main-loop.h"
 #include "cpu.h"
@@ -1183,14 +1184,18 @@ static int get_physical_address(CPURISCVState *env, hwaddr *physical,
         adue = adue && (env->henvcfg & HENVCFG_ADUE);
     }
 
-    int ptshift = (levels - 1) * ptidxbits;
+    int ptshift;
     target_ulong pte;
     hwaddr pte_addr;
+    const hwaddr base_root = base;
+    const bool be = mo_endian_env(env) == MO_BE;
     int i;
 
 #if !TCG_OVERSIZED_GUEST
 restart:
 #endif
+    ptshift = (levels - 1) * ptidxbits;
+    base = base_root;
     for (i = 0; i < levels; i++, ptshift -= ptidxbits) {
         target_ulong idx;
         if (i == 0) {
@@ -1227,7 +1232,7 @@ restart:
 
         int smpu_prot;
         int smpu_ret = get_physical_address_smpu(env, &smpu_prot, pte_addr,
-                                                 sizeof(target_ulong),
+                                                 ptesize,
                                                  MMU_DATA_LOAD, mmu_idx);
         if (smpu_ret != TRANSLATE_SUCCESS) {
             return TRANSLATE_SMPU_FAIL;
@@ -1235,16 +1240,18 @@ restart:
 
         int pmp_prot;
         int pmp_ret = get_physical_address_pmp(env, &pmp_prot, pte_addr,
-                                               sizeof(target_ulong),
+                                               ptesize,
                                                MMU_DATA_LOAD, PRV_S);
         if (pmp_ret != TRANSLATE_SUCCESS) {
             return TRANSLATE_PMP_FAIL;
         }
 
         if (riscv_cpu_mxl(env) == MXL_RV32) {
-            pte = address_space_ldl(cs->as, pte_addr, attrs, &res);
+            pte = be ? address_space_ldl_be(cs->as, pte_addr, attrs, &res)
+                     : address_space_ldl_le(cs->as, pte_addr, attrs, &res);
         } else {
-            pte = address_space_ldq(cs->as, pte_addr, attrs, &res);
+            pte = be ? address_space_ldq_be(cs->as, pte_addr, attrs, &res)
+                     : address_space_ldq_le(cs->as, pte_addr, attrs, &res);
         }
 
         if (res != MEMTX_OK) {
@@ -1412,19 +1419,42 @@ restart:
          *   it is no longer valid and we must re-walk the page table.
          */
         MemoryRegion *mr;
-        hwaddr l = sizeof(target_ulong), addr1;
+        hwaddr l = ptesize, addr1;
         mr = address_space_translate(cs->as, pte_addr, &addr1, &l,
                                      false, MEMTXATTRS_UNSPECIFIED);
         if (memory_region_is_ram(mr)) {
-            target_ulong *pte_pa = qemu_map_ram_ptr(mr->ram_block, addr1);
+            void *pte_pa = qemu_map_ram_ptr(mr->ram_block, addr1);
 #if TCG_OVERSIZED_GUEST
             /*
              * MTTCG is not enabled on oversized TCG guests so
              * page table updates do not need to be atomic
              */
-            *pte_pa = pte = updated_pte;
+            if (ptesize == 4) {
+                uint32_t val = be ? cpu_to_be32(updated_pte)
+                                  : cpu_to_le32(updated_pte);
+                *(uint32_t *)pte_pa = val;
+            } else {
+                uint64_t val = be ? cpu_to_be64(updated_pte)
+                                  : cpu_to_le64(updated_pte);
+                *(uint64_t *)pte_pa = val;
+            }
+            pte = updated_pte;
 #else
-            target_ulong old_pte = qatomic_cmpxchg(pte_pa, pte, updated_pte);
+            uint64_t old_pte;
+
+            if (ptesize == 4) {
+                uint32_t cmp = be ? cpu_to_be32(pte) : cpu_to_le32(pte);
+                uint32_t val = be ? cpu_to_be32(updated_pte)
+                                  : cpu_to_le32(updated_pte);
+                old_pte = qatomic_cmpxchg((uint32_t *)pte_pa, cmp, val);
+                old_pte = be ? be32_to_cpu(old_pte) : le32_to_cpu(old_pte);
+            } else {
+                uint64_t cmp = be ? cpu_to_be64(pte) : cpu_to_le64(pte);
+                uint64_t val = be ? cpu_to_be64(updated_pte)
+                                  : cpu_to_le64(updated_pte);
+                old_pte = qatomic_cmpxchg((uint64_t *)pte_pa, cmp, val);
+                old_pte = be ? be64_to_cpu(old_pte) : le64_to_cpu(old_pte);
+            }
             if (old_pte != pte) {
                 goto restart;
             }
