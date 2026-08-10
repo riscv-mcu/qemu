@@ -194,6 +194,7 @@ struct RISCVCPUConfig {
     bool pmp;
     bool smpu;
     bool debug;
+    bool big_endian;
     bool misa_w;
 
     bool short_isa_string;

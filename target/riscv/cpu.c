@@ -1359,6 +1359,9 @@ static void riscv_cpu_reset_hold(Object *obj)
                                         MSTATUS64_UXL, env->misa_mxl);
         }
     }
+    env->mstatus = set_field(env->mstatus, MSTATUS_MBE, cpu->cfg.big_endian);
+    env->mstatus = set_field(env->mstatus, MSTATUS_SBE, cpu->cfg.big_endian);
+    env->mstatus = set_field(env->mstatus, MSTATUS_UBE, cpu->cfg.big_endian);
     env->mcause = 0;
     env->miclaim = MIP_SGEIP;
     env->pc = env->resetvec;
