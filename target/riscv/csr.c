@@ -38,6 +38,88 @@
 #endif
 
 #if !defined(CONFIG_USER_ONLY)
+static target_ulong riscv_xnxti_read_vector_entry(CPURISCVState *env,
+                                                  uint64_t vec_addr,
+                                                  uint32_t size)
+{
+    CPUState *cs = env_cpu(env);
+    MemTxAttrs attrs = MEMTXATTRS_UNSPECIFIED;
+    MemTxResult res;
+    const bool be = mo_endian_env(env) == MO_BE;
+    uint64_t value;
+
+    if (size == 8) {
+        value = be ? address_space_ldq_be(cs->as, vec_addr, attrs, &res)
+                   : address_space_ldq_le(cs->as, vec_addr, attrs, &res);
+    } else {
+        value = be ? address_space_ldl_be(cs->as, vec_addr, attrs, &res)
+                   : address_space_ldl_le(cs->as, vec_addr, attrs, &res);
+    }
+
+    if (res != MEMTX_OK) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "xnxti vector read failed at 0x%" PRIx64 "\n",
+                      vec_addr);
+        return 0;
+    }
+
+    return value;
+}
+
+static void riscv_xpush_write_stack(CPURISCVState *env, uint64_t addr,
+                                    target_ulong value, uint32_t size)
+{
+    CPUState *cs = env_cpu(env);
+    MemTxAttrs attrs = MEMTXATTRS_UNSPECIFIED;
+    MemTxResult res;
+    const bool be = mo_endian_env(env) == MO_BE;
+
+    if (size == 8) {
+        if (be) {
+            address_space_stq_be(cs->as, addr, value, attrs, &res);
+        } else {
+            address_space_stq_le(cs->as, addr, value, attrs, &res);
+        }
+    } else if (be) {
+        address_space_stl_be(cs->as, addr, value, attrs, &res);
+    } else {
+        address_space_stl_le(cs->as, addr, value, attrs, &res);
+    }
+
+    if (res != MEMTX_OK) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "xpush CSR stack write failed at 0x%" PRIx64 "\n",
+                      addr);
+    }
+}
+
+static target_ulong riscv_xpop_read_stack(CPURISCVState *env, uint64_t addr,
+                                          uint32_t size)
+{
+    CPUState *cs = env_cpu(env);
+    MemTxAttrs attrs = MEMTXATTRS_UNSPECIFIED;
+    MemTxResult res;
+    const bool be = mo_endian_env(env) == MO_BE;
+    uint64_t value;
+
+    if (size == 8) {
+        value = be ? address_space_ldq_be(cs->as, addr, attrs, &res)
+                   : address_space_ldq_le(cs->as, addr, attrs, &res);
+    } else {
+        value = be ? address_space_ldl_be(cs->as, addr, attrs, &res)
+                   : address_space_ldl_le(cs->as, addr, attrs, &res);
+    }
+
+    if (res != MEMTX_OK) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "xpop CSR stack read failed at 0x%" PRIx64 "\n",
+                      addr);
+        return 0;
+    }
+
+    return value;
+}
+
 bool nuclei_eclic_tsp_swap_needed(CPURISCVState *env,
                                          target_ulong xcause,
                                          target_ulong xsubm)
@@ -1616,8 +1698,8 @@ static target_ulong legalize_xatp(CPURISCVState *env, target_ulong old_xatp,
     return old_xatp;
 }
 
-static target_ulong legalize_mpp(CPURISCVState *env, target_ulong old_mpp,
-                                 target_ulong val)
+static uint64_t legalize_mpp(CPURISCVState *env, target_ulong old_mpp,
+                             uint64_t val)
 {
     bool valid = false;
     target_ulong new_mpp = get_field(val, MSTATUS_MPP);
@@ -1676,7 +1758,7 @@ void riscv_nuclei_sync_mcause_from_mstatus(CPURISCVState *env)
 
 void riscv_nuclei_sync_mstatus_from_mcause(CPURISCVState *env)
 {
-    target_ulong mstatus = env->mstatus;
+    uint64_t mstatus = env->mstatus;
 
     /* Writes to mcause must feed the mirrored mstatus bits back as well. */
     mstatus = set_field(mstatus, MSTATUS_MPIE,
@@ -5578,8 +5660,7 @@ static int rmw_pushmsubm(CPURISCVState *env, int csrno, target_ulong *ret_value,
     }
 
     notify_addr = new_value * riscv_addr_size + env->gpr[2];
-
-    cpu_physical_memory_rw(notify_addr, &env->msubm,  riscv_addr_size, 1);
+    riscv_xpush_write_stack(env, notify_addr, env->msubm, riscv_addr_size);
 
     return RISCV_EXCP_NONE;
 }
@@ -5629,7 +5710,7 @@ static int rmw_jalmnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
     ready = get_xnxti_status(env, &clic_priv, &clic_il, &clic_irq);
     if (ready) {
         uint64_t vec_addr = clic_irq * riscv_addr_size + env->mtvt;
-        cpu_physical_memory_rw(vec_addr, &addr,  riscv_addr_size, 0);
+        addr = riscv_xnxti_read_vector_entry(env, vec_addr, riscv_addr_size);
         /*
          * jalmnxti must return to the CSR instruction itself so the common
          * entry can re-check pending non-vectored interrupts for tail-chaining.
@@ -5677,7 +5758,7 @@ static int rmw_pushmcause(CPURISCVState *env, int csrno, target_ulong *ret_value
         riscv_addr_size = 8;
     }
     notify_addr = new_value * riscv_addr_size + env->gpr[2];
-    cpu_physical_memory_rw(notify_addr, &env->mcause,  riscv_addr_size, 1);
+    riscv_xpush_write_stack(env, notify_addr, env->mcause, riscv_addr_size);
     return RISCV_EXCP_NONE;
 }
 
@@ -5701,7 +5782,7 @@ static int rmw_pushmepc(CPURISCVState *env, int csrno, target_ulong *ret_value,
     }
 
     notify_addr = new_value * riscv_addr_size + env->gpr[2];
-    cpu_physical_memory_rw(notify_addr, &env->mepc, riscv_addr_size, 1);
+    riscv_xpush_write_stack(env, notify_addr, env->mepc, riscv_addr_size);
 
     return RISCV_EXCP_NONE;
 }
@@ -5733,7 +5814,7 @@ static int rmw_jalsnxti(CPURISCVState *env, int csrno, target_ulong *ret_value,
     ready = get_xnxti_status(env, &clic_priv, &clic_il, &clic_irq);
     if (ready) {
         uint64_t vec_addr = clic_irq * riscv_addr_size + env->stvt;
-        cpu_physical_memory_rw(vec_addr, &addr,  riscv_addr_size, 0);
+        addr = riscv_xnxti_read_vector_entry(env, vec_addr, riscv_addr_size);
         /*
          * jalsnxti has the same self-linking tail-chaining behavior as
          * jalmnxti, so it must re-enter the CSR instruction after the ISR.
@@ -5784,7 +5865,7 @@ static int rmw_pushscause(CPURISCVState *env, int csrno, target_ulong *ret_value
         riscv_addr_size = 8;
     }
     notify_addr = new_value * riscv_addr_size + env->gpr[2];
-    cpu_physical_memory_rw(notify_addr, &env->scause,  riscv_addr_size, 1);
+    riscv_xpush_write_stack(env, notify_addr, env->scause, riscv_addr_size);
     return RISCV_EXCP_NONE;
 }
 
@@ -5808,7 +5889,7 @@ static int rmw_pushsepc(CPURISCVState *env, int csrno, target_ulong *ret_value,
     }
 
     notify_addr = new_value * riscv_addr_size + env->gpr[2];
-    cpu_physical_memory_rw(notify_addr, &env->sepc, riscv_addr_size, 1);
+    riscv_xpush_write_stack(env, notify_addr, env->sepc, riscv_addr_size);
 
     return RISCV_EXCP_NONE;
 }
@@ -5936,7 +6017,7 @@ static int rmw_pushssubm(CPURISCVState *env, int csrno, target_ulong *ret_value,
         riscv_addr_size = 8;
     }
     notify_addr = new_value * riscv_addr_size + env->gpr[2];
-    cpu_physical_memory_rw(notify_addr, &env->ssubm,  riscv_addr_size, 1);
+    riscv_xpush_write_stack(env, notify_addr, env->ssubm, riscv_addr_size);
     return RISCV_EXCP_NONE;
 }
 
@@ -6107,12 +6188,12 @@ static int rmw_popxret(CPURISCVState *env, int csrno, target_ulong *ret_value,
      */
     notify_addr = env->gpr[2];
     float_addr = notify_addr + gpr_frame_size;
-    cpu_physical_memory_rw(notify_addr + riscv_addr_size * 13,
-                           xsubm, riscv_addr_size, 0);
-    cpu_physical_memory_rw(notify_addr + riscv_addr_size * 12,
-                           xepc, riscv_addr_size, 0);
-    cpu_physical_memory_rw(notify_addr + riscv_addr_size * 11,
-                           xcause, riscv_addr_size, 0);
+    *xsubm = riscv_xpop_read_stack(env, notify_addr + riscv_addr_size * 13,
+                                   riscv_addr_size);
+    *xepc = riscv_xpop_read_stack(env, notify_addr + riscv_addr_size * 12,
+                                  riscv_addr_size);
+    *xcause = riscv_xpop_read_stack(env, notify_addr + riscv_addr_size * 11,
+                                    riscv_addr_size);
 
     if ((get_shadow_gpr_stack_size(env) > 0)) {
         /* Based on the current grp stack popping information of the interrupt,
@@ -6138,20 +6219,24 @@ static int rmw_popxret(CPURISCVState *env, int csrno, target_ulong *ret_value,
                         stack_ofst += 3;
                     }
                 }
-                cpu_physical_memory_rw(notify_addr +
-                                       riscv_addr_size * stack_ofst,
-                                        &env->gpr[context_regs[i]], riscv_addr_size, 0);
+                env->gpr[context_regs[i]] =
+                    riscv_xpop_read_stack(env,
+                                          notify_addr +
+                                          riscv_addr_size * stack_ofst,
+                                          riscv_addr_size);
             }
         }
         if (frame_restore_mask & ECLIC_STACK_SAVE_FCSR) {
-            cpu_physical_memory_rw(float_addr, &fcsr, riscv_addr_size, 0);
+            fcsr = riscv_xpop_read_stack(env, float_addr, riscv_addr_size);
             env->frm = (fcsr & FSR_RD) >> FSR_RD_SHIFT;
             riscv_cpu_set_fflags(env, (fcsr & FSR_AEXC) >> FSR_AEXC_SHIFT);
         }
         if (frame_restore_mask & ECLIC_STACK_SAVE_FPRS) {
             for (uint32_t i = 0; i < SHADOW_FPR_COUNT; i++) {
-                cpu_physical_memory_rw(float_addr + fpr_size * (i + 4),
-                                    &env->fpr[fpu_context_regs[i]], fpr_size, 0);
+                env->fpr[fpu_context_regs[i]] =
+                    riscv_xpop_read_stack(env,
+                                          float_addr + fpr_size * (i + 4),
+                                          fpr_size);
             }
         }
 
@@ -6169,7 +6254,7 @@ static int rmw_popxret(CPURISCVState *env, int csrno, target_ulong *ret_value,
             }
         }
     } else if (frame_restore_mask & ECLIC_STACK_SAVE_FCSR) {
-        cpu_physical_memory_rw(float_addr, &fcsr, riscv_addr_size, 0);
+        fcsr = riscv_xpop_read_stack(env, float_addr, riscv_addr_size);
         env->frm = (fcsr & FSR_RD) >> FSR_RD_SHIFT;
         riscv_cpu_set_fflags(env, (fcsr & FSR_AEXC) >> FSR_AEXC_SHIFT);
     }

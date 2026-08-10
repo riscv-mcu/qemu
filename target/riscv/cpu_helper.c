@@ -2055,6 +2055,33 @@ static target_ulong riscv_intr_pc(CPURISCVState *env, target_ulong tvec,
 #endif
 
 #if !defined(CONFIG_USER_ONLY)
+static void riscv_eclic_stack_write(CPURISCVState *env, target_ulong addr,
+                                    uint64_t value, uint32_t size)
+{
+    CPUState *cs = env_cpu(env);
+    MemTxAttrs attrs = MEMTXATTRS_UNSPECIFIED;
+    MemTxResult res;
+    const bool be = mo_endian_env(env) == MO_BE;
+
+    if (size == 8) {
+        if (be) {
+            address_space_stq_be(cs->as, addr, value, attrs, &res);
+        } else {
+            address_space_stq_le(cs->as, addr, value, attrs, &res);
+        }
+    } else if (be) {
+        address_space_stl_be(cs->as, addr, value, attrs, &res);
+    } else {
+        address_space_stl_le(cs->as, addr, value, attrs, &res);
+    }
+
+    if (res != MEMTX_OK) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "ECLIC stack write failed at 0x" TARGET_FMT_lx "\n",
+                      addr);
+    }
+}
+
 static void nuclei_eclic_save_caller_saved_gprs(CPURISCVState *env,
                                                 target_ulong stack_addr,
                                                 uint32_t gpr_size)
@@ -2074,8 +2101,8 @@ static void nuclei_eclic_save_caller_saved_gprs(CPURISCVState *env,
                 stack_ofst += 3;
             }
         }
-        cpu_physical_memory_rw(stack_addr + gpr_size * stack_ofst,
-                               &env->gpr[context_regs[i]], gpr_size, 1);
+        riscv_eclic_stack_write(env, stack_addr + gpr_size * stack_ofst,
+                                env->gpr[context_regs[i]], gpr_size);
     }
 }
 
@@ -2087,8 +2114,8 @@ static void nuclei_eclic_save_caller_saved_fprs(CPURISCVState *env,
      * caller-saved FPR subset starting at slot 4, matching popxret().
      */
     for (uint32_t i = 0; i < SHADOW_FPR_COUNT; i++) {
-        cpu_physical_memory_rw(stack_addr + fpr_size * (i + 4),
-                               &env->fpr[fpu_context_regs[i]], fpr_size, 1);
+        riscv_eclic_stack_write(env, stack_addr + fpr_size * (i + 4),
+                                env->fpr[fpu_context_regs[i]], fpr_size);
     }
 }
 
@@ -2114,7 +2141,7 @@ static void nuclei_eclic_context_auto_saving(CPURISCVState *env,
     RISCVEclicShadowState *shadow = &env->eclic_shadow;
     uint32_t first_shadow_grp, shadow_stack_size;
     uint8_t current_gpr_grp, current_fpr_grp;
-    void *xcause_addr, *xepc_addr, *xsubm_addr;
+    target_ulong *xcause_addr, *xepc_addr, *xsubm_addr;
     bool is_interrupt;
     bool int_shadow_enabled;
     bool float_shadow_enabled;
@@ -2189,7 +2216,7 @@ static void nuclei_eclic_context_auto_saving(CPURISCVState *env,
     if (fpr_frame_size) {
         fcsr = (riscv_cpu_get_fflags(env) << FSR_AEXC_SHIFT) |
                (env->frm << FSR_RD_SHIFT);
-        cpu_physical_memory_rw(float_addr, &fcsr, gpr_size, 1);
+        riscv_eclic_stack_write(env, float_addr, fcsr, gpr_size);
         frame_restore_mask |= ECLIC_STACK_SAVE_FCSR;
     }
 
@@ -2268,9 +2295,42 @@ static void nuclei_eclic_context_auto_saving(CPURISCVState *env,
      * popxret() can rebuild the interrupted trap state before helper_sret() /
      * helper_mret() executes the architectural return sequence.
      */
-    cpu_physical_memory_rw(stack_addr + gpr_size * 11, xcause_addr, gpr_size, 1);
-    cpu_physical_memory_rw(stack_addr + gpr_size * 12, xepc_addr, gpr_size, 1);
-    cpu_physical_memory_rw(stack_addr + gpr_size * 13, xsubm_addr, gpr_size, 1);
+    riscv_eclic_stack_write(env, stack_addr + gpr_size * 11,
+                            *xcause_addr, gpr_size);
+    riscv_eclic_stack_write(env, stack_addr + gpr_size * 12,
+                            *xepc_addr, gpr_size);
+    riscv_eclic_stack_write(env, stack_addr + gpr_size * 13,
+                            *xsubm_addr, gpr_size);
+}
+#endif
+
+#if !defined(CONFIG_USER_ONLY)
+static target_ulong riscv_eclic_read_vector_entry(CPUState *cs,
+                                                  CPURISCVState *env,
+                                                  uint64_t vec_addr,
+                                                  uint32_t size)
+{
+    MemTxAttrs attrs = MEMTXATTRS_UNSPECIFIED;
+    MemTxResult res;
+    const bool be = mo_endian_env(env) == MO_BE;
+    uint64_t value;
+
+    if (size == 8) {
+        value = be ? address_space_ldq_be(cs->as, vec_addr, attrs, &res)
+                   : address_space_ldq_le(cs->as, vec_addr, attrs, &res);
+    } else {
+        value = be ? address_space_ldl_be(cs->as, vec_addr, attrs, &res)
+                   : address_space_ldl_le(cs->as, vec_addr, attrs, &res);
+    }
+
+    if (res != MEMTX_OK) {
+        qemu_log_mask(LOG_GUEST_ERROR,
+                      "ECLIC vector read failed at 0x%" PRIx64 "\n",
+                      vec_addr);
+        return 0;
+    }
+
+    return value;
 }
 #endif
 
@@ -2485,7 +2545,8 @@ void riscv_cpu_do_interrupt(CPUState *cs)
                                                       cause & 0x3FF);
             if (int_vec_mode) {
                 uint64_t vec_addr = (cause & 0x3FF) *riscv_addr_size + env->stvt;
-                cpu_physical_memory_rw(vec_addr, &newpc,  riscv_addr_size, 0);
+                newpc = riscv_eclic_read_vector_entry(cs, env, vec_addr,
+                                                       riscv_addr_size);
             } else {
                 /* Non-vectored S-mode delivery selects stvec or stvt2 based on
                  * the selector bit defined by the Nuclei extension.
@@ -2582,7 +2643,8 @@ void riscv_cpu_do_interrupt(CPUState *cs)
                                                       cause & 0x3FF);
             if (int_vec_mode) {
                 uint64_t vec_addr = (cause & 0x3FF) *riscv_addr_size + env->mtvt;
-                cpu_physical_memory_rw(vec_addr, &newpc,  riscv_addr_size, 0);
+                newpc = riscv_eclic_read_vector_entry(cs, env, vec_addr,
+                                                       riscv_addr_size);
             } else {
                 /* Non-vectored M-mode delivery selects mtvec or mtvt2 based on
                  * the selector bit defined by the Nuclei extension.
