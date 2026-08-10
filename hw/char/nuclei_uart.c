@@ -163,14 +163,34 @@ uart_write(void *opaque, hwaddr offset,
     }
 }
 
-static const MemoryRegionOps uart_ops = {
-    .read = uart_read,
-    .write = uart_write,
-    .endianness = DEVICE_NATIVE_ENDIAN,
-    .valid = {
-        .min_access_size = 4,
-        .max_access_size = 4
-    }
+static const MemoryRegionOps nuclei_uart_ops[3] = {
+    [DEVICE_NATIVE_ENDIAN] = {
+        .read = uart_read,
+        .write = uart_write,
+        .endianness = DEVICE_NATIVE_ENDIAN,
+        .valid = {
+            .min_access_size = 4,
+            .max_access_size = 4
+        }
+    },
+    [DEVICE_BIG_ENDIAN] = {
+        .read = uart_read,
+        .write = uart_write,
+        .endianness = DEVICE_BIG_ENDIAN,
+        .valid = {
+            .min_access_size = 4,
+            .max_access_size = 4
+        }
+    },
+    [DEVICE_LITTLE_ENDIAN] = {
+        .read = uart_read,
+        .write = uart_write,
+        .endianness = DEVICE_LITTLE_ENDIAN,
+        .valid = {
+            .min_access_size = 4,
+            .max_access_size = 4
+        }
+    },
 };
 
 static void uart_rx(void *opaque, const uint8_t *buf, int size)
@@ -248,7 +268,7 @@ type_init(nuclei_uart_register_types);
  * Create UART device.
  */
 NucleiUARTState *nuclei_uart_create(hwaddr base, uint64_t size,
-                    Chardev *chr, qemu_irq irq)
+                    Chardev *chr, qemu_irq irq, bool big_endian)
 {
     DeviceState *dev;
     NucleiUARTState *s;
@@ -261,7 +281,11 @@ NucleiUARTState *nuclei_uart_create(hwaddr base, uint64_t size,
     qemu_chr_fe_init(&s->chr, chr, &error_abort);
     qemu_chr_fe_set_handlers(&s->chr, uart_can_rx, uart_rx, uart_event,
                              uart_be_change, s, NULL, true);
-    memory_region_init_io(&s->mmio, NULL, &uart_ops, s,
+    memory_region_init_io(&s->mmio, NULL,
+                          &nuclei_uart_ops[big_endian ?
+                                           DEVICE_BIG_ENDIAN :
+                                           DEVICE_LITTLE_ENDIAN],
+                          s,
                           TYPE_NUCLEI_UART, size);
     sysbus_init_mmio(sbd, &s->mmio);
     sysbus_init_irq(sbd, &s->irq);

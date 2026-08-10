@@ -543,17 +543,45 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
     }
 }
 
-static const MemoryRegionOps nuclei_timer_ops = {
-    .read = nuclei_timer_read,
-    .write = nuclei_timer_write,
-    .endianness = DEVICE_LITTLE_ENDIAN,
-    .valid = {
-        .min_access_size = 4,
-        .max_access_size = 8,
+static const MemoryRegionOps nuclei_timer_ops[3] = {
+    [DEVICE_NATIVE_ENDIAN] = {
+        .read = nuclei_timer_read,
+        .write = nuclei_timer_write,
+        .endianness = DEVICE_NATIVE_ENDIAN,
+        .valid = {
+            .min_access_size = 4,
+            .max_access_size = 8,
+        },
+        .impl = {
+            .min_access_size = 4,
+            .max_access_size = 4,
+        },
     },
-    .impl = {
-        .min_access_size = 4,
-        .max_access_size = 4,
+    [DEVICE_BIG_ENDIAN] = {
+        .read = nuclei_timer_read,
+        .write = nuclei_timer_write,
+        .endianness = DEVICE_BIG_ENDIAN,
+        .valid = {
+            .min_access_size = 4,
+            .max_access_size = 8,
+        },
+        .impl = {
+            .min_access_size = 4,
+            .max_access_size = 4,
+        },
+    },
+    [DEVICE_LITTLE_ENDIAN] = {
+        .read = nuclei_timer_read,
+        .write = nuclei_timer_write,
+        .endianness = DEVICE_LITTLE_ENDIAN,
+        .valid = {
+            .min_access_size = 4,
+            .max_access_size = 8,
+        },
+        .impl = {
+            .min_access_size = 4,
+            .max_access_size = 4,
+        },
     },
 };
 
@@ -631,7 +659,10 @@ static void nuclei_systimer_realize(DeviceState *dev, Error **errp)
     s->m_soft_irq = g_new0(qemu_irq, s->num_harts);
     s->s_soft_irq = g_new0(qemu_irq, s->num_harts);
 
-    memory_region_init_io(&s->iomem, OBJECT(dev), &nuclei_timer_ops,
+    memory_region_init_io(&s->iomem, OBJECT(dev),
+                          &nuclei_timer_ops[s->big_endian ?
+                                            DEVICE_BIG_ENDIAN :
+                                            DEVICE_LITTLE_ENDIAN],
                           s, TYPE_NUCLEI_SYSTIMER, 0x10000);
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->iomem);
 
@@ -705,7 +736,8 @@ type_init(nuclei_systimer_register_types);
 DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size,
                                     uint32_t hartid_base, uint32_t num_harts,
                                     DeviceState *eclic,
-                                    uint32_t timebase_freq)
+                                    uint32_t timebase_freq,
+                                    bool big_endian)
 {
     DeviceState *dev = qdev_new(TYPE_NUCLEI_SYSTIMER);
     NucleiSYSTIMERState *s = NUCLEI_SYSTIMER(dev);
@@ -719,6 +751,7 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size,
     if (eclic) {
         s->eclic = eclic;
     }
+    s->big_endian = big_endian;
 
     sysbus_realize_and_unref(SYS_BUS_DEVICE(dev), &error_fatal);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, addr);

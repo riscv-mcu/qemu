@@ -36,6 +36,7 @@
  */
 
 #include "qemu/osdep.h"
+#include "qemu/bswap.h"
 #include "qemu/error-report.h"
 #include "qapi/error.h"
 #include "qapi/visitor.h"
@@ -518,8 +519,8 @@ static void sifive_u_machine_init(MachineState *machine)
     target_ulong start_addr = memmap[SIFIVE_U_DEV_DRAM].base;
     target_ulong firmware_end_addr, kernel_start_addr;
     const char *firmware_name;
-    uint32_t start_addr_hi32 = 0x00000000;
     int i;
+    bool big_endian;
     uint32_t fdt_load_addr;
     uint64_t kernel_entry;
     DriveInfo *dinfo;
@@ -610,9 +611,7 @@ static void sifive_u_machine_init(MachineState *machine)
                                            machine);
     riscv_load_fdt(fdt_load_addr, machine->fdt);
 
-    if (!riscv_is_32bit(&s->soc.u_cpus)) {
-        start_addr_hi32 = (uint64_t)start_addr >> 32;
-    }
+    big_endian = s->soc.u_cpus.harts[0].cfg.big_endian;
 
     /* reset vector */
     uint32_t reset_vec[12] = {
@@ -623,30 +622,42 @@ static void sifive_u_machine_init(MachineState *machine)
         0,
         0,
         0x00028067,                    /*     jr     t0 */
-        start_addr,                    /* start: .dword */
-        start_addr_hi32,
-        fdt_load_addr,                 /* fdt_laddr: .dword */
-        0x00000000,
+        0,                             /* start: .dword */
+        0,
+        0,                             /* fdt_laddr: .dword */
+        0,
         0x00000000,
                                        /* fw_dyn: */
     };
     if (riscv_is_32bit(&s->soc.u_cpus)) {
-        reset_vec[4] = 0x0202a583;     /*     lw     a1, 32(t0) */
-        reset_vec[5] = 0x0182a283;     /*     lw     t0, 24(t0) */
+        reset_vec[4] = big_endian ?
+                       0x0242a583 :    /*     lw     a1, 36(t0) */
+                       0x0202a583;     /*     lw     a1, 32(t0) */
+        reset_vec[5] = big_endian ?
+                       0x01c2a283 :    /*     lw     t0, 28(t0) */
+                       0x0182a283;     /*     lw     t0, 24(t0) */
     } else {
         reset_vec[4] = 0x0202b583;     /*     ld     a1, 32(t0) */
         reset_vec[5] = 0x0182b283;     /*     ld     t0, 24(t0) */
     }
 
 
-    /* copy in the reset vector in little_endian byte order */
-    for (i = 0; i < ARRAY_SIZE(reset_vec); i++) {
+    /* MSEL and RISC-V instructions are always little-endian here. */
+    for (i = 0; i < 7; i++) {
         reset_vec[i] = cpu_to_le32(reset_vec[i]);
+    }
+    if (big_endian) {
+        stq_be_p(&reset_vec[7], start_addr);
+        stq_be_p(&reset_vec[9], fdt_load_addr);
+    } else {
+        stq_le_p(&reset_vec[7], start_addr);
+        stq_le_p(&reset_vec[9], fdt_load_addr);
     }
     rom_add_blob_fixed_as("mrom.reset", reset_vec, sizeof(reset_vec),
                           memmap[SIFIVE_U_DEV_MROM].base, &address_space_memory);
 
-    riscv_rom_copy_firmware_info(machine, memmap[SIFIVE_U_DEV_MROM].base,
+    riscv_rom_copy_firmware_info(machine, &s->soc.u_cpus,
+                                 memmap[SIFIVE_U_DEV_MROM].base,
                                  memmap[SIFIVE_U_DEV_MROM].size,
                                  sizeof(reset_vec), kernel_entry);
 

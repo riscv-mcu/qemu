@@ -1410,13 +1410,33 @@ static void nuclei_usart_write(void *opaque, hwaddr offset, uint64_t value,
     }
 }
 
-static const MemoryRegionOps nuclei_usart_ops = {
-    .read = nuclei_usart_read,
-    .write = nuclei_usart_write,
-    .endianness = DEVICE_NATIVE_ENDIAN,
-    .valid = {
-        .min_access_size = 4,
-        .max_access_size = 4,
+static const MemoryRegionOps nuclei_usart_ops[3] = {
+    [DEVICE_NATIVE_ENDIAN] = {
+        .read = nuclei_usart_read,
+        .write = nuclei_usart_write,
+        .endianness = DEVICE_NATIVE_ENDIAN,
+        .valid = {
+            .min_access_size = 4,
+            .max_access_size = 4,
+        },
+    },
+    [DEVICE_BIG_ENDIAN] = {
+        .read = nuclei_usart_read,
+        .write = nuclei_usart_write,
+        .endianness = DEVICE_BIG_ENDIAN,
+        .valid = {
+            .min_access_size = 4,
+            .max_access_size = 4,
+        },
+    },
+    [DEVICE_LITTLE_ENDIAN] = {
+        .read = nuclei_usart_read,
+        .write = nuclei_usart_write,
+        .endianness = DEVICE_LITTLE_ENDIAN,
+        .valid = {
+            .min_access_size = 4,
+            .max_access_size = 4,
+        },
     },
 };
 
@@ -1591,7 +1611,8 @@ static void nuclei_usart_register_types(void)
 type_init(nuclei_usart_register_types);
 
 NucleiUSARTState *nuclei_usart_create(hwaddr base, uint64_t size,
-                      Chardev *chr, qemu_irq irq, uint32_t version)
+                      Chardev *chr, qemu_irq irq, uint32_t version,
+                      bool big_endian)
 {
     DeviceState *dev;
     NucleiUSARTState *s;
@@ -1603,7 +1624,11 @@ NucleiUSARTState *nuclei_usart_create(hwaddr base, uint64_t size,
 
     qdev_prop_set_chr(dev, "chardev", chr);
     qdev_prop_set_uint32(dev, "version", version);
-    memory_region_init_io(&s->mmio, OBJECT(s), &nuclei_usart_ops, s,
+    memory_region_init_io(&s->mmio, OBJECT(s),
+                          &nuclei_usart_ops[big_endian ?
+                                             DEVICE_BIG_ENDIAN :
+                                             DEVICE_LITTLE_ENDIAN],
+                          s,
                           TYPE_NUCLEI_USART, size);
     sysbus_init_mmio(sbd, &s->mmio);
     sysbus_init_irq(sbd, &s->irq);

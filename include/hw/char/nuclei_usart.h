@@ -107,6 +107,7 @@ typedef struct NucleiUSARTState
 } NucleiUSARTState;
 
 NucleiUSARTState *nuclei_usart_create(hwaddr base, uint64_t size,
-                      Chardev *chr, qemu_irq irq, uint32_t version);
+                      Chardev *chr, qemu_irq irq, uint32_t version,
+                      bool big_endian);
 
 #endif

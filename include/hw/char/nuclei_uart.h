@@ -74,6 +74,6 @@ typedef struct NucleiUARTState
 } NucleiUARTState;
 
 NucleiUARTState *nuclei_uart_create(hwaddr base, uint64_t size,
-                    Chardev *chr, qemu_irq irq);
+                    Chardev *chr, qemu_irq irq, bool big_endian);
 
 #endif

@@ -20,6 +20,7 @@
 
 
 #include "qemu/osdep.h"
+#include "qemu/bswap.h"
 #include "qemu/units.h"
 #include "qemu/error-report.h"
 #include "qapi/error.h"
@@ -1218,12 +1219,12 @@ static void evalsoc_machine_init(MachineState *machine)
     EvalSoCState *s = RISCV_EVALSOC_MACHINE(machine);
     target_ulong start_addr;
     MemoryRegion *system_memory = get_system_memory();
-    uint32_t start_addr_hi32 = 0x00000000;
     uint32_t fdt_load_addr = 0;
     uint64_t kernel_entry = 0;
     target_ulong firmware_end_addr, kernel_start_addr;
     uint64_t kernel_entry_point;
     int i;
+    bool big_endian;
     DriveInfo *dinfo;
     BlockBackend *blk;
     DeviceState *flash_dev, *sd_dev, *card_dev;
@@ -1341,6 +1342,7 @@ static void evalsoc_machine_init(MachineState *machine)
         create_fdt(s, memmap, machine->ram_size, machine->kernel_cmdline);
     }
 
+    big_endian = s->soc.cpus.harts[0].cfg.big_endian;
     if (s->download == NULL)
     {
         start_addr = s->norflash.startup_addr;
@@ -1425,14 +1427,31 @@ static void evalsoc_machine_init(MachineState *machine)
 
         if(machine->kernel_filename)
         {
+            /*
+             * Keep the historical evalsoc startup policy: most CPUs reset to
+             * the selected download startup address, where the SDK vector table
+             * can jump to _start. N100 kept a special ELF-entry path.
+             */
             if (strstr(s->soc.cpu_type, "n100")) {
-                load_elf_ram_sym(machine->kernel_filename, NULL, NULL, NULL,
-                         &kernel_entry_point, NULL, NULL, NULL, 0,
-                         EM_RISCV, 1, 0, NULL, true, NULL);
-                start_addr = kernel_entry_point;
+                if (load_elf_ram_sym(machine->kernel_filename,
+                                     NULL, NULL, NULL,
+                                     &kernel_entry_point, NULL, NULL, NULL,
+                                     big_endian,
+                                     EM_RISCV, 1, 0, NULL, true, NULL) > 0) {
+                    if (riscv_is_32bit(&s->soc.cpus)) {
+                        kernel_entry_point &= UINT32_MAX;
+                    }
+                    start_addr = kernel_entry_point;
+                    kernel_entry = kernel_entry_point;
+                } else {
+                    kernel_entry = riscv_load_kernel(machine, &s->soc.cpus,
+                                                     kernel_start_addr,
+                                                     true, NULL);
+                }
             } else {
                 kernel_entry = riscv_load_kernel(machine, &s->soc.cpus,
-                                            kernel_start_addr, true, NULL);
+                                                 kernel_start_addr,
+                                                 true, NULL);
             }
         }
     }
@@ -1450,9 +1469,6 @@ static void evalsoc_machine_init(MachineState *machine)
         riscv_load_fdt(fdt_load_addr, machine->fdt);
     }
 
-#if defined(TARGET_RISCV64)
-    start_addr_hi32 = start_addr >> 32;
-#endif
     /* reset vector */
     uint32_t reset_vec[11] = {
         s->msel,    /* MSEL pin state */
@@ -1467,22 +1483,36 @@ static void evalsoc_machine_init(MachineState *machine)
         0x0182b283, /*     ld     t0, 24(t0) */
 #endif
         0x00028067, /*     jr     t0 */
-        start_addr, /* start: .dword */
-        start_addr_hi32,
-        fdt_load_addr, /* fdt_laddr: .dword */
+        0, /* start: .dword */
+        0,
+        0, /* fdt_laddr: .dword */
         0x00000000,
         /* fw_dyn: */
     };
+#if defined(TARGET_RISCV32)
+    if (big_endian) {
+        reset_vec[4] = 0x0242a583; /*     lw     a1, 36(t0) */
+        reset_vec[5] = 0x01c2a283; /*     lw     t0, 28(t0) */
+    }
+#endif
 
-     /* copy in the reset vector in little_endian byte order */
-    for (i = 0; i < ARRAY_SIZE(reset_vec); i++)
+    /* MSEL and RISC-V instructions are always little-endian here. */
+    for (i = 0; i < 7; i++)
     {
         reset_vec[i] = cpu_to_le32(reset_vec[i]);
+    }
+    if (big_endian) {
+        stq_be_p(&reset_vec[7], start_addr);
+        stq_be_p(&reset_vec[9], fdt_load_addr);
+    } else {
+        stq_le_p(&reset_vec[7], start_addr);
+        stq_le_p(&reset_vec[9], fdt_load_addr);
     }
     rom_add_blob_fixed_as("mrom.reset", reset_vec, sizeof(reset_vec),
                           memmap[EVALSOC_MROM].base, &address_space_memory);
 
-    riscv_rom_copy_firmware_info(machine, memmap[EVALSOC_MROM].base,
+    riscv_rom_copy_firmware_info(machine, &s->soc.cpus,
+                                 memmap[EVALSOC_MROM].base,
                                  memmap[EVALSOC_MROM].size,
                                  sizeof(reset_vec), kernel_entry);
 
@@ -1839,6 +1869,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     qemu_irq qspi0_irq = NULL;
     qemu_irq qspi2_irq = NULL;
     qemu_irq xec0_irq = NULL;
+    bool big_endian;
 
     qdev_prop_set_uint32(DEVICE(&s->cpus), "num-harts", ms->smp.cpus);
     qdev_prop_set_uint32(DEVICE(&s->cpus), "hartid-base", 0);
@@ -1846,6 +1877,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     qdev_prop_set_uint64(DEVICE(&s->cpus), "resetvec", 0x1004);
 
     sysbus_realize(SYS_BUS_DEVICE(&s->cpus), &error_abort);
+    big_endian = s->cpus.harts[0].cfg.big_endian;
 
     eclic_num_sources =
         evalsoc_effective_eclic_num_sources(evalsoc_eclic_num_sources(mst));
@@ -1997,18 +2029,20 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                                 memmap[EVALSOC_UART0].size,
                                 serial_hd(0),
                                 uart0_irq,
-                                mst->uart0.version);
+                                mst->uart0.version,
+                                big_endian);
         } else {
             nuclei_uart_create(mst->uart0.base,
                                memmap[EVALSOC_UART0].size,
                                serial_hd(0),
-                               uart0_irq);
+                               uart0_irq,
+                               big_endian);
         }
     }
 
     nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion.base,
                            memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus,
-                           s->eclic, mst->timer_freq);
+                           s->eclic, mst->timer_freq, big_endian);
 
     qdev_prop_set_uint32(DEVICE(&s->misc), "version", mst->misc.version);
     qdev_prop_set_uint32(DEVICE(&s->misc), "tick-hz", (uint32_t)mst->cpu_freq);
