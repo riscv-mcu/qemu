@@ -18,19 +18,19 @@
 
 static bool trans_lbuf(DisasContext *ctx, arg_lbuf *a)
 {
-    gen_helper_lbuf(cpu_gpr[a->rs1]);
+    gen_helper_lbuf(tcg_env, cpu_gpr[a->rs1]);
     return true;
 }
 
 static bool trans_sbuf(DisasContext *ctx, arg_sbuf *a)
 {
-    gen_helper_sbuf(cpu_gpr[a->rs1]);
+    gen_helper_sbuf(tcg_env, cpu_gpr[a->rs1]);
     return true;
 }
 
 static bool trans_rowsum(DisasContext *ctx, arg_rowsum *a)
 {
-    gen_helper_rowsum(cpu_gpr[a->rd],cpu_gpr[a->rs1]);
+    gen_helper_rowsum(cpu_gpr[a->rd], tcg_env, cpu_gpr[a->rs1]);
     return true;
 }
 

@@ -1794,9 +1794,9 @@ DEF_HELPER_4(dkmabt32, i64, env, i64, i64, i64)
 DEF_HELPER_4(dkmatt32, i64, env, i64, i64, i64)
 
 /* Nuclei nice instructions */
-DEF_HELPER_1(lbuf, void, tl)
-DEF_HELPER_1(sbuf, void, tl)
-DEF_HELPER_1(rowsum, tl, tl)
+DEF_HELPER_2(lbuf, void, env, tl)
+DEF_HELPER_2(sbuf, void, env, tl)
+DEF_HELPER_2(rowsum, tl, env, tl)
 
 /* Nuclei vnice instructions */
 DEF_HELPER_5(vnl32, void, ptr, ptr, tl, env, i32)

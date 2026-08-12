@@ -21,38 +21,56 @@
 #include "exec/exec-all.h"
 #include "exec/helper-proto.h"
 #include "exec/cpu_ldst.h"
-#include "exec/cpu-common.h"
+#include "internals.h"
 
-target_ulong nice_buf[3] = {0};
+uint32_t nice_buf[3] = {0};
 
-void HELPER(lbuf)(target_ulong rs1)
+static inline uint32_t nice_ld32(CPURISCVState *env, target_ulong addr,
+                                 uintptr_t ra)
+{
+    return mo_endian_env(env) == MO_BE ?
+           cpu_ldl_be_data_ra(env, addr, ra) :
+           cpu_ldl_le_data_ra(env, addr, ra);
+}
+
+static inline void nice_st32(CPURISCVState *env, target_ulong addr,
+                             uint32_t value, uintptr_t ra)
+{
+    if (mo_endian_env(env) == MO_BE) {
+        cpu_stl_be_data_ra(env, addr, value, ra);
+    } else {
+        cpu_stl_le_data_ra(env, addr, value, ra);
+    }
+}
+
+void HELPER(lbuf)(CPURISCVState *env, target_ulong rs1)
 {
 #ifndef CONFIG_USER_ONLY
-    cpu_physical_memory_rw(rs1, &nice_buf[0], 4, 0);
-    cpu_physical_memory_rw(rs1 + 4, &nice_buf[1], 4, 0);
-    cpu_physical_memory_rw(rs1 + 8,  &nice_buf[2], 4, 0);
+    nice_buf[0] = nice_ld32(env, rs1, GETPC());
+    nice_buf[1] = nice_ld32(env, rs1 + 4, GETPC());
+    nice_buf[2] = nice_ld32(env, rs1 + 8, GETPC());
 #endif
 }
 
-void HELPER(sbuf)(target_ulong rs1)
+void HELPER(sbuf)(CPURISCVState *env, target_ulong rs1)
 {
 #ifndef CONFIG_USER_ONLY
-    cpu_physical_memory_rw(rs1, &nice_buf[0], 4, 1);
-    cpu_physical_memory_rw(rs1 + 4, &nice_buf[1], 4, 1);
-    cpu_physical_memory_rw(rs1 + 8,  &nice_buf[2], 4, 1);
+    nice_st32(env, rs1, nice_buf[0], GETPC());
+    nice_st32(env, rs1 + 4, nice_buf[1], GETPC());
+    nice_st32(env, rs1 + 8, nice_buf[2], GETPC());
 #endif
 }
 
-target_ulong HELPER(rowsum)(target_ulong rs1)
+target_ulong HELPER(rowsum)(CPURISCVState *env, target_ulong rs1)
 {
 #ifndef CONFIG_USER_ONLY
-    target_ulong temp_buf[3] = {0};
+    uint32_t temp_buf[3] = {0};
 
-    cpu_physical_memory_rw(rs1, &temp_buf[0], 4, 0);
+    temp_buf[0] = nice_ld32(env, rs1, GETPC());
     nice_buf[0] = nice_buf[0] + temp_buf[0];
-    cpu_physical_memory_rw(rs1 + 4, &temp_buf[1], 4, 0);
+    temp_buf[1] = nice_ld32(env, rs1 + 4, GETPC());
     nice_buf[1] = nice_buf[1] + temp_buf[1];
-    cpu_physical_memory_rw(rs1 + 8,  &temp_buf[2], 4, 0);
+    temp_buf[2] = nice_ld32(env, rs1 + 8, GETPC());
     nice_buf[2] = nice_buf[2] + temp_buf[2];
 
     return temp_buf[0] + temp_buf[1] + temp_buf[2];
