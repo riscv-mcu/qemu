@@ -277,15 +277,34 @@ static void nuclei_cidu_write(void *opaque, hwaddr addr, uint64_t value,
     }
 }
 
-
-static const MemoryRegionOps nuclei_cidu_ops = {
-    .read = nuclei_cidu_read,
-    .write = nuclei_cidu_write,
-    .endianness = DEVICE_LITTLE_ENDIAN,
-    .valid = {
-        .min_access_size = 4,
-        .max_access_size = 4
-    }
+static const MemoryRegionOps nuclei_cidu_ops[3] = {
+    [DEVICE_NATIVE_ENDIAN] = {
+        .read = nuclei_cidu_read,
+        .write = nuclei_cidu_write,
+        .endianness = DEVICE_NATIVE_ENDIAN,
+        .valid = {
+            .min_access_size = 4,
+            .max_access_size = 4,
+        },
+    },
+    [DEVICE_BIG_ENDIAN] = {
+        .read = nuclei_cidu_read,
+        .write = nuclei_cidu_write,
+        .endianness = DEVICE_BIG_ENDIAN,
+        .valid = {
+            .min_access_size = 4,
+            .max_access_size = 4,
+        },
+    },
+    [DEVICE_LITTLE_ENDIAN] = {
+        .read = nuclei_cidu_read,
+        .write = nuclei_cidu_write,
+        .endianness = DEVICE_LITTLE_ENDIAN,
+        .valid = {
+            .min_access_size = 4,
+            .max_access_size = 4,
+        },
+    },
 };
 
 static Property nuclei_cidu_properties[] = {
@@ -308,7 +327,11 @@ static void nuclei_cidu_realize(DeviceState *dev, Error **errp)
         return;
     }
 
-    memory_region_init_io(&cidu->mmio, OBJECT(dev), &nuclei_cidu_ops, cidu,
+    memory_region_init_io(&cidu->mmio, OBJECT(dev),
+                          &nuclei_cidu_ops[cidu->big_endian ?
+                                           DEVICE_BIG_ENDIAN :
+                                           DEVICE_LITTLE_ENDIAN],
+                          cidu,
                           TYPE_NUCLEI_CIDU, cidu->aperture_size);
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &cidu->mmio);
 
@@ -366,7 +389,8 @@ type_init(nuclei_cidu_register_types);
  * Create Nuclei CIDU device.
  */
 DeviceState *nuclei_cidu_create(hwaddr addr, uint32_t aperture_size,
-                                uint32_t num_harts, uint32_t num_sources, DeviceState *eclic)
+                                uint32_t num_harts, uint32_t num_sources,
+                                DeviceState *eclic, bool big_endian)
 {
     DeviceState *dev = qdev_new(TYPE_NUCLEI_CIDU);
     NucleiCIDUState *s = NUCLEI_CIDU(dev);
@@ -379,6 +403,7 @@ DeviceState *nuclei_cidu_create(hwaddr addr, uint32_t aperture_size,
     qdev_prop_set_uint32(dev, "num-sources", num_sources);
     qdev_prop_set_uint64(dev, "mcidubase", addr);
     qdev_prop_set_uint32(dev, "aperture-size", aperture_size);
+    s->big_endian = big_endian;
     s->eclic = eclic;
 
     if (eclic != NULL) {

@@ -2020,7 +2020,8 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                     memmap[EVALSOC_CIDU].size,
                     ms->smp.cpus,
                     cidu_num_sources,
-                    s->eclic) : NULL;
+                    s->eclic,
+                    big_endian) : NULL;
 
     if (mst->uart0.enable) {
         uart0_irq = evalsoc_create_irq_fanout_by_id(s, mst->uart0.irq);

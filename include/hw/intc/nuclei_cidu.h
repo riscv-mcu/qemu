@@ -59,6 +59,7 @@ typedef struct NucleiCIDUState
     uint32_t num_sources;
     uint64_t mcidubase;
     uint32_t aperture_size;
+    bool big_endian;
 
     uint32_t coren_int_status[32]; /* Per-core pending ICI bits, W1C on write. */
     uint32_t intn_indicator[4096]; /* Software-selected destination hart bitmap. */
@@ -74,7 +75,8 @@ typedef struct NucleiCIDUState
 } NucleiCIDUState;
 
 DeviceState *nuclei_cidu_create(hwaddr addr, uint32_t aperture_size,
-                                uint32_t num_harts, uint32_t num_sources, DeviceState *eclic);
+                                uint32_t num_harts, uint32_t num_sources,
+                                DeviceState *eclic, bool big_endian);
 
 
 #endif
