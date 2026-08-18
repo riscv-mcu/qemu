@@ -27,6 +27,52 @@ static uint64_t ldn(CPURISCVState *env, uint8_t *mem_buf, size_t regsz)
     return (mo_endian_env(env) == MO_LE ? ldn_le_p : ldn_be_p)(mem_buf, regsz);
 }
 
+static void riscv_gdb_maybe_bswap_reg(CPURISCVState *env, GByteArray *buf,
+                                      int len)
+{
+    uint8_t *mem_buf;
+
+    if (mo_endian_env(env) != MO_BE) {
+        return;
+    }
+
+    mem_buf = gdb_get_reg_ptr(buf, len);
+    switch (len) {
+    case 4:
+        bswap32s((uint32_t *)mem_buf);
+        break;
+    case 8:
+        bswap64s((uint64_t *)mem_buf);
+        break;
+    default:
+        g_assert_not_reached();
+    }
+}
+
+static int riscv_gdb_get_reg32(CPURISCVState *env, GByteArray *buf,
+                               uint32_t val)
+{
+    int len = gdb_get_reg32(buf, val);
+
+    riscv_gdb_maybe_bswap_reg(env, buf, len);
+    return len;
+}
+
+static int riscv_gdb_get_reg64(CPURISCVState *env, GByteArray *buf,
+                               uint64_t val)
+{
+    int len = gdb_get_reg64(buf, val);
+
+    riscv_gdb_maybe_bswap_reg(env, buf, len);
+    return len;
+}
+
+#if TARGET_LONG_BITS == 64
+#define riscv_gdb_get_regl riscv_gdb_get_reg64
+#else
+#define riscv_gdb_get_regl riscv_gdb_get_reg32
+#endif
+
 struct TypeSize {
     const char *gdb_type;
     const char *id;
@@ -70,10 +116,10 @@ int riscv_cpu_gdb_read_register(CPUState *cs, GByteArray *mem_buf, int n)
 
     switch (mcc->misa_mxl_max) {
     case MXL_RV32:
-        return gdb_get_reg32(mem_buf, tmp);
+        return riscv_gdb_get_reg32(env, mem_buf, tmp);
     case MXL_RV64:
     case MXL_RV128:
-        return gdb_get_reg64(mem_buf, tmp);
+        return riscv_gdb_get_reg64(env, mem_buf, tmp);
     default:
         g_assert_not_reached();
     }
@@ -121,10 +167,10 @@ static int riscv_gdb_get_fpu(CPUState *cs, GByteArray *buf, int n)
 
     if (n < 32) {
         if (env->misa_ext & RVD) {
-            return gdb_get_reg64(buf, env->fpr[n]);
+            return riscv_gdb_get_reg64(env, buf, env->fpr[n]);
         }
         if (env->misa_ext & RVF) {
-            return gdb_get_reg32(buf, env->fpr[n]);
+            return riscv_gdb_get_reg32(env, buf, env->fpr[n]);
         }
     }
     return 0;
@@ -151,8 +197,8 @@ static int riscv_gdb_get_vector(CPUState *cs, GByteArray *buf, int n)
         int i;
         int cnt = 0;
         for (i = 0; i < vlenb; i += 8) {
-            cnt += gdb_get_reg64(buf,
-                                 env->vreg[(n * vlenb + i) / 8]);
+            cnt += riscv_gdb_get_reg64(env, buf,
+                                       env->vreg[(n * vlenb + i) / 8]);
         }
         return cnt;
     }
@@ -187,7 +233,7 @@ static int riscv_gdb_get_csr(CPUState *cs, GByteArray *buf, int n)
 
         result = riscv_csrrw_debug(env, n, &val, 0, 0);
         if (result == RISCV_EXCP_NONE) {
-            return gdb_get_regl(buf, val);
+            return riscv_gdb_get_regl(env, buf, val);
         }
     }
     return 0;
@@ -219,7 +265,7 @@ static int riscv_gdb_get_virtual(CPUState *cs, GByteArray *buf, int n)
         RISCVCPU *cpu = RISCV_CPU(cs);
         CPURISCVState *env = &cpu->env;
 
-        return gdb_get_regl(buf, env->priv);
+        return riscv_gdb_get_regl(env, buf, env->priv);
 #endif
     }
     return 0;
