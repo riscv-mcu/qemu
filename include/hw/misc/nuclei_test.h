@@ -34,6 +34,8 @@ struct NucleiTestState {
 
     /*< public >*/
     MemoryRegion mmio;
+
+    bool big_endian;
 };
 
 enum {
@@ -42,6 +44,6 @@ enum {
     FINISHER_RESET = 0x7777
 };
 
-DeviceState *nuclei_test_create(hwaddr addr);
+DeviceState *nuclei_test_create(hwaddr addr, bool big_endian);
 
 #endif

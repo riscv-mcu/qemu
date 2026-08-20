@@ -2106,7 +2106,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
 
     /* Nuclei Test MMIO device */
     if (mst->test.enable)
-        nuclei_test_create(memmap[EVALSOC_TEST].base);
+        nuclei_test_create(memmap[EVALSOC_TEST].base, big_endian);
 }
 
 static Property evalsoc_soc_props[] = {

@@ -53,30 +53,40 @@ static void nuclei_test_write(void *opaque, hwaddr addr,
                   __func__, (int)addr, val64);
 }
 
-static const MemoryRegionOps nuclei_test_ops = {
-    .read = nuclei_test_read,
-    .write = nuclei_test_write,
-    .endianness = DEVICE_NATIVE_ENDIAN,
-    .valid = {
-        .min_access_size = 2,
-        .max_access_size = 4
-    }
+static const MemoryRegionOps nuclei_test_ops[3] = {
+    [DEVICE_NATIVE_ENDIAN] = {
+        .read = nuclei_test_read,
+        .write = nuclei_test_write,
+        .endianness = DEVICE_NATIVE_ENDIAN,
+        .valid = {
+            .min_access_size = 2,
+            .max_access_size = 4
+        }
+    },
+    [DEVICE_BIG_ENDIAN] = {
+        .read = nuclei_test_read,
+        .write = nuclei_test_write,
+        .endianness = DEVICE_BIG_ENDIAN,
+        .valid = {
+            .min_access_size = 2,
+            .max_access_size = 4
+        }
+    },
+    [DEVICE_LITTLE_ENDIAN] = {
+        .read = nuclei_test_read,
+        .write = nuclei_test_write,
+        .endianness = DEVICE_LITTLE_ENDIAN,
+        .valid = {
+            .min_access_size = 2,
+            .max_access_size = 4
+        }
+    },
 };
-
-static void nuclei_test_init(Object *obj)
-{
-    NucleiTestState *s = NUCLEI_TEST(obj);
-
-    memory_region_init_io(&s->mmio, obj, &nuclei_test_ops, s,
-                          TYPE_NUCLEI_TEST, 0x1000);
-    sysbus_init_mmio(SYS_BUS_DEVICE(obj), &s->mmio);
-}
 
 static const TypeInfo nuclei_test_info = {
     .name          = TYPE_NUCLEI_TEST,
     .parent        = TYPE_SYS_BUS_DEVICE,
     .instance_size = sizeof(NucleiTestState),
-    .instance_init = nuclei_test_init,
 };
 
 static void nuclei_test_register_types(void)
@@ -90,9 +100,17 @@ type_init(nuclei_test_register_types)
 /*
  * Create Test device.
  */
-DeviceState *nuclei_test_create(hwaddr addr)
+DeviceState *nuclei_test_create(hwaddr addr, bool big_endian)
 {
     DeviceState *dev = qdev_new(TYPE_NUCLEI_TEST);
+    NucleiTestState *s = NUCLEI_TEST(dev);
+    s->big_endian = big_endian;
+    memory_region_init_io(&s->mmio, OBJECT(dev),
+                          &nuclei_test_ops[s->big_endian ?
+                                           DEVICE_BIG_ENDIAN :
+                                           DEVICE_LITTLE_ENDIAN],
+                          s, TYPE_NUCLEI_TEST, 0x1000);
+    sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->mmio);
     sysbus_realize_and_unref(SYS_BUS_DEVICE(dev), &error_fatal);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, addr);
     return dev;
