@@ -60,6 +60,14 @@ prepare_tools:
     - echo "Nuclei SDK Version $(cat build.txt)"
     # rm unused .git
     - rm -rf .git
+    # use nuclei sdk big-endian branch for big-endian testing
+    - cd $CI_PROJECT_DIR/prebuilt/
+    - git clone -b lx/big-endian --depth 1 git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git nuclei-sdk-be
+    - cd nuclei-sdk-be
+    - git describe --tags --always --abbrev=10 > build.txt
+    - echo "Nuclei SDK BE Version $(cat build.txt)"
+    # rm unused .git
+    - rm -rf .git
     # nmsis
     - cd $CI_PROJECT_DIR/prebuilt/
     # use NMSIS master branch for testing
@@ -240,6 +248,7 @@ test_sdk:
     - export PATH=$QEMU_PATH_LINUX:$PATH
     #- export PATH=$CI_PROJECT_DIR/prebuilt/gcc/gcc/bin:$PATH
     - qemu-system-riscv32 --version
+    - which riscv64-unknown-elf-gcc
     - riscv64-unknown-elf-gcc -v
     ################################################
     - cd $CI_PROJECT_DIR/prebuilt/nuclei-sdk
@@ -266,6 +275,72 @@ test_sdk:
     when: always
     paths:
       - $CI_PROJECT_DIR/prebuilt/nuclei-sdk/logs/
+
+test_sdk_be:
+  stage: test
+  timeout: 1h
+  #when: manual
+  interruptible: true
+  script:
+    # find qemu and gcc
+    - cd $CI_PROJECT_DIR
+    - export QEMU_PATH_LINUX=$(readlink -f linux_qemu/bin)
+    - export TOOLCHAIN_BIN_DIR=/home/share/devtools/toolchain/nuclei_gnu/linux64/newlibc/nuclei-2025-zicfilp-be/gcc/bin
+    - export PATH=$QEMU_PATH_LINUX:$TOOLCHAIN_BIN_DIR:$PATH
+    #- export PATH=$CI_PROJECT_DIR/prebuilt/gcc/gcc/bin:$PATH
+    - qemu-system-riscv32 --version
+    - which riscv64be-unknown-elf-gcc
+    - riscv64be-unknown-elf-gcc -v
+    ################################################
+    - cd $CI_PROJECT_DIR/prebuilt/nuclei-sdk-be
+    - pip3 install -r tools/scripts/requirements.txt
+    - export NUCLEI_SDK_ROOT=$(readlink -f $CI_PROJECT_DIR/prebuilt/nuclei-sdk-be)
+    - |
+      HWCFG=${CI_PROJECT_DIR}/.gitlab/nsdk_ci_be.json
+      if [ ! -f ${HWCFG} ] ; then
+        HWCFG=${NUCLEI_SDK_ROOT}/tools/scripts/nsdk_cli/configs/nuclei_fpga_eval_ci_bpv.json
+      fi
+      echo "Using HWCFG=${HWCFG}"
+    - echo "Nuclei SDK Version $(cat build.txt)"
+    - python3 tools/scripts/nsdk_cli/nsdk_bench.py --appcfg tools/scripts/nsdk_cli/configs/application_be.json --hwcfg ${HWCFG} --parallel=-j --make_options "COMPILE_PREFIX=riscv64be-unknown-elf- QEMU_CPU_EXTOPT=big-endian=on" --logdir logs/nuclei_fpga_eval_qemu_be_ci --run --run_target "qemu"
+  tags:
+    - os::linux
+    - env::docker
+    - env::nfs
+  image: $IMAGE:$IMAGE_TAG
+  #allow_failure: true
+  artifacts:
+    name: "qemu_test_sdk_be_job${CI_JOB_ID}_${CI_COMMIT_SHA::8}"
+    when: always
+    paths:
+      - $CI_PROJECT_DIR/prebuilt/nuclei-sdk-be/logs/
+
+test_newlib_regression_be:
+  stage: test
+  timeout: 4h
+  interruptible: true
+  script:
+    - cd $CI_PROJECT_DIR
+    - export QEMU_BIN_DIR=$(readlink -f linux_qemu/bin)
+    - export TOOLCHAIN_BIN_DIR=/home/share/devtools/toolchain/nuclei_gnu/linux64/newlibc/nuclei-2025-zicfilp-be/gcc/bin
+    - export RUNNER=qemu
+    - export QEMU_CPU_EXTOPT_BE=big-endian=on
+    - export PATH=$QEMU_BIN_DIR:$TOOLCHAIN_BIN_DIR:$PATH
+    - qemu-system-riscv32 --version
+    - which riscv64be-unknown-elf-gcc
+    - riscv64be-unknown-elf-gcc -v
+    - cd $CI_PROJECT_DIR/prebuilt/nuclei-sdk-be/test/newlib_regression
+    - ./run_newlib_regression.sh
+  tags:
+    - os::linux
+    - env::docker
+    - env::nfs
+  image: $IMAGE:$IMAGE_TAG
+  artifacts:
+    name: "qemu_newlib_regression_job${CI_JOB_ID}_${CI_COMMIT_SHA::8}"
+    when: always
+    paths:
+      - $CI_PROJECT_DIR/prebuilt/nuclei-sdk-be/test/newlib_regression/logs/
 
 test_sdk_threadx:
   stage: test

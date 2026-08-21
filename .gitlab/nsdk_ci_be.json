@@ -1,0 +1,301 @@
+{
+    "run_config": {
+        "target" : "qemu",
+        "xlmodel" : {
+            "timeout": 240
+        },
+        "qemu" : {
+            "timeout": 60
+        }
+    },
+    "parallel": "-j",
+    "build_target": "clean all",
+    "build_config": {
+        "SOC": "evalsoc",
+        "BOARD": "nuclei_fpga_eval"
+    },
+    "build_configs": {
+        "n202-ilm": {"DOWNLOAD": "ilm", "CORE": "n202", "ARCH_EXT": "_zicond_zmmul_zca_zcb_zcmp_zba_zbb_zbs"},
+        "n202-zicfilp-ilm": {"DOWNLOAD": "ilm", "CORE": "n202", "ARCH_EXT": "_zicfilp_zicond_zmmul_zca_zcb_zcmp_zba_zbb_zbs"},
+        "n300-ilm": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs"},
+        "n300-zicfilp-ilm": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicfilp_zicond_zca_zcb_zcmp_zba_zbb_zbs"},
+        "n202e-ilm": {"DOWNLOAD": "ilm", "CORE": "n202e", "ARCH_EXT": "_zicond_zmmul_zca_zcb_zcmp_zba_zbb_zbs"},
+        "n202e-zicfilp-ilm": {"DOWNLOAD": "ilm", "CORE": "n202e", "ARCH_EXT": "_zicfilp_zicond_zmmul_zca_zcb_zcmp_zba_zbb_zbs"},
+        "n300e-ilm": {"DOWNLOAD": "ilm", "CORE": "n300e", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs"},
+        "n300e-zicfilp-ilm": {"DOWNLOAD": "ilm", "CORE": "n300e", "ARCH_EXT": "_zicfilp_zicond_zca_zcb_zcmp_zba_zbb_zbs"}
+    },
+    "appconfig": {
+        "application/baremetal/demo_plic": {
+            "build_config": {
+                "XLCFG_PLIC": "1"
+            }
+        },
+        "application/baremetal/demo_smode_plic": {
+            "build_config": {
+                "XLCFG_PLIC": "1"
+            }
+        },
+        "application/baremetal/demo_cache": {
+            "build_config": {
+                "XLCFG_CCM": "1",
+                "XLCFG_HPM": "1",
+                "DOWNLOAD": "ddr"
+            }
+        },
+        "application/baremetal/demo_pma": {
+            "build_config": {
+                "XLCFG_CCM": "1",
+                "XLCFG_HPM": "1"
+            }
+        },
+        "application/baremetal/benchmark/whetstone_v1.2": {
+            "run_config": {
+                "qemu": {
+                    "timeout": 60
+                }
+            }
+        },
+        "application/baremetal/benchmark/whetstone": {
+            "run_config": {
+                "qemu": {
+                    "timeout": 60
+                }
+            }
+        },
+        "application/baremetal/demo_profiling": {
+            "build_config": {
+                "DOWNLOAD": "sram"
+            }
+        },
+        "application/baremetal/demo_smpu": {
+            "build_config": {
+                "XLCFG_SMPU": "1"
+            },
+            "build_configs": {
+                "n300-chk0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "CHK_MODE": "0"},
+                "n300-chk1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "CHK_MODE": "1"},
+                "n300-chk2": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "CHK_MODE": "2"},
+                "n300-chk3": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "CHK_MODE": "3"},
+                "n300-chk4": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "CHK_MODE": "4"},
+                "n300-chk5": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "CHK_MODE": "5"}
+            },
+            "checks": {
+                "PASS": [
+                    "SMPU fault occurs"
+                ]
+            }
+        },
+        "application/baremetal/smphello": {
+            "build_config": {
+                "SMP": "4",
+                "ICOUNT_OPT": ""
+            }
+        },
+        "test/core": {
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/demo_eclic": {
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/demo_smode_eclic": {
+            "build_config": {
+                "XLCFG_SMODE": "1"
+            },
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/demo_eclic_umode": {
+            "build_config": {
+                "XLCFG_SMPU": "1"
+            },
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/demo_pmp": {
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/demo_eclic_stress": {
+            "build_configs": {
+                "n300-smode1-eclicv1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_SMODE": "1", "XLCFG_SSTC": "1"},
+                "n300-smode0-eclicv1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_SMODE": "0", "XLCFG_SSTC": "0"},
+                "n300-smode1-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_SMODE": "1", "XLCFG_SSTC": "1", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-smode1-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_SMODE": "1", "XLCFG_SSTC": "1", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "n300-smode1-eclicv2-hwctx1-intstack1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_SMODE": "1", "XLCFG_SSTC": "1", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1", "INTSTACK": "1"},
+                "n300-smode0-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_SMODE": "0", "XLCFG_SSTC": "0", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-smode0-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_SMODE": "0", "XLCFG_SSTC": "0", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "n300-smode0-eclicv2-hwctx1-intstack1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_SMODE": "0", "XLCFG_SSTC": "0", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1", "INTSTACK": "1"}
+            }
+        },
+        "application/baremetal/exception_mmode": {
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/exception_smode": {
+            "build_config": {
+                "XLCFG_SMODE": "1"
+            },
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/exception_umode": {
+            "build_config": {
+                "XLCFG_SMODE": "1"
+            },
+            "build_configs": {
+                "n300-smpu1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_SMPU": "1"},
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"},
+                "n300-eclicv2-hwctx0-smpu1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0", "XLCFG_SMPU": "1"},
+                "n300-eclicv2-hwctx1-smpu1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1", "XLCFG_SMPU": "1"}
+            }
+        },
+        "application/baremetal/demo_cidu": {
+            "build_config": {
+                "SMP": "4",
+                "XLCFG_CIDU": "1",
+                "ICOUNT_OPT": ""
+            },
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "sram", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "sram", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/demo_timer": {
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/demo_sstc": {
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/baremetal/lowpower": {
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/freertos/smpdemo": {
+            "build_config": {
+                "SMP": "4",
+                "ICOUNT_OPT": "",
+                "XLCFG_SMPCC": "1",
+                "XLCFG_CCM": "1"
+            },
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "sram", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "sram", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/threadx/smpdemo": {
+            "build_config": {
+                "SMP": "4",
+                "ICOUNT_OPT": "",
+                "XLCFG_SMPCC": "1"
+            },
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "sram", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "sram", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/freertos/demo": {
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/rtthread/demo": {
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/rtthread/msh": {
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/rtthread/demo_smode": {
+            "build_config": {
+                "XLCFG_SMODE": "1"
+            },
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0", "XLCFG_SSTC": "1"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1", "XLCFG_SSTC": "1"}
+            }
+        },
+        "application/threadx/demo": {
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        },
+        "application/ucosii/demo": {
+            "build_configs": {
+                "n300-eclicv2-hwctx0": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "0"},
+                "n300-eclicv2-hwctx1": {"DOWNLOAD": "ilm", "CORE": "n300", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs", "XLCFG_ECLIC": "2", "ECLIC_HWCTX": "1"}
+            }
+        }
+    },
+    "expecteds": {
+        "application/baremetal/smphello" : {
+            "n202-ilm": { "build": false, "run": false },
+            "n202-zicfilp-ilm" : {"build": false, "run": false},
+            "n202e-ilm": { "build": false, "run": false },
+            "n202e-zicfilp-ilm" : {"build": false, "run": false}
+        },
+        "application/baremetal/demo_zicfilp_lpad_imm" : {
+            "n202-ilm": { "build": false, "run": false },
+            "n202e-ilm" : {"build": false, "run": false},
+            "n300-ilm": { "build": false, "run": false },
+            "n300e-ilm" : {"build": false, "run": false}
+        },
+        "application/baremetal/demo_zicfilp_lpad_negative" : {
+            "n202-ilm": { "build": false, "run": false },
+            "n202e-ilm" : {"build": false, "run": false},
+            "n300-ilm": { "build": false, "run": false },
+            "n300e-ilm" : {"build": false, "run": false}
+        },
+        "application/baremetal/demo_zicfilp_newlib_lpad" : {
+            "n202-ilm": { "build": false, "run": false },
+            "n202e-ilm" : {"build": false, "run": false},
+            "n300-ilm": { "build": false, "run": false },
+            "n300e-ilm" : {"build": false, "run": false}
+        },
+        "application/threadx/smpdemo" : {
+            "n202-ilm": { "build": false, "run": false },
+            "n202-zicfilp-ilm" : {"build": false, "run": false},
+            "n202e-ilm": { "build": false, "run": false },
+            "n202e-zicfilp-ilm" : {"build": false, "run": false}
+        },
+        "application/freertos/smpdemo" : {
+            "n202-ilm": { "build": false, "run": false },
+            "n202-zicfilp-ilm" : {"build": false, "run": false},
+            "n202e-ilm": { "build": false, "run": false },
+            "n202e-zicfilp-ilm" : {"build": false, "run": false}
+        }
+    },
+    "expected": {
+    }
+}
