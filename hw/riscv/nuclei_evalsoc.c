@@ -62,12 +62,6 @@ uint32_t debug_flag = 0;
 
 #define DEBUGF(fmt, args...)    {if(debug_flag)printf(fmt ,##args);}
 
-#if defined(TARGET_RISCV32)
-#define BIOS_FILENAME "opensbi-riscv32-generic-fw_dynamic.bin"
-#else
-#define BIOS_FILENAME "opensbi-riscv64-generic-fw_dynamic.bin"
-#endif
-
 #define IREGION_BASE_ADDR   (0x18000000)
 #define IREGION_MAX_SIZE    (0x8000000)
 #define IREGION_MIN_SIZE    (0x400000)
@@ -79,7 +73,6 @@ static const struct MemmapEntry
     const char *name;
 }  evalsoc_memmap[] = {
     [EVALSOC_IINFO]   = { IREGION_IINFO_OFS,              IREGION_IINFO_SIZE,   "IINFO"},
-    [EVALSOC_MROM]    = { EVALSOC_MROM_BASE,              EVALSOC_MROM_SIZE,    "MROM" },
     [EVALSOC_XEC0]    = { EVALSOC_XEC0_BASE,              EVALSOC_XEC0_SIZE,    "XEC0"},
     [EVALSOC_TEST]    = { EVALSOC_TEST_BASE,              EVALSOC_TEST_SIZE,    "TEST" },
     [EVALSOC_MISC]    = { EVALSOC_MISC_BASE,              EVALSOC_MISC_SIZE,    "MISC" },
@@ -878,10 +871,6 @@ static void parse_json_config(MachineState *machine)
         {"plic",           &s->iregion.plic_en,         "iregion.plic"},
         {"clicintctlbits", &s->iregion.clicintctlbits,  "iregion.clicintctlbits"},
     };
-    const JsonFieldMapping mrom_mappings[] = {
-        {"base",    &s->mrom.base,     "mrom.base"},
-        {"size",    &s->mrom.size,     "mrom.size"},
-    };
     const JsonFieldMapping test_mappings[] = {
         {"base",    &s->test.base,     "test.base"},
         {"size",    &s->test.size,     "test.size"},
@@ -1030,8 +1019,6 @@ static void parse_json_config(MachineState *machine)
                                     exit(1);
                                 }
                                 s->iregion.size = (s->iregion.plic_en) ? IREGION_MAX_SIZE : IREGION_MIN_SIZE;
-                            } else if (!strcmp(page1->key, "mrom")) {
-                                parse_json_keys_and_values(options_page2, mrom_mappings, ARRAY_SIZE(mrom_mappings));
                             } else if (!strcmp(page1->key, "test")) {
                                 parse_json_keys_and_values(options_page2, test_mappings, ARRAY_SIZE(test_mappings));
                             } else if (!strcmp(page1->key, "misc")) {
@@ -1105,8 +1092,6 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
     memoryRegion[EVALSOC_DDR].size = s->ddr.size;
     memoryRegion[EVALSOC_XIP].base = s->norflash.base;
     memoryRegion[EVALSOC_XIP].size = s->norflash.size;
-    memoryRegion[EVALSOC_MROM].base = s->mrom.base;
-    memoryRegion[EVALSOC_MROM].size = s->mrom.size;
     memoryRegion[EVALSOC_TEST].base = s->test.base;
     memoryRegion[EVALSOC_TEST].size = s->test.size;
     memoryRegion[EVALSOC_MISC].base = s->misc.base;
@@ -1219,12 +1204,10 @@ static void evalsoc_machine_init(MachineState *machine)
     EvalSoCState *s = RISCV_EVALSOC_MACHINE(machine);
     target_ulong start_addr;
     MemoryRegion *system_memory = get_system_memory();
-    uint32_t fdt_load_addr = 0;
-    uint64_t kernel_entry = 0;
-    target_ulong firmware_end_addr, kernel_start_addr;
     uint64_t kernel_entry_point;
     int i;
     bool big_endian;
+    bool kernel_loaded = false;
     DriveInfo *dinfo;
     BlockBackend *blk;
     DeviceState *flash_dev, *sd_dev, *card_dev;
@@ -1251,6 +1234,33 @@ static void evalsoc_machine_init(MachineState *machine)
     /*if flash startup_addr not set, use flashxip startup_addr*/
     s->flash.startup_addr = (s->flash.startup_addr == -1) ? s->norflash.startup_addr: s->flash.startup_addr;
 
+    if (s->download == NULL)
+    {
+        start_addr = s->norflash.startup_addr;
+    }
+    else if (!strcmp(s->download, "ilm"))
+    {
+        start_addr = s->ilm.startup_addr;
+    }
+    else if (!strcmp(s->download, "ddr"))
+    {
+        // For cpu release after 2023.06, the DDR base changed from 0xA0000000 to 0x80000000
+        // But we want to keep DOWNLOAD=ddr still use old 0xA0000000 base
+        start_addr = s->ddr.startup_addr; // sram mode = ddr mode base address
+    }
+    else if (!strcmp(s->download, "sram"))
+    {
+        start_addr = s->sram.startup_addr;
+    }
+    else if (!strcmp(s->download, "flash"))
+    {
+        start_addr = s->flash.startup_addr;
+    }
+    else
+    {
+        start_addr = s->norflash.startup_addr;
+    }
+
     if(is_iregion_addr_overlap(memmap, s, machine->smp.cpus) == true)
     {
         error_report("is_iregion_addr_overlap() failed");
@@ -1264,6 +1274,8 @@ static void evalsoc_machine_init(MachineState *machine)
 
     object_property_set_str(OBJECT(&s->soc), "cpu-type", machine->cpu_type,
                             &error_abort);
+    object_property_set_uint(OBJECT(&s->soc), "boot-addr", start_addr,
+                             &error_abort);
     object_property_set_uint(OBJECT(&s->soc.spi0), "version",
                              s->qspi0.version, &error_abort);
     object_property_set_uint(OBJECT(&s->soc.spi0), "xip-size",
@@ -1342,33 +1354,6 @@ static void evalsoc_machine_init(MachineState *machine)
         create_fdt(s, memmap, machine->ram_size, machine->kernel_cmdline);
     }
 
-    big_endian = s->soc.cpus.harts[0].cfg.big_endian;
-    if (s->download == NULL)
-    {
-        start_addr = s->norflash.startup_addr;
-    }
-    else if (!strcmp(s->download, "ilm"))
-    {
-        start_addr = s->ilm.startup_addr;
-    }
-    else if (!strcmp(s->download, "ddr"))
-    {
-        // For cpu release after 2023.06, the DDR base changed from 0xA0000000 to 0x80000000
-        // But we want to keep DOWNLOAD=ddr still use old 0xA0000000 base
-        start_addr = s->ddr.startup_addr; // sram mode = ddr mode base address
-    }
-    else if (!strcmp(s->download, "sram"))
-    {
-        start_addr = s->sram.startup_addr;
-    }
-    else if (!strcmp(s->download, "flash"))
-    {
-        start_addr = s->flash.startup_addr;
-    }
-    else
-    {
-        start_addr = s->norflash.startup_addr;
-    }
     DEBUGF("download mode is %s\n", s->download);
     DEBUGF("ddr     : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->ddr.base,(long)s->ddr.size,(long)s->ddr.startup_addr);
     DEBUGF("ilm     : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->ilm.base,(long)s->ilm.size,(long)s->ilm.startup_addr);
@@ -1376,7 +1361,6 @@ static void evalsoc_machine_init(MachineState *machine)
     DEBUGF("norflash: base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->norflash.base,(long)s->norflash.size,(long)s->norflash.startup_addr);
     DEBUGF("flash   : base:0x%lx, size:0x%lx, startup_addr:0x%lx\n", (long)s->flash.base,(long)s->flash.size,(long)s->flash.startup_addr);
     DEBUGF("dlm     : base:0x%lx, size:0x%lx\n", (long)s->dlm.base,(long)s->dlm.size);
-    DEBUGF("mrom    : base:0x%lx, size:0x%lx\n", (long)s->mrom.base,(long)s->mrom.size);
     DEBUGF("test    : base:0x%lx, size:0x%lx\n", (long)s->test.base,(long)s->test.size);
     DEBUGF("misc    : base:0x%lx, size:0x%lx, irq0:%ld, irq1:%ld, version:0x%lx\n",
            (long)s->misc.base, (long)s->misc.size,
@@ -1409,112 +1393,30 @@ static void evalsoc_machine_init(MachineState *machine)
     DEBUGF("timer_freq : %d\n", (int)s->timer_freq);
     DEBUGF("firmware startup addr:0x%lx\n", (long)start_addr);
 
-    if (machine->firmware) {
-        firmware_end_addr = riscv_find_and_load_firmware(machine, BIOS_FILENAME,
-                                                     start_addr, NULL);
-    } else {
-        firmware_end_addr = (target_ulong)(-1);
-    }
-
-    if (machine->firmware == NULL)
-    {
-        if (firmware_end_addr != (target_ulong)(-1)) {
-            kernel_start_addr = riscv_calc_kernel_start_addr(&s->soc.cpus,
-                                                         firmware_end_addr);
-        } else {
-            kernel_start_addr = start_addr;
-        }
-
-        if(machine->kernel_filename)
-        {
-            /*
-             * Keep the historical evalsoc startup policy: most CPUs reset to
-             * the selected download startup address, where the SDK vector table
-             * can jump to _start. N100 kept a special ELF-entry path.
-             */
-            if (strstr(s->soc.cpu_type, "n100")) {
-                if (load_elf_ram_sym(machine->kernel_filename,
-                                     NULL, NULL, NULL,
-                                     &kernel_entry_point, NULL, NULL, NULL,
-                                     big_endian,
-                                     EM_RISCV, 1, 0, NULL, true, NULL) > 0) {
-                    if (riscv_is_32bit(&s->soc.cpus)) {
-                        kernel_entry_point &= UINT32_MAX;
-                    }
-                    start_addr = kernel_entry_point;
-                    kernel_entry = kernel_entry_point;
-                } else {
-                    kernel_entry = riscv_load_kernel(machine, &s->soc.cpus,
-                                                     kernel_start_addr,
-                                                     true, NULL);
-                }
-            } else {
-                kernel_entry = riscv_load_kernel(machine, &s->soc.cpus,
-                                                 kernel_start_addr,
-                                                 true, NULL);
+    big_endian = s->soc.cpus.harts[0].cfg.big_endian;
+    if ((!machine->firmware || !strcmp(machine->firmware, "none")) &&
+        machine->kernel_filename && strstr(s->soc.cpu_type, "n100")) {
+        if (load_elf_ram_sym(machine->kernel_filename,
+                             NULL, NULL, NULL,
+                             &kernel_entry_point, NULL, NULL, NULL,
+                             big_endian, EM_RISCV, 1, 0, NULL, true,
+                             NULL) > 0) {
+            if (riscv_is_32bit(&s->soc.cpus)) {
+                kernel_entry_point &= UINT32_MAX;
             }
+            start_addr = kernel_entry_point;
+            for (i = 0; i < s->soc.cpus.num_harts; i++) {
+                s->soc.cpus.harts[i].env.resetvec = start_addr;
+            }
+            kernel_loaded = true;
         }
     }
-    else
-    {
-        /*
-        * If dynamic firmware is used, it doesn't know where is the next mode
-        * if kernel argument is not set.
-        */
-        kernel_entry = 0;
 
-        fdt_load_addr = riscv_compute_fdt_addr(s->ddr.base,
-                                            machine->ram_size,
-                                           machine);
-        riscv_load_fdt(fdt_load_addr, machine->fdt);
+    if (machine->firmware && strcmp(machine->firmware, "none")) {
+        riscv_find_and_load_firmware(machine, NULL, start_addr, NULL);
+    } else if (machine->kernel_filename && !kernel_loaded) {
+        riscv_load_kernel(machine, &s->soc.cpus, start_addr, true, NULL);
     }
-
-    /* reset vector */
-    uint32_t reset_vec[11] = {
-        s->msel,    /* MSEL pin state */
-        0x00000297, /* 1:  auipc  t0, %pcrel_hi(fw_dyn) */
-        0x02828613, /*     addi   a2, t0, %pcrel_lo(1b) */
-        0xf1402573, /*     csrr   a0, mhartid  */
-#if defined(TARGET_RISCV32)
-        0x0202a583, /*     lw     a1, 32(t0) */
-        0x0182a283, /*     lw     t0, 24(t0) */
-#elif defined(TARGET_RISCV64)
-        0x0202b583, /*     ld     a1, 32(t0) */
-        0x0182b283, /*     ld     t0, 24(t0) */
-#endif
-        0x00028067, /*     jr     t0 */
-        0, /* start: .dword */
-        0,
-        0, /* fdt_laddr: .dword */
-        0x00000000,
-        /* fw_dyn: */
-    };
-#if defined(TARGET_RISCV32)
-    if (big_endian) {
-        reset_vec[4] = 0x0242a583; /*     lw     a1, 36(t0) */
-        reset_vec[5] = 0x01c2a283; /*     lw     t0, 28(t0) */
-    }
-#endif
-
-    /* MSEL and RISC-V instructions are always little-endian here. */
-    for (i = 0; i < 7; i++)
-    {
-        reset_vec[i] = cpu_to_le32(reset_vec[i]);
-    }
-    if (big_endian) {
-        stq_be_p(&reset_vec[7], start_addr);
-        stq_be_p(&reset_vec[9], fdt_load_addr);
-    } else {
-        stq_le_p(&reset_vec[7], start_addr);
-        stq_le_p(&reset_vec[9], fdt_load_addr);
-    }
-    rom_add_blob_fixed_as("mrom.reset", reset_vec, sizeof(reset_vec),
-                          memmap[EVALSOC_MROM].base, &address_space_memory);
-
-    riscv_rom_copy_firmware_info(machine, &s->soc.cpus,
-                                 memmap[EVALSOC_MROM].base,
-                                 memmap[EVALSOC_MROM].size,
-                                 sizeof(reset_vec), kernel_entry);
 
     /* Connect an SPI flash to SPI0 */
     flash_dev = qdev_new("w25q512jv");
@@ -1595,8 +1497,6 @@ static void evalsoc_machine_instance_init(Object *obj)
     s->norflash.base = memmap[EVALSOC_XIP].base;
     s->norflash.size = memmap[EVALSOC_XIP].size;
     s->norflash.startup_addr = -1;
-    s->mrom.base = memmap[EVALSOC_MROM].base;
-    s->mrom.size = memmap[EVALSOC_MROM].size;
     s->test.base = memmap[EVALSOC_TEST].base;
     s->test.size = memmap[EVALSOC_TEST].size;
     s->test.enable = 1;
@@ -1780,9 +1680,9 @@ static void evalsoc_machine_class_init(ObjectClass *oc, void *data)
                                    evalsoc_machine_get_download,
                                    evalsoc_machine_set_download);
     object_class_property_set_description(oc, "download",
-                                          "Set on to tell QEMU's ROM to jump to "
-                                          "download mode. Otherwise QEMU will jump to flash base address, aka download=flashxip"
-                                          "nuclei support these download modes(flashxip,flash,ilm,ddr,sram)");
+                                          "Set direct reset download mode. "
+                                          "Otherwise QEMU will reset to flash base address, aka download=flashxip. "
+                                          "Nuclei supports these download modes: flashxip, flash, ilm, ddr, sram");
     object_class_property_add_bool(oc, "cidu",
                                    evalsoc_machine_get_cidu,
                                    evalsoc_machine_set_cidu);
@@ -1845,7 +1745,6 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     EvalSoCState *mst = RISCV_EVALSOC_MACHINE(ms);
     EvalSoCSoCState *s = RISCV_EVALSOC_SOC(dev);
     const struct MemmapEntry *memmap = evalsoc_memmap;
-    MemoryRegion *sys_mem = get_system_memory();
     NucleiSMPCCInit smpcc_cfg = {EVALSOC_SMP_VER,
                                 EVALSOC_SMP_CFG | ((ms->smp.cpus - 1) << 1),
                                 EVALSOC_CC_CFG,
@@ -1874,7 +1773,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     qdev_prop_set_uint32(DEVICE(&s->cpus), "num-harts", ms->smp.cpus);
     qdev_prop_set_uint32(DEVICE(&s->cpus), "hartid-base", 0);
     qdev_prop_set_string(DEVICE(&s->cpus), "cpu-type", s->cpu_type);
-    qdev_prop_set_uint64(DEVICE(&s->cpus), "resetvec", 0x1004);
+    qdev_prop_set_uint64(DEVICE(&s->cpus), "resetvec", s->boot_addr);
 
     sysbus_realize(SYS_BUS_DEVICE(&s->cpus), &error_abort);
     big_endian = s->cpus.harts[0].cfg.big_endian;
@@ -1897,13 +1796,6 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
      * cluster is realized.
      */
     qdev_realize(DEVICE(&s->u_cluster), NULL, &error_abort);
-
-    /* Mask ROM */
-    memory_region_init_rom(&s->internal_rom, OBJECT(dev), "riscv.evalsoc.irom",
-                           memmap[EVALSOC_MROM].size, &error_fatal);
-    memory_region_add_subregion(sys_mem,
-        memmap[EVALSOC_MROM].base, &s->internal_rom);
-
 
     /* create PLIC hart topology configuration string */
     plic_hart_config_len = (strlen(EVALSOC_PLIC_HART_CONFIG) + 1) *
@@ -2112,6 +2004,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
 static Property evalsoc_soc_props[] = {
     DEFINE_PROP_UINT32("serial", EvalSoCSoCState, serial, OTP_SERIAL),
     DEFINE_PROP_STRING("cpu-type", EvalSoCSoCState, cpu_type),
+    DEFINE_PROP_UINT64("boot-addr", EvalSoCSoCState, boot_addr, 0),
     DEFINE_PROP_END_OF_LIST()
 };
 

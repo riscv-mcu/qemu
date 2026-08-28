@@ -83,7 +83,6 @@ typedef struct EvalSoCSoCState {
     DeviceState *smpcc;
     MemoryRegion ilm;
     MemoryRegion dlm;
-    MemoryRegion internal_rom;
     MemoryRegion xip_mem;
     MemoryRegion ddr;
     MemoryRegion sram;
@@ -98,6 +97,7 @@ typedef struct EvalSoCSoCState {
 
     uint32_t serial;
     char *cpu_type;
+    uint64_t boot_addr;
 
 } EvalSoCSoCState;
 
@@ -153,7 +153,6 @@ typedef struct
     evalsoc_device_info norflash;
     evalsoc_device_info sram;
     evalsoc_device_info flash;
-    evalsoc_device_info mrom;
     evalsoc_device_info test;
     evalsoc_misc_info misc;
     evalsoc_device_info uart0;
@@ -172,7 +171,6 @@ typedef struct
     uint64_t irqmax;
     /*< public >*/
     EvalSoCSoCState soc;
-    uint32_t msel;
     uint32_t serial;
     EvalsocAIAType aia_type;
     int aia_guests;
@@ -186,7 +184,6 @@ typedef struct
 enum {
     EVALSOC_IINFO,
     EVALSOC_DEBUG,
-    EVALSOC_MROM,
     EVALSOC_TEST,
     EVALSOC_TIMER,
     EVALSOC_CLINT,
@@ -296,8 +293,6 @@ enum
 #define EVALSOC_PLIC_CONTEXT_BASE 0x200000
 #define EVALSOC_PLIC_CONTEXT_STRIDE 0x1000
 
-#define EVALSOC_MROM_BASE           (0x1000)
-#define EVALSOC_MROM_SIZE           (0xf000)
 #define EVALSOC_TEST_BASE           (0x100000)
 #define EVALSOC_TEST_SIZE           (0x10000)
 #define EVALSOC_XEC0_BASE           (0x10002000)
