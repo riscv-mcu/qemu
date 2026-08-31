@@ -81,6 +81,7 @@ prepare_tools:
   tags:
     - env::docker
     - net::outside
+    - host::whss9
   image: $IMAGE:$IMAGE_TAG
   #allow_failure: true
   artifacts:
@@ -143,6 +144,7 @@ build_linux_qemu:
   tags:
     - os::linux
     - env::docker
+    - host::whss9
   image: rego.corp.nucleisys.com/software/build-linux-qemu:centos7
   script:
     # build Slirp lib first
@@ -180,6 +182,7 @@ build_windows_qemu:
   tags:
     - os::linux
     - env::docker
+    - host::whss9
   image:
     name: rego.corp.nucleisys.com/software/build-windows-qemu:latest
     entrypoint: ["/bin/sh", "-c"]
@@ -268,6 +271,7 @@ test_sdk:
   tags:
     - os::linux
     - env::docker
+    - host::whss9
   image: $IMAGE:$IMAGE_TAG
   #allow_failure: true
   artifacts:
@@ -307,6 +311,7 @@ test_sdk_be:
     - os::linux
     - env::docker
     - env::nfs
+    - host::whss9
   image: $IMAGE:$IMAGE_TAG
   #allow_failure: true
   artifacts:
@@ -335,6 +340,7 @@ test_newlib_regression_be:
     - os::linux
     - env::docker
     - env::nfs
+    - host::whss9
   image: $IMAGE:$IMAGE_TAG
   artifacts:
     name: "qemu_newlib_regression_job${CI_JOB_ID}_${CI_COMMIT_SHA::8}"
@@ -379,6 +385,7 @@ test_sdk_threadx:
   tags:
     - os::linux
     - env::docker
+    - host::whss9
   image: $IMAGE:$IMAGE_TAG
   #allow_failure: true
   artifacts:
@@ -439,6 +446,7 @@ test_nmsis:
   tags:
     - os::linux
     - env::docker
+    - host::whss9
   image: $IMAGE:$IMAGE_TAG
   #allow_failure: true
   artifacts:
@@ -474,6 +482,7 @@ test_linux_and_misc:
   tags:
     - env::shell
     - user::xl_ci
+    - host::whss9
   artifacts:
     name: "qemu_test_linux_job${CI_JOB_ID}_${CI_COMMIT_SHA::8}"
     when: always
@@ -557,6 +566,7 @@ make_qemu_zip:
   tags:
     - env::shell
     - user::xl_ci
+    - host::whss9
   artifacts:
     name: "qemu_deploy_${CI_COMMIT_TIMESTAMP::10}_${CI_COMMIT_SHORT_SHA}"
     when: always
@@ -603,6 +613,7 @@ deploy-qemu:
   tags:
     - env::shell
     - user::xl_ci
+    - host::whss9
   artifacts:
     name: "qemu_deploy_${CI_COMMIT_TIMESTAMP::10}_${CI_COMMIT_SHORT_SHA}"
     when: always
@@ -645,3 +656,4 @@ link-qemu:
   tags:
     - env::shell
     - user::xl_ci
+    - host::whss9
