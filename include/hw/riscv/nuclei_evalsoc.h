@@ -105,6 +105,7 @@ typedef struct {
     const char *key;
     void *field_ptr;
     const char *field_name; // debug use
+    bool *present_ptr; /* Optional flag: the JSON key was explicitly present. */
 } JsonFieldMapping;
 
 typedef struct {
@@ -114,6 +115,7 @@ typedef struct {
     uint64_t startup_addr;
     uint64_t enable;
     uint64_t version;
+    bool irq_present; /* True when soc-cfg explicitly presents this IRQ. */
 } evalsoc_device_info;
 
 typedef struct {
@@ -123,6 +125,8 @@ typedef struct {
     uint64_t counter1_irq;
     uint64_t enable;
     uint64_t version;
+    bool counter0_irq_present; /* True when soc-cfg explicitly presents this IRQ. */
+    bool counter1_irq_present; /* True when soc-cfg explicitly presents this IRQ. */
 } evalsoc_misc_info;
 
 typedef struct {
@@ -168,7 +172,7 @@ typedef struct
     evalsoc_device_info imsic_s;
     uint64_t cpu_freq;
     uint64_t timer_freq;
-    uint64_t irqmax;
+    uint64_t irqmax; /* Shared external IRQ ceiling for PLIC/APLIC/ECLIC. */
     /*< public >*/
     EvalSoCSoCState soc;
     uint32_t serial;
@@ -210,59 +214,19 @@ enum {
     EVALSOC_DEV_END
 };
 
-enum
-{
-    EVALSOC_PLIC_GPIO_IRQ0 = 1,
-    EVALSOC_PLIC_GPIO_IRQ1 = 2,
-    EVALSOC_PLIC_GPIO_IRQ2 = 3,
-    EVALSOC_PLIC_GPIO_IRQ3 = 4,
-    EVALSOC_PLIC_GPIO_IRQ4 = 5,
-    EVALSOC_PLIC_GPIO_IRQ5 = 6,
-    EVALSOC_PLIC_GPIO_IRQ6 = 7,
-    EVALSOC_PLIC_ETHERNET_IRQ = 8,
-    EVALSOC_PLIC_GPIO_IRQ8 = 9,
-    EVALSOC_PLIC_GPIO_IRQ9 = 10,
-    EVALSOC_PLIC_GPIO_IRQ10 = 11,
-    EVALSOC_PLIC_GPIO_IRQ11 = 12,
-    EVALSOC_PLIC_GPIO_IRQ12 = 13,
-    EVALSOC_PLIC_GPIO_IRQ13 = 14,
-    EVALSOC_PLIC_GPIO_IRQ14 = 15,
-    EVALSOC_PLIC_GPIO_IRQ15 = 16,
-    EVALSOC_PLIC_GPIO_IRQ16 = 17,
-    EVALSOC_PLIC_GPIO_IRQ17 = 18,
-    EVALSOC_PLIC_GPIO_IRQ18 = 19,
-    EVALSOC_PLIC_GPIO_IRQ19 = 20,
-    EVALSOC_PLIC_GPIO_IRQ20 = 21,
-    EVALSOC_PLIC_GPIO_IRQ21 = 22,
-    EVALSOC_PLIC_GPIO_IRQ22 = 23,
-    EVALSOC_PLIC_GPIO_IRQ23 = 24,
-    EVALSOC_PLIC_GPIO_IRQ24 = 25,
-    EVALSOC_PLIC_GPIO_IRQ25 = 26,
-    EVALSOC_PLIC_GPIO_IRQ26 = 27,
-    EVALSOC_PLIC_GPIO_IRQ27 = 28,
-    EVALSOC_PLIC_GPIO_IRQ28 = 29,
-    EVALSOC_PLIC_GPIO_IRQ29 = 30,
-    EVALSOC_PLIC_GPIO_IRQ30 = 31,
-    EVALSOC_PLIC_GPIO_IRQ31 = 32,
-    EVALSOC_PLIC_UART0_IRQ = 33,
-    EVALSOC_PLIC_GPIO_IRQ33 = 34,
-    EVALSOC_PLIC_SPI0_IRQ = 35,
-    EVALSOC_PLIC_SPI1_IRQ = 36,
-    EVALSOC_PLIC_SPI2_IRQ = 37,
-    EVALSOC_PLIC_COUNTER0_IRQ = 38,
-    EVALSOC_PLIC_COUNTER1_IRQ = 39,
-    EVALSOC_PLIC_INT_MAX
-};
-
 #define EVALSOC_UART0_IRQ_BASE                    1
 #define EVALSOC_UDMA_IRQ_BASE                     2
 #define EVALSOC_QSPI0_IRQ_BASE                    3
 #define EVALSOC_QSPI1_IRQ_BASE                    4
 #define EVALSOC_QSPI2_IRQ_BASE                    5
+#define EVALSOC_COUNTER0_IRQ_BASE                 6
+#define EVALSOC_COUNTER1_IRQ_BASE                 7
 #define EVALSOC_XEC0_IRQ_BASE                     8
 
 #define PLIC_IRQ_TO_ECLIC_IRQ(n)                  (n + 18)
-#define EVALSOC_DEFAULT_IRQMAX                    40
+#define EVALSOC_IRQMAX_MIN                        40
+#define EVALSOC_IRQMAX_LIMIT                      1024
+#define EVALSOC_DEFAULT_IRQMAX                    EVALSOC_IRQMAX_LIMIT
 
 enum
 {
@@ -277,14 +241,13 @@ enum
 #define EVALSOC_CLM_WAY_EN          0
 #define EVALSOC_CLUSTER_CACHE_SIZE  0x40000
 
-#define EVALSOC_ECLIC_NUM_SOURCES 4096
-#define EVALSOC_ECLIC_NUM_SOURCES_WITH_SMODE 1024
+#define EVALSOC_ECLIC_NUM_SOURCES EVALSOC_IRQMAX_LIMIT
 
 #define EVALSOC_MANAGEMENT_CPU_COUNT 1
 #define EVALSOC_COMPUTE_CPU_COUNT 16
 
 #define EVALSOC_PLIC_HART_CONFIG "MS"
-#define EVALSOC_PLIC_NUM_SOURCES 1024
+#define EVALSOC_PLIC_NUM_SOURCES EVALSOC_IRQMAX_LIMIT
 #define EVALSOC_PLIC_NUM_PRIORITIES 7
 #define EVALSOC_PLIC_PRIORITY_BASE 0x00
 #define EVALSOC_PLIC_PENDING_BASE 0x1000

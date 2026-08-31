@@ -659,6 +659,7 @@ struct CPUArchState {
     uint32_t exccode; /* Current encoded ECLIC claim for riscv_cpu_do_interrupt(). */
     bool irq_pending;
     void *eclic;
+    uint32_t eclic_num_sources;
     void *clic;       /* clic interrupt controller */
     void *systimer;
 

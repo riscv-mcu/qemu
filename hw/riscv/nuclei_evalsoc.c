@@ -109,8 +109,6 @@ static bool evalsoc_has_plic(const EvalSoCState *s)
     return (s->aia_type == EVALSOC_AIA_TYPE_NONE) && s->iregion.plic_en;
 }
 
-static uint32_t get_irq_number_alignment(uint64_t n);
-
 #define EVALSOC_DUAL_IRQ_DELTA   32
 
 typedef struct EvalSoCIrqFanout {
@@ -118,131 +116,134 @@ typedef struct EvalSoCIrqFanout {
     int count;
 } EvalSoCIrqFanout;
 
-static inline uint32_t evalsoc_irqchip_num_sources(const EvalSoCState *s)
-{
-    uint32_t max_id = s->irqmax ? (s->irqmax - 1 + EVALSOC_DUAL_IRQ_DELTA) : 0;
+/* Each route entry keeps up to two board-level sink IDs:
+ * ids[0] is the base line and ids[1] is the +32 companion line.
+ * count says how many entries in ids[] are valid for this source.
+ */
+typedef struct EvalSoCIrqRoute {
+    uint64_t ids[2];
+    int count;
+} EvalSoCIrqRoute;
 
-    return MIN(max_id + 1, EVALSOC_PLIC_NUM_SOURCES);
+/* If any dual-source IRQ is explicitly present in soc-cfg, the remaining dual-source
+ * devices keep only the large companion line.
+ */
+static bool evalsoc_any_dual_irq_present(const EvalSoCState *s)
+{
+    return (s->uart0.enable && s->uart0.irq_present) ||
+           (s->udma.enable && s->udma.irq_present) ||
+           (s->qspi0.enable && s->qspi0.irq_present) ||
+           (s->qspi1.enable && s->qspi1.irq_present) ||
+           (s->qspi2.enable && s->qspi2.irq_present) ||
+           (s->misc.enable &&
+            (s->misc.counter0_irq_present ||
+             s->misc.counter1_irq_present));
 }
 
-static inline uint32_t evalsoc_eclic_num_sources(const EvalSoCState *s)
+static EvalSoCIrqRoute evalsoc_make_irq_route(const EvalSoCState *s,
+                                              uint64_t irq,
+                                              bool dual,
+                                              bool irq_present)
 {
-    uint32_t max_irq = s->irqmax ? (s->irqmax - 1 + EVALSOC_DUAL_IRQ_DELTA) : 0;
-    uint32_t max_eclic_irq = PLIC_IRQ_TO_ECLIC_IRQ(max_irq);
+    EvalSoCIrqRoute route = { 0 };
 
-    return get_irq_number_alignment(max_eclic_irq + 1);
-}
-
-static inline uint32_t evalsoc_cidu_num_sources(uint32_t eclic_num_sources)
-{
-    return eclic_num_sources - CIDU_EXT_INT_OFST;
-}
-
-static bool evalsoc_hart0_has_smode(void)
-{
-    RISCVCPU *cpu = RISCV_CPU(qemu_get_cpu(0));
-
-    return cpu && riscv_has_ext(&cpu->env, RVS);
-}
-
-static uint32_t evalsoc_effective_eclic_num_sources(uint32_t num_sources)
-{
-    if (evalsoc_hart0_has_smode()) {
-        return MIN(num_sources,
-                   (uint32_t)EVALSOC_ECLIC_NUM_SOURCES_WITH_SMODE);
+    if (!dual || irq_present) {
+        route.ids[route.count++] = irq;
+    } else if (evalsoc_any_dual_irq_present(s)) {
+        route.ids[route.count++] = irq + EVALSOC_DUAL_IRQ_DELTA;
+    } else {
+        route.ids[route.count++] = irq;
+        route.ids[route.count++] = irq + EVALSOC_DUAL_IRQ_DELTA;
     }
 
-    return num_sources;
-}
-
-static void evalsoc_validate_eclic_irq_layout(const EvalSoCState *s,
-                                              uint32_t eclic_num_sources)
-{
-    uint64_t max_irq = s->irqmax ? (s->irqmax - 1 + EVALSOC_DUAL_IRQ_DELTA) : 0;
-    uint64_t max_eclic_irq = PLIC_IRQ_TO_ECLIC_IRQ(max_irq);
-    uint64_t max_irqmax = eclic_num_sources -
-                          EVALSOC_DUAL_IRQ_DELTA -
-                          PLIC_IRQ_TO_ECLIC_IRQ(0);
-
-    if (max_eclic_irq >= eclic_num_sources) {
-        error_report("irqmax=%" PRIu64
-                     " exceeds ECLIC-visible range for the current CPU "
-                     "privilege configuration; max supported value is %" PRIu64
-                     " (num_sources=%u, hart0.s=%s)",
-                     s->irqmax, max_irqmax, eclic_num_sources,
-                     evalsoc_hart0_has_smode() ? "true" : "false");
-        exit(1);
-    }
+    return route;
 }
 
 static void evalsoc_validate_irq_layout(const EvalSoCState *s)
 {
-    evalsoc_device_info misc_counter0 = {
-        .irq = s->misc.counter0_irq,
-        .enable = s->misc.enable,
-    };
-    evalsoc_device_info misc_counter1 = {
-        .irq = s->misc.counter1_irq,
-        .enable = s->misc.enable,
-    };
+    bool legacy_plic = (s->aia_type == EVALSOC_AIA_TYPE_NONE) &&
+                       !(s->aplic_m.enable | s->aplic_s.enable);
+    bool has_irqchip = legacy_plic ? s->iregion.plic_en : true;
+    bool has_eclic = evalsoc_has_eclic(s) || s->iregion.cidu_en;
     struct {
         const char *name;
-        const evalsoc_device_info *dev;
+        uint64_t irq;
+        bool enabled;
+        bool dual;
+        bool irq_present;
     } devices[] = {
-        { "uart0", &s->uart0 },
-        { "udma",  &s->udma  },
-        { "qspi0", &s->qspi0 },
-        { "qspi2", &s->qspi2 },
-        { "xec0",  &s->xec0  },
-        { "misc.counter0", &misc_counter0 },
-        { "misc.counter1", &misc_counter1 },
+        { "uart0", s->uart0.irq, s->uart0.enable, true,
+          s->uart0.irq_present },
+        { "udma", s->udma.irq, s->udma.enable, true,
+          s->udma.irq_present },
+        { "qspi0", s->qspi0.irq, s->qspi0.enable, true,
+          s->qspi0.irq_present },
+        { "qspi1", s->qspi1.irq, s->qspi1.enable, true,
+          s->qspi1.irq_present },
+        { "qspi2", s->qspi2.irq, s->qspi2.enable, true,
+          s->qspi2.irq_present },
+        { "xec0", s->xec0.irq, s->xec0.enable, false,
+          s->xec0.irq_present },
+        { "misc.counter0", s->misc.counter0_irq, s->misc.enable, true,
+          s->misc.counter0_irq_present },
+        { "misc.counter1", s->misc.counter1_irq, s->misc.enable, true,
+          s->misc.counter1_irq_present },
     };
-    uint64_t max_base_irq;
-    uint64_t max_irq;
     size_t i;
 
-    if (s->irqmax < EVALSOC_DEFAULT_IRQMAX) {
-        error_report("irqmax=%" PRIu64 " is less than the minimum supported value %d",
-                     s->irqmax, EVALSOC_DEFAULT_IRQMAX);
-        exit(1);
-    }
-
-    if (s->irqmax > EVALSOC_PLIC_NUM_SOURCES - EVALSOC_DUAL_IRQ_DELTA) {
+    if (s->irqmax < EVALSOC_IRQMAX_MIN || s->irqmax > EVALSOC_IRQMAX_LIMIT) {
         error_report("irqmax=%" PRIu64
-                     " is too large for dual-IRQ fanout; max supported value is %u",
-                     s->irqmax, EVALSOC_PLIC_NUM_SOURCES - EVALSOC_DUAL_IRQ_DELTA);
+                     " is outside supported interrupt source count [%u, %u]",
+                     s->irqmax, EVALSOC_IRQMAX_MIN, EVALSOC_IRQMAX_LIMIT);
         exit(1);
     }
 
-    max_base_irq = s->irqmax - 1;
-    max_irq = max_base_irq + EVALSOC_DUAL_IRQ_DELTA;
+    if (s->iregion.cidu_en && s->irqmax <= CIDU_EXT_INT_OFST) {
+        error_report("irqmax=%" PRIu64
+                     " leaves no CIDU external interrupt inputs after offset %d",
+                     s->irqmax, CIDU_EXT_INT_OFST);
+        exit(1);
+    }
 
     for (i = 0; i < ARRAY_SIZE(devices); i++) {
-        const evalsoc_device_info *dev = devices[i].dev;
-        uint64_t companion_irq = dev->irq + EVALSOC_DUAL_IRQ_DELTA;
+        EvalSoCIrqRoute route;
+        int n;
 
-        if (!dev->enable) {
+        if (!devices[i].enabled) {
             continue;
         }
 
-        if (dev->irq == 0) {
+        if (devices[i].irq == 0) {
             error_report("%s.irq must be a non-zero external source ID",
                          devices[i].name);
             exit(1);
         }
 
-        if (dev->irq > max_base_irq) {
-            error_report("%s.irq=%" PRIu64
-                         " exceeds irqmax-visible range [1, %" PRIu64 "]",
-                         devices[i].name, dev->irq, max_base_irq);
-            exit(1);
-        }
+        route = evalsoc_make_irq_route(s, devices[i].irq,
+                                        devices[i].dual,
+                                        devices[i].irq_present);
+        for (n = 0; n < route.count; n++) {
+            uint64_t irq = route.ids[n];
+            uint64_t eclic_irq = PLIC_IRQ_TO_ECLIC_IRQ(irq);
 
-        if (companion_irq > max_irq) {
-            error_report("%s companion IRQ=%" PRIu64
-                         " exceeds fanned-out irq range [0, %" PRIu64 "]",
-                         devices[i].name, companion_irq, max_irq);
-            exit(1);
+            if (irq == 0 || irq >= s->irqmax) {
+                error_report("%s routed IRQ=%" PRIu64
+                             " exceeds PLIC/APLIC irqmax-visible range [1, %" PRIu64 "]",
+                             devices[i].name, irq, s->irqmax - 1);
+                exit(1);
+            }
+
+            /* If ECLIC cannot represent the mapped ID, it is fine as long as
+             * a PLIC/APLIC exists to own that large IRQ instead.
+             */
+            if (has_eclic && eclic_irq >= s->irqmax && !has_irqchip) {
+                error_report("%s routed ECLIC IRQ=%" PRIu64
+                             " exceeds ECLIC irqmax-visible range [0, %" PRIu64
+                             "] from source IRQ=%" PRIu64
+                             ", and no PLIC/APLIC irqchip is enabled",
+                             devices[i].name, eclic_irq, s->irqmax - 1, irq);
+                exit(1);
+            }
         }
     }
 }
@@ -278,11 +279,15 @@ static void evalsoc_irq_fanout_handler(void *opaque, int n, int level)
     }
 }
 
-static qemu_irq evalsoc_create_irq_fanout_by_id(EvalSoCSoCState *soc,
-                                                uint64_t irq)
+static qemu_irq evalsoc_create_irq_fanout(EvalSoCSoCState *soc,
+                                          const EvalSoCState *s,
+                                          uint64_t irq,
+                                          bool dual,
+                                          bool irq_present)
 {
+    EvalSoCIrqRoute route = evalsoc_make_irq_route(s, irq, dual, irq_present);
     EvalSoCIrqFanout *fanout;
-    uint64_t companion_irq = irq + EVALSOC_DUAL_IRQ_DELTA;
+    int n;
 
     fanout = g_new0(EvalSoCIrqFanout, 1);
 
@@ -291,17 +296,20 @@ static qemu_irq evalsoc_create_irq_fanout_by_id(EvalSoCSoCState *soc,
         return NULL;
     }
 
-    if (soc->irqchip) {
-        fanout->targets[fanout->count++] =
-            qdev_get_gpio_in(DEVICE(soc->irqchip), irq);
-        fanout->targets[fanout->count++] =
-            qdev_get_gpio_in(DEVICE(soc->irqchip), companion_irq);
-    }
-    if (soc->eclic) {
-        fanout->targets[fanout->count++] =
-            evalsoc_get_eclic_external_sink(soc, irq);
-        fanout->targets[fanout->count++] =
-            evalsoc_get_eclic_external_sink(soc, companion_irq);
+    for (n = 0; n < route.count; n++) {
+        uint64_t id = route.ids[n];
+
+        if (soc->irqchip) {
+            fanout->targets[fanout->count++] =
+                qdev_get_gpio_in(DEVICE(soc->irqchip), id);
+        }
+        /* Only wire the ECLIC sink when the mapped ID still fits its source
+         * window; otherwise the route stays PLIC/APLIC-only.
+         */
+        if (soc->eclic && PLIC_IRQ_TO_ECLIC_IRQ(id) < s->irqmax) {
+            fanout->targets[fanout->count++] =
+                evalsoc_get_eclic_external_sink(soc, id);
+        }
     }
 
     return qemu_allocate_irq(evalsoc_irq_fanout_handler, fanout, 0);
@@ -772,19 +780,6 @@ static QDict *parse_json_filename(const char *filename, Error **errp)
     return options;
 }
 
-static uint32_t get_irq_number_alignment(uint64_t n)
-{
-    uint32_t result = 1;
-    g_assert(n <= EVALSOC_ECLIC_NUM_SOURCES);
-    if (n < 16) {
-        return 16;
-    }
-    while (result < n) {
-        result <<= 1;
-    }
-    return (n == result) ? n : result;
-}
-
 static unsigned long string_to_uint64(const char *str)
 {
     char *end;
@@ -823,6 +818,9 @@ static void parse_json_keys_and_values(QDict *qdict, const JsonFieldMapping *key
             continue;
         }
         *(uint64_t *)mapping->field_ptr = string_to_uint64(str_val);
+        if (mapping->present_ptr) {
+            *mapping->present_ptr = true;
+        }
     }
 }
 
@@ -879,22 +877,24 @@ static void parse_json_config(MachineState *machine)
     const JsonFieldMapping misc_mappings[] = {
         {"base",    &s->misc.base,     "misc.base"},
         {"size",    &s->misc.size,     "misc.size"},
-        {"counter0_irq", &s->misc.counter0_irq, "misc.counter0_irq"},
-        {"counter1_irq", &s->misc.counter1_irq, "misc.counter1_irq"},
+        {"counter0_irq", &s->misc.counter0_irq, "misc.counter0_irq",
+         &s->misc.counter0_irq_present},
+        {"counter1_irq", &s->misc.counter1_irq, "misc.counter1_irq",
+         &s->misc.counter1_irq_present},
         {"enable",  &s->misc.enable,   "misc.enable"},
         {"version", &s->misc.version,  "misc.version"},
     };
     const JsonFieldMapping uart0_mappings[] = {
         {"base",    &s->uart0.base,     "uart0.base"},
         {"size",    &s->uart0.size,     "uart0.size"},
-        {"irq",     &s->uart0.irq,      "uart0.irq"},
+        {"irq",     &s->uart0.irq,      "uart0.irq", &s->uart0.irq_present},
         {"enable",  &s->uart0.enable,   "uart0.enable"},
         {"version", &s->uart0.version,  "uart0.version"},
     };
     const JsonFieldMapping qspi0_mappings[] = {
         {"base",    &s->qspi0.base,     "qspi0.base"},
         {"size",    &s->qspi0.size,     "qspi0.size"},
-        {"irq",     &s->qspi0.irq,      "qspi0.irq"},
+        {"irq",     &s->qspi0.irq,      "qspi0.irq", &s->qspi0.irq_present},
         {"enable",  &s->qspi0.enable,   "qspi0.enable"},
         {"version", &s->qspi0.version,  "qspi0.version"},
         {"xip_base",   &s->qspi0_xip.base,   "qspi0.xip_base"},
@@ -904,28 +904,28 @@ static void parse_json_config(MachineState *machine)
     const JsonFieldMapping udma_mappings[] = {
         {"base",    &s->udma.base,     "udma.base"},
         {"size",    &s->udma.size,     "udma.size"},
-        {"irq",     &s->udma.irq,      "udma.irq"},
+        {"irq",     &s->udma.irq,      "udma.irq", &s->udma.irq_present},
         {"enable",  &s->udma.enable,   "udma.enable"},
         {"version", &s->udma.version,  "udma.version"},
     };
     const JsonFieldMapping qspi1_mappings[] = {
         {"base",    &s->qspi1.base,     "qspi1.base"},
         {"size",    &s->qspi1.size,     "qspi1.size"},
-        {"irq",     &s->qspi1.irq,      "qspi1.irq"},
+        {"irq",     &s->qspi1.irq,      "qspi1.irq", &s->qspi1.irq_present},
         {"enable",  &s->qspi1.enable,   "qspi1.enable"},
         {"version", &s->qspi1.version,  "qspi1.version"},
     };
     const JsonFieldMapping qspi2_mappings[] = {
         {"base",    &s->qspi2.base,     "qspi2.base"},
         {"size",    &s->qspi2.size,     "qspi2.size"},
-        {"irq",     &s->qspi2.irq,      "qspi2.irq"},
+        {"irq",     &s->qspi2.irq,      "qspi2.irq", &s->qspi2.irq_present},
         {"enable",  &s->qspi2.enable,   "qspi2.enable"},
         {"version", &s->qspi2.version,  "qspi2.version"},
     };
     const JsonFieldMapping xec0_mappings[] = {
         {"base",    &s->xec0.base,      "xec0.base"},
         {"size",    &s->xec0.size,      "xec0.size"},
-        {"irq",     &s->xec0.irq,       "xec0.irq"},
+        {"irq",     &s->xec0.irq,       "xec0.irq", &s->xec0.irq_present},
         {"enable",  &s->xec0.enable,    "xec0.enable"},
     };
     const JsonFieldMapping aplic_m_mappings[] = {
@@ -991,10 +991,6 @@ static void parse_json_config(MachineState *machine)
                             } else if(!strcmp(page1->key, "irqmax")) {
                                 const char *val = qstring_get_str(qobject_to(QString, page1->value));
                                 if (g_strcmp0(val, "")) {
-                                    if (string_to_uint64(val) < EVALSOC_DEFAULT_IRQMAX) {
-                                        error_report("irqmax is less than the default supported irq number: %d!", EVALSOC_DEFAULT_IRQMAX);
-                                        exit(1);
-                                    }
                                     s->irqmax = string_to_uint64(val);
                                 }
                             } else if (!strcmp(page1->key, "cpu_freq")) {
@@ -1372,28 +1368,28 @@ static void evalsoc_machine_init(MachineState *machine)
            (long)s->misc.base, (long)s->misc.size,
            (long)s->misc.counter0_irq, (long)s->misc.counter1_irq,
            (long)s->misc.version);
-    DEBUGF("uart0   : base:0x%lx, size:0x%lx, irq:%d/+32, version:0x%lx\n",
-           (long)s->uart0.base, (long)s->uart0.size, (int)s->uart0.irq,
+    DEBUGF("uart0   : base:0x%lx, size:0x%lx, irq:%ld, version:0x%lx\n",
+           (long)s->uart0.base, (long)s->uart0.size, (long)s->uart0.irq,
            (long)s->uart0.version);
     DEBUGF("aplic_m : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->aplic_m.base, (long)s->aplic_m.size, (int)s->aplic_m.enable);
     DEBUGF("aplic_s : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->aplic_s.base, (long)s->aplic_s.size, (int)s->aplic_s.enable);
     DEBUGF("imsic_m : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->imsic_m.base, (long)s->imsic_m.size, (int)s->imsic_m.enable);
     DEBUGF("imsic_s : base:0x%lx, size:0x%lx, enable:%d\n", (long)s->imsic_s.base, (long)s->imsic_s.size, (int)s->imsic_s.enable);
-    DEBUGF("qspi0   : base:0x%lx, size:0x%lx, irq:%d/+32, version:0x%lx\n",
-           (long)s->qspi0.base, (long)s->qspi0.size, (int)s->qspi0.irq,
+    DEBUGF("qspi0   : base:0x%lx, size:0x%lx, irq:%ld, version:0x%lx\n",
+           (long)s->qspi0.base, (long)s->qspi0.size, (long)s->qspi0.irq,
            (long)s->qspi0.version);
-    DEBUGF("udma    : base:0x%lx, size:0x%lx, irq:%d/+32, version:0x%lx\n",
-           (long)s->udma.base, (long)s->udma.size, (int)s->udma.irq,
+    DEBUGF("udma    : base:0x%lx, size:0x%lx, irq:%ld, version:0x%lx\n",
+           (long)s->udma.base, (long)s->udma.size, (long)s->udma.irq,
            (long)s->udma.version);
     DEBUGF("qspi0_xip: base:0x%lx, size:0x%lx, enable:%ld\n", (long)s->qspi0_xip.base, (long)s->qspi0_xip.size, (long)s->qspi0_xip.enable);
-    DEBUGF("qspi1   : base:0x%lx, size:0x%lx, irq:%d/+32, version:0x%lx\n",
-           (long)s->qspi1.base, (long)s->qspi1.size, (int)s->qspi1.irq,
+    DEBUGF("qspi1   : base:0x%lx, size:0x%lx, irq:%ld, version:0x%lx\n",
+           (long)s->qspi1.base, (long)s->qspi1.size, (long)s->qspi1.irq,
            (long)s->qspi1.version);
-    DEBUGF("qspi2   : base:0x%lx, size:0x%lx, irq:%d/+32, version:0x%lx\n",
-           (long)s->qspi2.base, (long)s->qspi2.size, (int)s->qspi2.irq,
+    DEBUGF("qspi2   : base:0x%lx, size:0x%lx, irq:%ld, version:0x%lx\n",
+           (long)s->qspi2.base, (long)s->qspi2.size, (long)s->qspi2.irq,
            (long)s->qspi2.version);
-    DEBUGF("xec0    : base:0x%lx, size:0x%lx, irq:%d/+32\n",
-           (long)s->xec0.base, (long)s->xec0.size, (int)s->xec0.irq);
+    DEBUGF("xec0    : base:0x%lx, size:0x%lx, irq:%ld\n",
+           (long)s->xec0.base, (long)s->xec0.size, (long)s->xec0.irq);
     DEBUGF("iregion : base:0x%lx, size:0x%lx\n", (long)s->iregion.base, (long)s->iregion.size);
     DEBUGF("irqmax  : %d\n", (int)s->irqmax);
     DEBUGF("timer_freq : %d\n", (int)s->timer_freq);
@@ -1468,12 +1464,7 @@ static void evalsoc_machine_instance_init(Object *obj)
 
     s->cpu_freq = EVALSOC_CPU_FREQ;
     s->timer_freq = EVALSOC_TIMEBASE_FREQ;
-    /* irqmax: max irq number for external irq
-            1.eclic core irq:irq[0~18] external irq:irq[19...4095]
-            2.plic  irq 0: wire 0 external irq:irq[1...1023]
-            3.when hart0 keeps S-mode enabled, board-level ECLIC wiring is
-              later capped to at most 1024 sources during SoC realize
-    */
+    /* irqmax is the shared external interrupt ceiling for ECLIC/PLIC/APLIC. */
     s->irqmax = EVALSOC_DEFAULT_IRQMAX;
     /* Default to the Nuclei reset value unless soc-cfg overrides it. */
     s->iregion.base = IREGION_BASE_ADDR;
@@ -1508,8 +1499,8 @@ static void evalsoc_machine_instance_init(Object *obj)
     s->test.enable = 1;
     s->misc.base = memmap[EVALSOC_MISC].base;
     s->misc.size = memmap[EVALSOC_MISC].size;
-    s->misc.counter0_irq = EVALSOC_PLIC_COUNTER0_IRQ;
-    s->misc.counter1_irq = EVALSOC_PLIC_COUNTER1_IRQ;
+    s->misc.counter0_irq = EVALSOC_COUNTER0_IRQ_BASE;
+    s->misc.counter1_irq = EVALSOC_COUNTER1_IRQ_BASE;
     s->misc.enable = 1;
     s->misc.version = 0;
     s->uart0.base = memmap[EVALSOC_UART0].base;
@@ -1766,9 +1757,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     bool msimode;
     hwaddr msi_addr;
     uint32_t guest_bits;
-    uint32_t irqchip_num_sources = evalsoc_irqchip_num_sources(mst);
-    uint32_t eclic_num_sources;
-    uint32_t cidu_num_sources;
+    uint32_t irqmax;
     qemu_irq uart0_irq = NULL;
     qemu_irq udma_irq = NULL;
     qemu_irq qspi0_irq = NULL;
@@ -1784,16 +1773,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     sysbus_realize(SYS_BUS_DEVICE(&s->cpus), &error_abort);
     big_endian = s->cpus.harts[0].cfg.big_endian;
 
-    eclic_num_sources =
-        evalsoc_effective_eclic_num_sources(evalsoc_eclic_num_sources(mst));
-    cidu_num_sources = evalsoc_cidu_num_sources(eclic_num_sources);
-    if (mst->iregion.eclic_en || mst->iregion.cidu_en) {
-        /*
-         * Keep the board-level IRQ fanout within the source bank size selected
-         * from hart0's current S-mode capability.
-         */
-        evalsoc_validate_eclic_irq_layout(mst, eclic_num_sources);
-    }
+    irqmax = (uint32_t)mst->irqmax;
 
     /*
      * The cluster must be realized after the RISC-V hart array container,
@@ -1826,7 +1806,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
             s->irqchip = sifive_plic_create(
                 memmap[EVALSOC_PLIC].base + mst->iregion.base,
                 plic_hart_config, ms->smp.cpus, 0,
-                irqchip_num_sources,
+                irqmax,
                 EVALSOC_PLIC_NUM_PRIORITIES,
                 EVALSOC_PLIC_PRIORITY_BASE,
                 EVALSOC_PLIC_PENDING_BASE,
@@ -1878,7 +1858,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
             mst->aplic_m.size,
             0,
             (msimode) ? 0 : ms->smp.cpus,
-            irqchip_num_sources,
+            irqmax - 1,
             VIRT_IRQCHIP_NUM_PRIO_BITS,
             msimode, true, NULL);
 
@@ -1889,7 +1869,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                 mst->aplic_s.size,
                 0,
                 (msimode) ? 0 : ms->smp.cpus,
-                irqchip_num_sources,
+                irqmax - 1,
                 VIRT_IRQCHIP_NUM_PRIO_BITS,
                 msimode, false, s->irqchip);
         }
@@ -1901,7 +1881,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                     memmap[EVALSOC_ECLIC].size,
                     true,
                     ms->smp.cpus,
-                    eclic_num_sources,
+                    irqmax,
                     /* Pass the board-visible CLICINTCTLBITS straight into the
                      * ECLIC model so clicinfo matches the selected soc-cfg.
                      */
@@ -1917,12 +1897,13 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                 nuclei_cidu_create(memmap[EVALSOC_CIDU].base + mst->iregion.base,
                     memmap[EVALSOC_CIDU].size,
                     ms->smp.cpus,
-                    cidu_num_sources,
+                    irqmax - CIDU_EXT_INT_OFST,
                     s->eclic,
                     big_endian) : NULL;
 
     if (mst->uart0.enable) {
-        uart0_irq = evalsoc_create_irq_fanout_by_id(s, mst->uart0.irq);
+        uart0_irq = evalsoc_create_irq_fanout(s, mst, mst->uart0.irq, true,
+                                              mst->uart0.irq_present);
         if (mst->uart0.version >= NUCLEI_USART_VERSION_3_1_0) {
             nuclei_usart_create(mst->uart0.base,
                                 mst->uart0.size,
@@ -1953,9 +1934,11 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->misc), 0, mst->misc.base);
         /* Only Counter0/1 use the shared external interrupt fanout path. */
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->misc), 0,
-                evalsoc_create_irq_fanout_by_id(s, mst->misc.counter0_irq));
+                evalsoc_create_irq_fanout(s, mst, mst->misc.counter0_irq, true,
+                                          mst->misc.counter0_irq_present));
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->misc), 1,
-                evalsoc_create_irq_fanout_by_id(s, mst->misc.counter1_irq));
+                evalsoc_create_irq_fanout(s, mst, mst->misc.counter1_irq, true,
+                                          mst->misc.counter1_irq_present));
     }
 
     object_property_set_link(OBJECT(&s->spi0), "udma",
@@ -1966,7 +1949,8 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         return;
     }
     if (mst->qspi0.enable) {
-        qspi0_irq = evalsoc_create_irq_fanout_by_id(s, mst->qspi0.irq);
+        qspi0_irq = evalsoc_create_irq_fanout(s, mst, mst->qspi0.irq, true,
+                                              mst->qspi0.irq_present);
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi0), 0,
                         mst->qspi0.base);
         if (mst->qspi0_xip.enable) {
@@ -1980,7 +1964,8 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         return;
     }
     if (mst->qspi2.enable) {
-        qspi2_irq = evalsoc_create_irq_fanout_by_id(s, mst->qspi2.irq);
+        qspi2_irq = evalsoc_create_irq_fanout(s, mst, mst->qspi2.irq, true,
+                                              mst->qspi2.irq_present);
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi2), 0,
                         mst->qspi2.base);
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi2), 0, qspi2_irq);
@@ -1990,7 +1975,8 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         return;
     }
     if (mst->udma.enable) {
-        udma_irq = evalsoc_create_irq_fanout_by_id(s, mst->udma.irq);
+        udma_irq = evalsoc_create_irq_fanout(s, mst, mst->udma.irq, true,
+                                             mst->udma.irq_present);
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->udma), 0, mst->udma.base);
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->udma), 0, udma_irq);
     }
@@ -2002,7 +1988,8 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         return;
     }
     if (mst->xec0.enable) {
-        xec0_irq = evalsoc_create_irq_fanout_by_id(s, mst->xec0.irq);
+        xec0_irq = evalsoc_create_irq_fanout(s, mst, mst->xec0.irq, false,
+                                             mst->xec0.irq_present);
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->xec0), 0,
                         mst->xec0.base);
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->xec0), 0, xec0_irq);

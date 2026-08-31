@@ -5341,6 +5341,60 @@ static RISCVException write_ucode(CPURISCVState *env, int csrno,
 }
 
 #if !defined(CONFIG_USER_ONLY)
+/* ECLIC vector-table alignment follows ISA spec sections 8.5.15 and 19.2.2.5. */
+static uint32_t nuclei_eclic_mtvt_alignment(uint32_t num_sources, bool rv64)
+{
+    uint32_t sources = num_sources ? num_sources : 16;
+    uint32_t alignment;
+
+    if (sources <= 16) {
+        alignment = 64;
+    } else if (sources <= 32) {
+        alignment = 128;
+    } else if (sources <= 64) {
+        alignment = 256;
+    } else if (sources <= 128) {
+        alignment = 512;
+    } else if (sources <= 256) {
+        alignment = 1024;
+    } else if (sources <= 512) {
+        alignment = 2048;
+    } else if (sources <= 1024) {
+        alignment = 4096;
+    } else if (sources <= 2048) {
+        alignment = 8192;
+    } else {
+        alignment = 16384;
+    }
+
+    if (rv64) {
+        alignment <<= 1;
+    }
+
+    return alignment;
+}
+
+static uint32_t nuclei_eclic_stvt_alignment(uint32_t num_sources)
+{
+    uint32_t sources = num_sources ? num_sources : 16;
+
+    if (sources <= 16) {
+        return 64;
+    } else if (sources <= 32) {
+        return 128;
+    } else if (sources <= 64) {
+        return 256;
+    } else if (sources <= 128) {
+        return 512;
+    } else if (sources <= 256) {
+        return 1024;
+    } else if (sources <= 512) {
+        return 2048;
+    }
+
+    return 4096;
+}
+
 static int read_mtvt(CPURISCVState *env, int csrno, target_ulong *val)
 {
     *val = env->mtvt;
@@ -5349,7 +5403,10 @@ static int read_mtvt(CPURISCVState *env, int csrno, target_ulong *val)
 
 static int write_mtvt(CPURISCVState *env, int csrno, target_ulong val)
 {
-    env->mtvt = val;
+    uint32_t alignment = nuclei_eclic_mtvt_alignment(env->eclic_num_sources,
+                                                      riscv_cpu_mxl(env) == MXL_RV64);
+
+    env->mtvt = val & ~((target_ulong)alignment - 1);
     return RISCV_EXCP_NONE;
 }
 
@@ -5361,7 +5418,9 @@ static int read_stvt(CPURISCVState *env, int csrno, target_ulong *val)
 
 static int write_stvt(CPURISCVState *env, int csrno, target_ulong val)
 {
-    env->stvt = val & ~((target_ulong)0x3f);
+    uint32_t alignment = nuclei_eclic_stvt_alignment(env->eclic_num_sources);
+
+    env->stvt = val & ~((target_ulong)alignment - 1);
     return RISCV_EXCP_NONE;
 }
 

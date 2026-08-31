@@ -1269,6 +1269,7 @@ static void nuclei_eclic_realize(DeviceState *dev, Error **errp)
         }
 
         cpu->env.eclic = eclic;
+        cpu->env.eclic_num_sources = eclic->num_sources;
         nuclei_eclic_sync_cpu_thresholds(eclic, i);
         nuclei_eclic_shadow_gpr_init(&cpu->env);
     }
