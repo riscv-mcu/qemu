@@ -82,6 +82,7 @@ struct NucleiXECState {
     NetClientState *drop_peer;
     NICConf conf;
     qemu_irq irq;
+    uint64_t size;
     uint8_t mac[6];
     uint32_t revision;
 

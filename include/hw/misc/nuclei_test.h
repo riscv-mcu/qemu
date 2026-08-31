@@ -44,6 +44,6 @@ enum {
     FINISHER_RESET = 0x7777
 };
 
-DeviceState *nuclei_test_create(hwaddr addr, bool big_endian);
+DeviceState *nuclei_test_create(hwaddr addr, uint64_t size, bool big_endian);
 
 #endif

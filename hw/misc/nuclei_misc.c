@@ -315,6 +315,7 @@ static const VMStateDescription vmstate_nuclei_misc = {
 static Property nuclei_misc_props[] = {
     DEFINE_PROP_UINT32("tick-hz", NucleiMiscState, tick_hz, 32768),
     DEFINE_PROP_UINT32("version", NucleiMiscState, version, 0),
+    DEFINE_PROP_UINT64("size", NucleiMiscState, size, NUCLEI_MISC_SIZE),
     DEFINE_PROP_END_OF_LIST(),
 };
 
@@ -324,9 +325,6 @@ static void nuclei_misc_init(Object *obj)
     SysBusDevice *sbd = SYS_BUS_DEVICE(obj);
     int i;
 
-    memory_region_init_io(&s->mmio, obj, &nuclei_misc_ops, s,
-                          TYPE_NUCLEI_MISC, NUCLEI_MISC_SIZE);
-    sysbus_init_mmio(sbd, &s->mmio);
     sysbus_init_irq(sbd, &s->irq[0]);
     sysbus_init_irq(sbd, &s->irq[1]);
     /*
@@ -365,6 +363,10 @@ static void nuclei_misc_realize(DeviceState *dev, Error **errp)
         error_setg(errp, "tick-hz must be non-zero");
         return;
     }
+
+    memory_region_init_io(&s->mmio, OBJECT(dev), &nuclei_misc_ops, s,
+                          TYPE_NUCLEI_MISC, s->size);
+    sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->mmio);
 }
 
 static void nuclei_misc_class_init(ObjectClass *klass, void *data)

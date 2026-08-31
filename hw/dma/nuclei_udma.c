@@ -1703,9 +1703,6 @@ static void nuclei_udma_init(Object *obj)
     SysBusDevice *sbd = SYS_BUS_DEVICE(obj);
 
     sysbus_init_irq(sbd, &s->irq);
-    memory_region_init_io(&s->mmio, obj, &nuclei_udma_ops, s,
-                          TYPE_NUCLEI_UDMA, NUCLEI_UDMA_REG_SIZE);
-    sysbus_init_mmio(sbd, &s->mmio);
 }
 
 static void nuclei_udma_realize(DeviceState *dev, Error **errp)
@@ -1742,6 +1739,10 @@ static void nuclei_udma_realize(DeviceState *dev, Error **errp)
                    NUCLEI_UDMA_PAM_MAX_REQ_QUEUE_DEPTH);
         return;
     }
+
+    memory_region_init_io(&s->mmio, OBJECT(dev), &nuclei_udma_ops, s,
+                          TYPE_NUCLEI_UDMA, s->size);
+    sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->mmio);
 
     if (!s->mem_mr || s->mem_mr == get_system_memory()) {
         s->mem_mr = get_system_memory();
@@ -1788,6 +1789,8 @@ static Property nuclei_udma_properties[] = {
                        NUCLEI_UDMA_DEFAULT_PAM_REQ_QUEUE_DEPTH),
     DEFINE_PROP_UINT32("version", NucleiUDMAState, version,
                        NUCLEI_UDMA_DEFAULT_VERSION),
+    DEFINE_PROP_UINT64("size", NucleiUDMAState, size,
+                       NUCLEI_UDMA_REG_SIZE),
     DEFINE_PROP_LINK("memory", NucleiUDMAState, mem_mr,
                      TYPE_MEMORY_REGION, MemoryRegion *),
     DEFINE_PROP_END_OF_LIST(),

@@ -71,6 +71,7 @@ struct NucleiMiscState {
 
     uint32_t tick_hz;
     uint32_t version;
+    uint64_t size;
 
     uint32_t iocp_r;
     uint32_t iocp_w;

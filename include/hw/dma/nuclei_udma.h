@@ -259,6 +259,7 @@ typedef struct NucleiUDMAState {
     uint32_t per_channels;
     uint32_t version;
     uint32_t pamem_request_queue_depth;
+    uint64_t size;
 
     uint32_t pctrl;
     uint32_t event;

@@ -1278,12 +1278,18 @@ static void evalsoc_machine_init(MachineState *machine)
                              &error_abort);
     object_property_set_uint(OBJECT(&s->soc.spi0), "version",
                              s->qspi0.version, &error_abort);
+    object_property_set_uint(OBJECT(&s->soc.spi0), "size",
+                             s->qspi0.size, &error_abort);
     object_property_set_uint(OBJECT(&s->soc.spi0), "xip-size",
                              s->qspi0_xip.size, &error_abort);
     object_property_set_uint(OBJECT(&s->soc.udma), "version",
                              s->udma.version, &error_abort);
+    object_property_set_uint(OBJECT(&s->soc.udma), "size",
+                             s->udma.size, &error_abort);
     object_property_set_uint(OBJECT(&s->soc.spi2), "version",
                              s->qspi2.version, &error_abort);
+    object_property_set_uint(OBJECT(&s->soc.spi2), "size",
+                             s->qspi2.size, &error_abort);
     qdev_realize(DEVICE(&s->soc), NULL, &error_abort);
 
     //ilm
@@ -1919,14 +1925,14 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         uart0_irq = evalsoc_create_irq_fanout_by_id(s, mst->uart0.irq);
         if (mst->uart0.version >= NUCLEI_USART_VERSION_3_1_0) {
             nuclei_usart_create(mst->uart0.base,
-                                memmap[EVALSOC_UART0].size,
+                                mst->uart0.size,
                                 serial_hd(0),
                                 uart0_irq,
                                 mst->uart0.version,
                                 big_endian);
         } else {
             nuclei_uart_create(mst->uart0.base,
-                               memmap[EVALSOC_UART0].size,
+                               mst->uart0.size,
                                serial_hd(0),
                                uart0_irq,
                                big_endian);
@@ -1939,6 +1945,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
 
     qdev_prop_set_uint32(DEVICE(&s->misc), "version", mst->misc.version);
     qdev_prop_set_uint32(DEVICE(&s->misc), "tick-hz", (uint32_t)mst->cpu_freq);
+    qdev_prop_set_uint64(DEVICE(&s->misc), "size", mst->misc.size);
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->misc), errp)) {
         return;
     }
@@ -1955,7 +1962,9 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                              OBJECT(&s->udma), &error_abort);
     qdev_prop_set_uint32(DEVICE(&s->spi0), "dma-tx-channel", 0);
     qdev_prop_set_uint32(DEVICE(&s->spi0), "dma-rx-channel", 1);
-    sysbus_realize(SYS_BUS_DEVICE(&s->spi0), errp);
+    if (!sysbus_realize(SYS_BUS_DEVICE(&s->spi0), errp)) {
+        return;
+    }
     if (mst->qspi0.enable) {
         qspi0_irq = evalsoc_create_irq_fanout_by_id(s, mst->qspi0.irq);
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi0), 0,
@@ -1967,7 +1976,9 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         sysbus_connect_irq(SYS_BUS_DEVICE(&s->spi0), 0, qspi0_irq);
     }
 
-    sysbus_realize(SYS_BUS_DEVICE(&s->spi2), errp);
+    if (!sysbus_realize(SYS_BUS_DEVICE(&s->spi2), errp)) {
+        return;
+    }
     if (mst->qspi2.enable) {
         qspi2_irq = evalsoc_create_irq_fanout_by_id(s, mst->qspi2.irq);
         sysbus_mmio_map(SYS_BUS_DEVICE(&s->spi2), 0,
@@ -1986,6 +1997,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
 
     object_property_set_int(OBJECT(&s->xec0), "revision", XEC_REVISION,
                             &error_abort);
+    qdev_prop_set_uint64(DEVICE(&s->xec0), "size", mst->xec0.size);
     if (!sysbus_realize(SYS_BUS_DEVICE(&s->xec0), errp)) {
         return;
     }
@@ -1998,7 +2010,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
 
     /* Nuclei Test MMIO device */
     if (mst->test.enable)
-        nuclei_test_create(memmap[EVALSOC_TEST].base, big_endian);
+        nuclei_test_create(mst->test.base, mst->test.size, big_endian);
 }
 
 static Property evalsoc_soc_props[] = {

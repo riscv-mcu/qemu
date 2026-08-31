@@ -35,6 +35,7 @@ typedef struct NucleiUDMAState NucleiUDMAState;
 #define NUCLEI_SPI_VERSION_1_1_0     0x00010100
 #define NUCLEI_SPI_VERSION_1_2_8     0x00010208
 #define NUCLEI_SPI_DEFAULT_VERSION   NUCLEI_SPI_VERSION_1_1_0
+#define NUCLEI_SPI_MMIO_SIZE         0x1000
 #define NUCLEI_SPI_DEFAULT_XIP_SIZE  0x04000000ULL
 
 /* Nuclei QSPI Regs */
@@ -193,6 +194,7 @@ typedef struct NucleiSPIState {
 
     uint32_t num_cs;
     uint32_t version;
+    uint64_t size;
     uint64_t xip_size;
     qemu_irq *cs_lines;
     NucleiUDMAState *udma;

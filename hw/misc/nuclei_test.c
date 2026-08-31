@@ -100,7 +100,7 @@ type_init(nuclei_test_register_types)
 /*
  * Create Test device.
  */
-DeviceState *nuclei_test_create(hwaddr addr, bool big_endian)
+DeviceState *nuclei_test_create(hwaddr addr, uint64_t size, bool big_endian)
 {
     DeviceState *dev = qdev_new(TYPE_NUCLEI_TEST);
     NucleiTestState *s = NUCLEI_TEST(dev);
@@ -109,7 +109,7 @@ DeviceState *nuclei_test_create(hwaddr addr, bool big_endian)
                           &nuclei_test_ops[s->big_endian ?
                                            DEVICE_BIG_ENDIAN :
                                            DEVICE_LITTLE_ENDIAN],
-                          s, TYPE_NUCLEI_TEST, 0x1000);
+                          s, TYPE_NUCLEI_TEST, size);
     sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->mmio);
     sysbus_realize_and_unref(SYS_BUS_DEVICE(dev), &error_fatal);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, addr);

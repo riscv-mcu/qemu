@@ -1198,7 +1198,7 @@ static void nuclei_spi_realize(DeviceState *dev, Error **errp)
     }
 
     memory_region_init_io(&s->mmio, OBJECT(s), &nuclei_spi_ops, s,
-                          TYPE_NUCLEI_SPI, 0x1000);
+                          TYPE_NUCLEI_SPI, s->size);
     sysbus_init_mmio(sbd, &s->mmio);
     memory_region_init_io(&s->xip_mmio, OBJECT(s), &nuclei_spi_xip_ops, s,
                           TYPE_NUCLEI_SPI ".xip", s->xip_size);
@@ -1223,6 +1223,7 @@ static Property nuclei_spi_properties[] = {
     DEFINE_PROP_UINT32("num-cs", NucleiSPIState, num_cs, 1),
     DEFINE_PROP_UINT32("version", NucleiSPIState, version,
                        NUCLEI_SPI_DEFAULT_VERSION),
+    DEFINE_PROP_UINT64("size", NucleiSPIState, size, NUCLEI_SPI_MMIO_SIZE),
     DEFINE_PROP_UINT64("xip-size", NucleiSPIState, xip_size,
                        NUCLEI_SPI_DEFAULT_XIP_SIZE),
     DEFINE_PROP_LINK("udma", NucleiSPIState, udma,

@@ -756,6 +756,9 @@ static NetClientInfo net_nuclei_xec_drop_peer_info = {
 static void nuclei_xec_realize(DeviceState *dev, Error **errp)
 {
     NucleiXECState *s = NUCLEI_XEC(dev);
+    memory_region_init_io(&s->mmio, OBJECT(dev), &nuclei_xec_ops, s,
+                          TYPE_NUCLEI_XEC, s->size);
+    sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->mmio);
 
     address_space_init(&s->dma_as,
                        s->dma_mr ? s->dma_mr : get_system_memory(), "dma");
@@ -832,10 +835,6 @@ static void nuclei_xec_init(Object *obj)
     DeviceState *dev = DEVICE(obj);
 
     nuclei_xec_init_register_masks(s);
-    memory_region_init_io(&s->mmio, OBJECT(s), &nuclei_xec_ops, s,
-                          TYPE_NUCLEI_XEC, sizeof(s->regs));
-
-    sysbus_init_mmio(SYS_BUS_DEVICE(dev), &s->mmio);
     qemu_configure_nic_device(dev, true, TYPE_NUCLEI_XEC);
 }
 
@@ -855,6 +854,8 @@ static Property nuclei_xec_properties[] = {
     DEFINE_NIC_PROPERTIES(NucleiXECState, conf),
     DEFINE_PROP_UINT32("revision", NucleiXECState, revision,
                        0x10000),
+    DEFINE_PROP_UINT64("size", NucleiXECState, size,
+                       XEC_MAXREG * sizeof(uint32_t)),
     DEFINE_PROP_UINT8("phy-addr", NucleiXECState, phy_addr, BOARD_PHY_ADDRESS),
     DEFINE_PROP_UINT16("jumbo-max-len", NucleiXECState,
                        jumbo_max_len, 4096),
