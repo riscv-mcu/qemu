@@ -109,6 +109,39 @@ static bool evalsoc_has_plic(const EvalSoCState *s)
     return (s->aia_type == EVALSOC_AIA_TYPE_NONE) && s->iregion.plic_en;
 }
 
+static bool evalsoc_cpu_big_endian(const RISCVCPU *cpu)
+{
+    return cpu->cfg.big_endian == ON_OFF_AUTO_ON;
+}
+
+static void evalsoc_resolve_auto_big_endian(RISCVHartArrayState *harts,
+                                            MachineState *machine)
+{
+    char *firmware_filename = NULL;
+    bool big_endian = false;
+    uint32_t i;
+
+    if (!harts->num_harts ||
+        harts->harts[0].cfg.big_endian != ON_OFF_AUTO_AUTO) {
+        return;
+    }
+
+    if (machine->firmware && strcmp(machine->firmware, "none")) {
+        firmware_filename = riscv_find_firmware(machine->firmware, NULL);
+        if (firmware_filename) {
+            riscv_probe_elf_endian(firmware_filename, &big_endian);
+            g_free(firmware_filename);
+        }
+    } else if (machine->kernel_filename) {
+        riscv_probe_elf_endian(machine->kernel_filename, &big_endian);
+    }
+
+    for (i = 0; i < harts->num_harts; i++) {
+        harts->harts[i].cfg.big_endian = big_endian ?
+                                         ON_OFF_AUTO_ON : ON_OFF_AUTO_OFF;
+    }
+}
+
 #define EVALSOC_DUAL_IRQ_DELTA   32
 
 typedef struct EvalSoCIrqFanout {
@@ -1395,7 +1428,7 @@ static void evalsoc_machine_init(MachineState *machine)
     DEBUGF("timer_freq : %d\n", (int)s->timer_freq);
     DEBUGF("firmware startup addr:0x%lx\n", (long)start_addr);
 
-    big_endian = s->soc.cpus.harts[0].cfg.big_endian;
+    big_endian = evalsoc_cpu_big_endian(&s->soc.cpus.harts[0]);
     if ((!machine->firmware || !strcmp(machine->firmware, "none")) &&
         machine->kernel_filename && strstr(s->soc.cpu_type, "n100")) {
         if (load_elf_ram_sym(machine->kernel_filename,
@@ -1415,7 +1448,8 @@ static void evalsoc_machine_init(MachineState *machine)
     }
 
     if (machine->firmware && strcmp(machine->firmware, "none")) {
-        riscv_find_and_load_firmware(machine, NULL, start_addr, NULL);
+        riscv_find_and_load_firmware_endian(machine, NULL, start_addr,
+                                            big_endian, NULL);
     } else if (machine->kernel_filename && !kernel_loaded) {
         riscv_load_kernel(machine, &s->soc.cpus, start_addr, true, NULL);
     }
@@ -1771,7 +1805,8 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     qdev_prop_set_uint64(DEVICE(&s->cpus), "resetvec", s->boot_addr);
 
     sysbus_realize(SYS_BUS_DEVICE(&s->cpus), &error_abort);
-    big_endian = s->cpus.harts[0].cfg.big_endian;
+    evalsoc_resolve_auto_big_endian(&s->cpus, ms);
+    big_endian = evalsoc_cpu_big_endian(&s->cpus.harts[0]);
 
     irqmax = (uint32_t)mst->irqmax;
 

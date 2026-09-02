@@ -21,6 +21,8 @@
 #ifndef RISCV_CPU_CFG_H
 #define RISCV_CPU_CFG_H
 
+#include "qapi/qapi-types-common.h"
+
 /*
  * map is a 16-bit bitmap: the most significant set bit in map is the maximum
  * satp mode that is supported. It may be chosen by the user and must respect
@@ -194,7 +196,7 @@ struct RISCVCPUConfig {
     bool pmp;
     bool smpu;
     bool debug;
-    bool big_endian;
+    OnOffAuto big_endian;
     bool misa_w;
 
     bool short_isa_string;

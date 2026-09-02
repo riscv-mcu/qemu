@@ -22,6 +22,7 @@
 #include "qemu/datadir.h"
 #include "qemu/units.h"
 #include "qemu/error-report.h"
+#include "qapi/error.h"
 #include "exec/cpu-defs.h"
 #include "hw/boards.h"
 #include "hw/loader.h"
@@ -127,6 +128,39 @@ char *riscv_find_firmware(const char *firmware_filename,
     return filename;
 }
 
+bool riscv_probe_elf_endian(const char *filename, bool *big_endian)
+{
+    union {
+        Elf32_Ehdr h32;
+        Elf64_Ehdr h64;
+    } elf_header;
+    Error *err = NULL;
+    uint8_t elf_class;
+    uint8_t elf_data;
+
+    g_assert(big_endian != NULL);
+
+    *big_endian = false;
+    load_elf_hdr(filename, &elf_header, NULL, &err);
+    if (err) {
+        error_free(err);
+        return false;
+    }
+
+    elf_class = elf_header.h32.e_ident[EI_CLASS];
+    if (elf_class != ELFCLASS32 && elf_class != ELFCLASS64) {
+        return false;
+    }
+
+    elf_data = elf_header.h32.e_ident[EI_DATA];
+    if (elf_data != ELFDATA2LSB && elf_data != ELFDATA2MSB) {
+        return false;
+    }
+
+    *big_endian = elf_data == ELFDATA2MSB;
+    return true;
+}
+
 target_ulong riscv_find_and_load_firmware(MachineState *machine,
                                           const char *default_machine_firmware,
                                           hwaddr firmware_load_addr,
@@ -173,6 +207,57 @@ target_ulong riscv_load_firmware(const char *firmware_filename,
 
     error_report("could not load firmware '%s'", firmware_filename);
     exit(1);
+}
+
+static target_ulong riscv_load_firmware_endian(const char *firmware_filename,
+                                               hwaddr firmware_load_addr,
+                                               bool big_endian,
+                                               symbol_fn_t sym_cb)
+{
+    uint64_t firmware_entry, firmware_end;
+    ssize_t firmware_size;
+
+    g_assert(firmware_filename != NULL);
+
+    if (load_elf_ram_sym(firmware_filename, NULL, NULL, NULL,
+                         &firmware_entry, NULL, &firmware_end, NULL,
+                         big_endian, EM_RISCV, 1, 0, NULL, true, sym_cb) > 0) {
+        return firmware_end;
+    }
+
+    firmware_size = load_image_targphys_as(firmware_filename,
+                                           firmware_load_addr,
+                                           current_machine->ram_size, NULL);
+
+    if (firmware_size > 0) {
+        return firmware_load_addr + firmware_size;
+    }
+
+    error_report("could not load firmware '%s'", firmware_filename);
+    exit(1);
+}
+
+target_ulong riscv_find_and_load_firmware_endian(MachineState *machine,
+                                                 const char *default_machine_firmware,
+                                                 hwaddr firmware_load_addr,
+                                                 bool big_endian,
+                                                 symbol_fn_t sym_cb)
+{
+    char *firmware_filename;
+    target_ulong firmware_end_addr = firmware_load_addr;
+
+    firmware_filename = riscv_find_firmware(machine->firmware,
+                                            default_machine_firmware);
+
+    if (firmware_filename) {
+        /* If not "none" load the firmware */
+        firmware_end_addr = riscv_load_firmware_endian(firmware_filename,
+                                                       firmware_load_addr,
+                                                       big_endian, sym_cb);
+        g_free(firmware_filename);
+    }
+
+    return firmware_end_addr;
 }
 
 static void riscv_load_initrd(MachineState *machine, uint64_t kernel_entry)
@@ -224,7 +309,7 @@ target_ulong riscv_load_kernel(MachineState *machine,
     const char *kernel_filename = machine->kernel_filename;
     uint64_t kernel_load_base, kernel_entry;
     void *fdt = machine->fdt;
-    const bool big_endian = harts->harts[0].cfg.big_endian;
+    const bool big_endian = harts->harts[0].cfg.big_endian == ON_OFF_AUTO_ON;
 
     g_assert(kernel_filename != NULL);
 
@@ -352,7 +437,7 @@ void riscv_rom_copy_firmware_info(MachineState *machine,
 {
     struct fw_dynamic_info dinfo;
     size_t dinfo_len;
-    const bool be = harts->harts[0].cfg.big_endian;
+    const bool be = harts->harts[0].cfg.big_endian == ON_OFF_AUTO_ON;
 
     if (sizeof(dinfo.magic) == 4) {
         dinfo.magic = be ? cpu_to_be32(FW_DYNAMIC_INFO_MAGIC_VALUE)
@@ -400,7 +485,7 @@ void riscv_setup_rom_reset_vec(MachineState *machine, RISCVHartArrayState *harts
 {
     int i;
     const bool rv32 = riscv_is_32bit(harts);
-    const bool big_endian = harts->harts[0].cfg.big_endian;
+    const bool big_endian = harts->harts[0].cfg.big_endian == ON_OFF_AUTO_ON;
     /* reset vector */
     uint32_t reset_vec[10] = {
         0x00000297,                  /* 1:  auipc  t0, %pcrel_hi(fw_dyn) */

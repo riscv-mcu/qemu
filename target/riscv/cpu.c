@@ -1321,6 +1321,7 @@ static void riscv_cpu_reset_hold(Object *obj)
 #ifndef CONFIG_USER_ONLY
     uint8_t iprio;
     int i, irq, rdzero;
+    bool big_endian;
 #endif
     CPUState *cs = CPU(obj);
     RISCVCPU *cpu = RISCV_CPU(cs);
@@ -1331,6 +1332,7 @@ static void riscv_cpu_reset_hold(Object *obj)
         mcc->parent_phases.hold(obj);
     }
 #ifndef CONFIG_USER_ONLY
+    big_endian = cpu->cfg.big_endian == ON_OFF_AUTO_ON;
     env->mintstatus = 0;
     env->msubm = 0;
     env->ssubm = 0;
@@ -1359,9 +1361,9 @@ static void riscv_cpu_reset_hold(Object *obj)
                                         MSTATUS64_UXL, env->misa_mxl);
         }
     }
-    env->mstatus = set_field(env->mstatus, MSTATUS_MBE, cpu->cfg.big_endian);
-    env->mstatus = set_field(env->mstatus, MSTATUS_SBE, cpu->cfg.big_endian);
-    env->mstatus = set_field(env->mstatus, MSTATUS_UBE, cpu->cfg.big_endian);
+    env->mstatus = set_field(env->mstatus, MSTATUS_MBE, big_endian);
+    env->mstatus = set_field(env->mstatus, MSTATUS_SBE, big_endian);
+    env->mstatus = set_field(env->mstatus, MSTATUS_UBE, big_endian);
     env->mcause = 0;
     env->miclaim = MIP_SGEIP;
     env->pc = env->resetvec;
@@ -2764,7 +2766,8 @@ RISCVCPUProfile *riscv_profiles[] = {
 
 static Property riscv_cpu_properties[] = {
     DEFINE_PROP_BOOL("debug", RISCVCPU, cfg.debug, true),
-    DEFINE_PROP_BOOL("big-endian", RISCVCPU, cfg.big_endian, false),
+    DEFINE_PROP_ON_OFF_AUTO("big-endian", RISCVCPU, cfg.big_endian,
+                            ON_OFF_AUTO_AUTO),
 
     {.name = "pmu-mask", .info = &prop_pmu_mask},
     {.name = "pmu-num", .info = &prop_pmu_num}, /* Deprecated */
