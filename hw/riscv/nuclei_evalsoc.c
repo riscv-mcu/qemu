@@ -1431,7 +1431,8 @@ static void evalsoc_machine_init(MachineState *machine)
     big_endian = evalsoc_cpu_big_endian(&s->soc.cpus.harts[0]);
     if ((!machine->firmware || !strcmp(machine->firmware, "none")) &&
         machine->kernel_filename && strstr(s->soc.cpu_type, "n100")) {
-        if (load_elf_ram_sym(machine->kernel_filename,
+        if (riscv_check_elf_compatible(machine->kernel_filename, &s->soc.cpus)
+            && load_elf_ram_sym(machine->kernel_filename,
                              NULL, NULL, NULL,
                              &kernel_entry_point, NULL, NULL, NULL,
                              big_endian, EM_RISCV, 1, 0, NULL, true,
@@ -1448,9 +1449,15 @@ static void evalsoc_machine_init(MachineState *machine)
     }
 
     if (machine->firmware && strcmp(machine->firmware, "none")) {
-        riscv_find_and_load_firmware_endian(machine, NULL, start_addr,
-                                            big_endian, NULL);
+        char *firmware_filename = riscv_find_firmware(machine->firmware, NULL);
+        if (firmware_filename) {
+            riscv_check_elf_compatible(firmware_filename, &s->soc.cpus);
+            riscv_load_firmware_endian(firmware_filename, start_addr,
+                                       big_endian, NULL);
+            g_free(firmware_filename);
+        }
     } else if (machine->kernel_filename && !kernel_loaded) {
+        riscv_check_elf_compatible(machine->kernel_filename, &s->soc.cpus);
         riscv_load_kernel(machine, &s->soc.cpus, start_addr, true, NULL);
     }
 

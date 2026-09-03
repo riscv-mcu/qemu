@@ -161,6 +161,76 @@ bool riscv_probe_elf_endian(const char *filename, bool *big_endian)
     return true;
 }
 
+bool riscv_check_elf_compatible(const char *filename,
+                                RISCVHartArrayState *harts)
+{
+    union {
+        Elf32_Ehdr h32;
+        Elf64_Ehdr h64;
+    } elf_header;
+    const uint8_t *e_ident = elf_header.h32.e_ident;
+    uint16_t elf_machine;
+    bool elf_is64;
+    bool cpu_is_32bit;
+    Error *err = NULL;
+
+    g_assert(harts != NULL);
+
+    load_elf_hdr(filename, &elf_header, &elf_is64, &err);
+    if (err) {
+        /*
+         * Keep the existing raw image / uImage fallback path intact. Once
+         * load_elf_hdr() succeeds, the image is known to be an ELF and the
+         * checks below become fatal.
+         */
+        error_free(err);
+        return false;
+    }
+
+    switch (e_ident[EI_CLASS]) {
+    case ELFCLASS32:
+    case ELFCLASS64:
+        break;
+    default:
+        error_report("ELF image '%s' has unsupported ELF class %u",
+                     filename, e_ident[EI_CLASS]);
+        exit(1);
+    }
+
+    switch (e_ident[EI_DATA]) {
+    case ELFDATA2LSB:
+    case ELFDATA2MSB:
+        break;
+    default:
+        error_report("ELF image '%s' has unsupported ELF data encoding %u",
+                     filename, e_ident[EI_DATA]);
+        exit(1);
+    }
+
+    elf_machine = elf_is64 ? elf_header.h64.e_machine
+                           : elf_header.h32.e_machine;
+    elf_machine = e_ident[EI_DATA] == ELFDATA2MSB
+                  ? be16_to_cpu(elf_machine)
+                  : le16_to_cpu(elf_machine);
+
+    if (elf_machine != EM_RISCV) {
+        error_report("ELF image '%s' is not RISC-V "
+                     "(e_machine=%u)",
+                     filename, elf_machine);
+        exit(1);
+    }
+
+    cpu_is_32bit = riscv_is_32bit(harts);
+    if (cpu_is_32bit && elf_is64) {
+        error_report("ELF image '%s' is a 64-bit RISC-V ELF, but the selected "
+                     "CPU is RV32",
+                     filename);
+        exit(1);
+    }
+
+    return true;
+}
+
 target_ulong riscv_find_and_load_firmware(MachineState *machine,
                                           const char *default_machine_firmware,
                                           hwaddr firmware_load_addr,
@@ -209,10 +279,10 @@ target_ulong riscv_load_firmware(const char *firmware_filename,
     exit(1);
 }
 
-static target_ulong riscv_load_firmware_endian(const char *firmware_filename,
-                                               hwaddr firmware_load_addr,
-                                               bool big_endian,
-                                               symbol_fn_t sym_cb)
+target_ulong riscv_load_firmware_endian(const char *firmware_filename,
+                                        hwaddr firmware_load_addr,
+                                        bool big_endian,
+                                        symbol_fn_t sym_cb)
 {
     uint64_t firmware_entry, firmware_end;
     ssize_t firmware_size;
@@ -235,29 +305,6 @@ static target_ulong riscv_load_firmware_endian(const char *firmware_filename,
 
     error_report("could not load firmware '%s'", firmware_filename);
     exit(1);
-}
-
-target_ulong riscv_find_and_load_firmware_endian(MachineState *machine,
-                                                 const char *default_machine_firmware,
-                                                 hwaddr firmware_load_addr,
-                                                 bool big_endian,
-                                                 symbol_fn_t sym_cb)
-{
-    char *firmware_filename;
-    target_ulong firmware_end_addr = firmware_load_addr;
-
-    firmware_filename = riscv_find_firmware(machine->firmware,
-                                            default_machine_firmware);
-
-    if (firmware_filename) {
-        /* If not "none" load the firmware */
-        firmware_end_addr = riscv_load_firmware_endian(firmware_filename,
-                                                       firmware_load_addr,
-                                                       big_endian, sym_cb);
-        g_free(firmware_filename);
-    }
-
-    return firmware_end_addr;
 }
 
 static void riscv_load_initrd(MachineState *machine, uint64_t kernel_entry)

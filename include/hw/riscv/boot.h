@@ -34,21 +34,22 @@ char *riscv_plic_hart_config_string(int hart_count);
 target_ulong riscv_calc_kernel_start_addr(RISCVHartArrayState *harts,
                                           target_ulong firmware_end_addr);
 bool riscv_probe_elf_endian(const char *filename, bool *big_endian);
+bool riscv_check_elf_compatible(const char *filename,
+                                RISCVHartArrayState *harts);
 target_ulong riscv_find_and_load_firmware(MachineState *machine,
                                           const char *default_machine_firmware,
                                           hwaddr firmware_load_addr,
                                           symbol_fn_t sym_cb);
-target_ulong riscv_find_and_load_firmware_endian(MachineState *machine,
-                                                 const char *default_machine_firmware,
-                                                 hwaddr firmware_load_addr,
-                                                 bool big_endian,
-                                                 symbol_fn_t sym_cb);
 const char *riscv_default_firmware_name(RISCVHartArrayState *harts);
 char *riscv_find_firmware(const char *firmware_filename,
                           const char *default_machine_firmware);
 target_ulong riscv_load_firmware(const char *firmware_filename,
                                  hwaddr firmware_load_addr,
                                  symbol_fn_t sym_cb);
+target_ulong riscv_load_firmware_endian(const char *firmware_filename,
+                                        hwaddr firmware_load_addr,
+                                        bool big_endian,
+                                        symbol_fn_t sym_cb);
 target_ulong riscv_load_kernel(MachineState *machine,
                                RISCVHartArrayState *harts,
                                target_ulong firmware_end_addr,
