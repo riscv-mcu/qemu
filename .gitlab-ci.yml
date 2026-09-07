@@ -62,7 +62,7 @@ prepare_tools:
     - rm -rf .git
     # use nuclei sdk big-endian branch for big-endian testing
     - cd $CI_PROJECT_DIR/prebuilt/
-    - git clone -b lx/big-endian --depth 1 git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git nuclei-sdk-be
+    - git clone -b hqfang/lpad-be --depth 1 git@gito.corp.nucleisys.com:software/library/nuclei-sdk.git nuclei-sdk-be
     - cd nuclei-sdk-be
     - git describe --tags --always --abbrev=10 > build.txt
     - echo "Nuclei SDK BE Version $(cat build.txt)"
@@ -306,7 +306,7 @@ test_sdk_be:
       fi
       echo "Using HWCFG=${HWCFG}"
     - echo "Nuclei SDK Version $(cat build.txt)"
-    - python3 tools/scripts/nsdk_cli/nsdk_bench.py --appcfg tools/scripts/nsdk_cli/configs/application_be.json --hwcfg ${HWCFG} --parallel=-j --make_options "COMPILE_PREFIX=riscv64be-unknown-elf- QEMU_CPU_EXTOPT=big-endian=on" --logdir logs/nuclei_fpga_eval_qemu_be_ci --run --run_target "qemu"
+    - python3 tools/scripts/nsdk_cli/nsdk_bench.py --appcfg tools/scripts/nsdk_cli/configs/application_be.json --hwcfg ${HWCFG} --parallel=-j --logdir logs/nuclei_fpga_eval_qemu_be_ci --run --run_target "qemu"
   tags:
     - os::linux
     - env::docker
@@ -329,12 +329,11 @@ test_newlib_regression_be:
     - export QEMU_BIN_DIR=$(readlink -f linux_qemu/bin)
     - export TOOLCHAIN_BIN_DIR=/home/share/devtools/toolchain/nuclei_gnu/linux64/newlibc/nuclei-2025-zicfilp-be/gcc/bin
     - export RUNNER=qemu
-    - export QEMU_CPU_EXTOPT_BE=big-endian=on
     - export PATH=$QEMU_BIN_DIR:$TOOLCHAIN_BIN_DIR:$PATH
     - qemu-system-riscv32 --version
     - which riscv64be-unknown-elf-gcc
     - riscv64be-unknown-elf-gcc -v
-    - cd $CI_PROJECT_DIR/prebuilt/nuclei-sdk-be/test/newlib_regression
+    - cd $CI_PROJECT_DIR/prebuilt/nuclei-sdk-be/test/newlib/regression
     - ./run_newlib_regression.sh
   tags:
     - os::linux
@@ -346,7 +345,7 @@ test_newlib_regression_be:
     name: "qemu_newlib_regression_job${CI_JOB_ID}_${CI_COMMIT_SHA::8}"
     when: always
     paths:
-      - $CI_PROJECT_DIR/prebuilt/nuclei-sdk-be/test/newlib_regression/logs/
+      - $CI_PROJECT_DIR/prebuilt/nuclei-sdk-be/test/newlib/regression/logs/
 
 test_sdk_threadx:
   stage: test

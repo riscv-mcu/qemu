@@ -24,6 +24,11 @@
         "n300e-ilm": {"DOWNLOAD": "ilm", "CORE": "n300e", "ARCH_EXT": "_zicond_zca_zcb_zcmp_zba_zbb_zbs"},
         "n300e-zicfilp-ilm": {"DOWNLOAD": "ilm", "CORE": "n300e", "ARCH_EXT": "_zicfilp_zicond_zca_zcb_zcmp_zba_zbb_zbs"}
     },
+    "appdirs": [
+        "test/zicfilp/lpad_imm",
+        "test/zicfilp/lpad_neg",
+        "test/zicfilp/lpad_newlib"
+    ],
     "appconfig": {
         "application/baremetal/demo_plic": {
             "build_config": {
@@ -265,19 +270,19 @@
             "n202e-ilm": { "build": false, "run": false },
             "n202e-zicfilp-ilm" : {"build": false, "run": false}
         },
-        "application/baremetal/demo_zicfilp_lpad_imm" : {
+        "test/zicfilp/lpad_imm": {
             "n202-ilm": { "build": false, "run": false },
             "n202e-ilm" : {"build": false, "run": false},
             "n300-ilm": { "build": false, "run": false },
             "n300e-ilm" : {"build": false, "run": false}
         },
-        "application/baremetal/demo_zicfilp_lpad_negative" : {
+        "test/zicfilp/lpad_neg" : {
             "n202-ilm": { "build": false, "run": false },
             "n202e-ilm" : {"build": false, "run": false},
             "n300-ilm": { "build": false, "run": false },
             "n300e-ilm" : {"build": false, "run": false}
         },
-        "application/baremetal/demo_zicfilp_newlib_lpad" : {
+        "test/zicfilp/lpad_newlib" : {
             "n202-ilm": { "build": false, "run": false },
             "n202e-ilm" : {"build": false, "run": false},
             "n300-ilm": { "build": false, "run": false },
