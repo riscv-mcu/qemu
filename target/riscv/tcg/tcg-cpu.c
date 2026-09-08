@@ -414,6 +414,10 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         riscv_cpu_validate_g(cpu);
     }
 
+    if (cpu->cfg.ext_zba && cpu->cfg.ext_zbb && cpu->cfg.ext_zbs) {
+        cpu->env.misa_ext |= RVB;
+    }
+
     if (riscv_has_ext(env, RVB)) {
         riscv_cpu_validate_b(cpu);
     }
@@ -465,6 +469,15 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
     if (cpu->cfg.ext_zfa && !riscv_has_ext(env, RVF)) {
         error_setg(errp, "Zfa extension requires F extension");
         return;
+    }
+
+    if (riscv_has_ext(env, RVM)) {
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zmmul), true);
+    }
+
+    if (riscv_has_ext(env, RVA)) {
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zaamo), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zalrsc), true);
     }
 
     if (cpu->cfg.ext_xxlvfbf) {

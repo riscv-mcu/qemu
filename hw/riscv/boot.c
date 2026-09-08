@@ -19,6 +19,7 @@
 
 #include "qemu/osdep.h"
 #include "qemu/bswap.h"
+#include "qemu/cutils.h"
 #include "qemu/datadir.h"
 #include "qemu/units.h"
 #include "qemu/error-report.h"
@@ -40,6 +41,447 @@ bool riscv_is_32bit(RISCVHartArrayState *harts)
 {
     RISCVCPUClass *mcc = RISCV_CPU_GET_CLASS(&harts->harts[0]);
     return mcc->misa_mxl_max == MXL_RV32;
+}
+
+#define RISCV_ELF_ATTR_FORMAT_VERSION 'A'
+#define RISCV_ELF_ATTR_TAG_FILE 1
+#define RISCV_ELF_ATTR_TAG_ARCH 5
+
+static bool riscv_elf_decode_uleb128(const uint8_t **data,
+                                     const uint8_t *end, uint32_t *value)
+{
+    int len;
+
+    if (*data >= end) {
+        return false;
+    }
+    if ((**data & 0x80) && *data + 1 >= end) {
+        return false;
+    }
+
+    len = uleb128_decode_small(*data, value);
+    if (len < 0 || *data + len > end) {
+        return false;
+    }
+
+    *data += len;
+    return true;
+}
+
+static uint32_t riscv_elf_read_u32(const uint8_t *data, int elf_data)
+{
+    return elf_data == ELFDATA2MSB ? ldl_be_p(data) : ldl_le_p(data);
+}
+
+static void riscv_elf_read_section_header(const uint8_t *shdr,
+                                          bool elf_is64,
+                                          int elf_data,
+                                          uint32_t *name,
+                                          uint64_t *offset,
+                                          uint64_t *size)
+{
+    if (elf_is64) {
+        if (name) {
+            *name = elf_data == ELFDATA2MSB ?
+                    ldl_be_p(shdr + offsetof(Elf64_Shdr, sh_name)) :
+                    ldl_le_p(shdr + offsetof(Elf64_Shdr, sh_name));
+        }
+        *offset = elf_data == ELFDATA2MSB ?
+                  ldq_be_p(shdr + offsetof(Elf64_Shdr, sh_offset)) :
+                  ldq_le_p(shdr + offsetof(Elf64_Shdr, sh_offset));
+        *size = elf_data == ELFDATA2MSB ?
+                ldq_be_p(shdr + offsetof(Elf64_Shdr, sh_size)) :
+                ldq_le_p(shdr + offsetof(Elf64_Shdr, sh_size));
+    } else {
+        if (name) {
+            *name = elf_data == ELFDATA2MSB ?
+                    ldl_be_p(shdr + offsetof(Elf32_Shdr, sh_name)) :
+                    ldl_le_p(shdr + offsetof(Elf32_Shdr, sh_name));
+        }
+        *offset = elf_data == ELFDATA2MSB ?
+                  ldl_be_p(shdr + offsetof(Elf32_Shdr, sh_offset)) :
+                  ldl_le_p(shdr + offsetof(Elf32_Shdr, sh_offset));
+        *size = elf_data == ELFDATA2MSB ?
+                ldl_be_p(shdr + offsetof(Elf32_Shdr, sh_size)) :
+                ldl_le_p(shdr + offsetof(Elf32_Shdr, sh_size));
+    }
+}
+
+static size_t riscv_isa_extension_name_len(const char *ext, size_t len)
+{
+    size_t major, pos = len;
+
+    while (pos > 0) {
+        pos--;
+        if (ext[pos] != 'p') {
+            continue;
+        }
+        if (pos == 0 || pos + 1 == len) {
+            return len;
+        }
+        for (size_t i = pos + 1; i < len; i++) {
+            if (!g_ascii_isdigit(ext[i])) {
+                return len;
+            }
+        }
+
+        major = pos;
+        while (major > 0 && g_ascii_isdigit(ext[major - 1])) {
+            major--;
+        }
+
+        return major < pos ? major : len;
+    }
+
+    return len;
+}
+
+static void riscv_isa_extensions_add_literal(GPtrArray *extensions,
+                                             const char *ext)
+{
+    g_ptr_array_add(extensions, g_strdup(ext));
+}
+
+static void riscv_isa_extensions_add(GPtrArray *extensions,
+                                     const char *ext, size_t len)
+{
+    g_autofree char *name = NULL;
+
+    len = riscv_isa_extension_name_len(ext, len);
+    if (len == 0) {
+        return;
+    }
+
+    name = g_ascii_strdown(ext, len);
+    if (!strcmp(name, "g")) {
+        static const char * const g_exts[] = {
+            "i", "m", "a", "f", "d", "zicsr", "zifencei"
+        };
+
+        for (size_t i = 0; i < ARRAY_SIZE(g_exts); i++) {
+            riscv_isa_extensions_add_literal(extensions, g_exts[i]);
+        }
+        return;
+    }
+
+    riscv_isa_extensions_add_literal(extensions, name);
+}
+
+static void riscv_elf_extensions_add(GHashTable *extensions, const char *ext)
+{
+    if (!g_hash_table_contains(extensions, ext)) {
+        g_hash_table_add(extensions, g_strdup(ext));
+    }
+}
+
+static bool riscv_isa_string_parse_extensions(const char *isa,
+                                              GPtrArray *extensions)
+{
+    const char *token;
+
+    if (!g_str_has_prefix(isa, "rv")) {
+        return false;
+    }
+
+    isa += 2;
+    if (!g_ascii_isdigit(*isa)) {
+        return false;
+    }
+    while (g_ascii_isdigit(*isa)) {
+        isa++;
+    }
+
+    while (*isa != '\0') {
+        while (*isa == '_') {
+            isa++;
+        }
+        token = isa;
+        while (*isa != '\0' && *isa != '_') {
+            isa++;
+        }
+
+        if (isa == token) {
+            continue;
+        }
+
+        if (isa - token == 1 || token[0] == 'z' || token[0] == 'Z' ||
+            token[0] == 's' || token[0] == 'S' || token[0] == 'x' ||
+            token[0] == 'X') {
+            riscv_isa_extensions_add(extensions, token, isa - token);
+        } else {
+            size_t len = riscv_isa_extension_name_len(token, isa - token);
+
+            for (size_t i = 0; i < len; i++) {
+                if (!g_ascii_isalpha(token[i])) {
+                    return false;
+                }
+                riscv_isa_extensions_add(extensions, &token[i], 1);
+            }
+        }
+    }
+
+    return true;
+}
+
+static GHashTable *riscv_elf_collect_cpu_extensions(RISCVCPU *cpu)
+{
+    const RISCVCPUMultiExtConfig *prop;
+    GHashTable *extensions = g_hash_table_new_full(g_str_hash, g_str_equal,
+                                                   g_free, NULL);
+    uint32_t i;
+
+    for (i = 0; misa_bits[i] != 0; i++) {
+        if (riscv_has_ext(&cpu->env, misa_bits[i])) {
+            riscv_elf_extensions_add(extensions,
+                                     riscv_get_misa_ext_name(misa_bits[i]));
+        }
+    }
+
+    for (prop = riscv_cpu_extensions; prop->name != NULL; prop++) {
+        if (isa_ext_is_enabled(cpu, prop->offset)) {
+            riscv_elf_extensions_add(extensions, prop->name);
+        }
+    }
+
+    for (prop = riscv_cpu_vendor_exts; prop->name != NULL; prop++) {
+        if (isa_ext_is_enabled(cpu, prop->offset)) {
+            riscv_elf_extensions_add(extensions, prop->name);
+        }
+    }
+
+    return extensions;
+}
+
+static bool riscv_isa_has_compatible_ext(GHashTable *cpu_extensions,
+                                         const char *elf_ext)
+{
+    return g_hash_table_contains(cpu_extensions, elf_ext);
+}
+
+static char *riscv_elf_parse_file_attributes(const uint8_t *data,
+                                             const uint8_t *end)
+{
+    while (data < end) {
+        const uint8_t *str_end;
+        uint32_t tag;
+
+        if (!riscv_elf_decode_uleb128(&data, end, &tag)) {
+            return NULL;
+        }
+
+        if (tag & 1) {
+            str_end = memchr(data, '\0', end - data);
+            if (!str_end) {
+                return NULL;
+            }
+            if (tag == RISCV_ELF_ATTR_TAG_ARCH) {
+                return g_strndup((const char *)data, str_end - data);
+            }
+            data = str_end + 1;
+        } else {
+            uint32_t value;
+
+            if (!riscv_elf_decode_uleb128(&data, end, &value)) {
+                return NULL;
+            }
+        }
+    }
+
+    return NULL;
+}
+
+static char *riscv_elf_parse_riscv_attributes(const uint8_t *data,
+                                              size_t size,
+                                              int elf_data)
+{
+    const uint8_t *end = data + size;
+
+    if (size < 1 || *data != RISCV_ELF_ATTR_FORMAT_VERSION) {
+        return NULL;
+    }
+
+    data++;
+    while (end - data >= sizeof(uint32_t)) {
+        const uint8_t *vendor_end, *subsection_end;
+        uint32_t subsection_len;
+
+        subsection_len = riscv_elf_read_u32(data, elf_data);
+        if (subsection_len < sizeof(uint32_t) ||
+            subsection_len > end - data) {
+            return NULL;
+        }
+
+        subsection_end = data + subsection_len;
+        data += sizeof(uint32_t);
+        vendor_end = memchr(data, '\0', subsection_end - data);
+        if (!vendor_end) {
+            return NULL;
+        }
+
+        data = vendor_end + 1;
+        while (data < subsection_end) {
+            const uint8_t *tag_start = data;
+            const uint8_t *file_end;
+            uint32_t tag, file_len;
+
+            if (!riscv_elf_decode_uleb128(&data, subsection_end, &tag) ||
+                subsection_end - data < sizeof(uint32_t)) {
+                return NULL;
+            }
+
+            file_len = riscv_elf_read_u32(data, elf_data);
+            if (file_len < data + sizeof(uint32_t) - tag_start ||
+                file_len > subsection_end - tag_start) {
+                return NULL;
+            }
+
+            file_end = tag_start + file_len;
+            if (tag == RISCV_ELF_ATTR_TAG_FILE) {
+                char *arch = riscv_elf_parse_file_attributes(
+                    data + sizeof(uint32_t), file_end);
+
+                if (arch) {
+                    return arch;
+                }
+            }
+            data = file_end;
+        }
+    }
+
+    return NULL;
+}
+
+static char *riscv_elf_read_arch_attribute(const char *filename,
+                                           const void *elf_header,
+                                           bool elf_is64,
+                                           int elf_data)
+{
+    const uint8_t *file_data, *shdr_table, *shstrtab;
+    g_autoptr(GMappedFile) mapped_file = NULL;
+    uint64_t shoff, shstr_offset, shstr_size;
+    uint16_t shentsize, shnum, shstrndx;
+    gsize file_len;
+
+    mapped_file = g_mapped_file_new(filename, false, NULL);
+    if (!mapped_file) {
+        return NULL;
+    }
+
+    file_data = (const uint8_t *)g_mapped_file_get_contents(mapped_file);
+    file_len = g_mapped_file_get_length(mapped_file);
+
+    if (elf_is64) {
+        const Elf64_Ehdr *ehdr = elf_header;
+
+        shoff = elf_data == ELFDATA2MSB ?
+                be64_to_cpu(ehdr->e_shoff) : le64_to_cpu(ehdr->e_shoff);
+        shentsize = elf_data == ELFDATA2MSB ?
+                    be16_to_cpu(ehdr->e_shentsize) :
+                    le16_to_cpu(ehdr->e_shentsize);
+        shnum = elf_data == ELFDATA2MSB ?
+                be16_to_cpu(ehdr->e_shnum) : le16_to_cpu(ehdr->e_shnum);
+        shstrndx = elf_data == ELFDATA2MSB ?
+                   be16_to_cpu(ehdr->e_shstrndx) :
+                   le16_to_cpu(ehdr->e_shstrndx);
+    } else {
+        const Elf32_Ehdr *ehdr = elf_header;
+
+        shoff = elf_data == ELFDATA2MSB ?
+                be32_to_cpu(ehdr->e_shoff) : le32_to_cpu(ehdr->e_shoff);
+        shentsize = elf_data == ELFDATA2MSB ?
+                    be16_to_cpu(ehdr->e_shentsize) :
+                    le16_to_cpu(ehdr->e_shentsize);
+        shnum = elf_data == ELFDATA2MSB ?
+                be16_to_cpu(ehdr->e_shnum) : le16_to_cpu(ehdr->e_shnum);
+        shstrndx = elf_data == ELFDATA2MSB ?
+                   be16_to_cpu(ehdr->e_shstrndx) :
+                   le16_to_cpu(ehdr->e_shstrndx);
+    }
+
+    if (shoff == 0 || shentsize == 0 || shnum == 0 || shstrndx >= shnum ||
+        shoff > file_len || shnum > (file_len - shoff) / shentsize) {
+        return NULL;
+    }
+
+    shdr_table = file_data + shoff;
+    if (shentsize < (elf_is64 ? sizeof(Elf64_Shdr) : sizeof(Elf32_Shdr))) {
+        return NULL;
+    }
+
+    riscv_elf_read_section_header(shdr_table + shstrndx * shentsize,
+                                  elf_is64, elf_data, NULL,
+                                  &shstr_offset, &shstr_size);
+    if (shstr_offset > file_len || shstr_size > file_len - shstr_offset) {
+        return NULL;
+    }
+    shstrtab = file_data + shstr_offset;
+
+    for (uint16_t i = 0; i < shnum; i++) {
+        uint32_t name;
+        uint64_t offset, size;
+
+        riscv_elf_read_section_header(shdr_table + i * shentsize,
+                                      elf_is64, elf_data, &name,
+                                      &offset, &size);
+        if (name >= shstr_size) {
+            continue;
+        }
+        if (strcmp((const char *)shstrtab + name, ".riscv.attributes")) {
+            continue;
+        }
+        if (offset > file_len || size > file_len - offset) {
+            return NULL;
+        }
+        return riscv_elf_parse_riscv_attributes(file_data + offset,
+                                                size, elf_data);
+    }
+
+    return NULL;
+}
+
+static void riscv_warn_elf_arch_mismatch(const char *filename,
+                                         const void *elf_header,
+                                         bool elf_is64,
+                                         int elf_data,
+                                         RISCVHartArrayState *harts)
+{
+    g_autofree char *elf_arch = NULL;
+    g_autofree char *cpu_arch = NULL;
+    g_autofree char *missing_str = NULL;
+    g_autoptr(GHashTable) cpu_extensions = NULL;
+    g_autoptr(GPtrArray) elf_order = NULL;
+    g_autoptr(GPtrArray) missing = NULL;
+
+    elf_arch = riscv_elf_read_arch_attribute(filename, elf_header,
+                                             elf_is64, elf_data);
+    if (!elf_arch) {
+        return;
+    }
+
+    elf_order = g_ptr_array_new_with_free_func(g_free);
+    if (!riscv_isa_string_parse_extensions(elf_arch, elf_order)) {
+        return;
+    }
+
+    cpu_extensions = riscv_elf_collect_cpu_extensions(&harts->harts[0]);
+    missing = g_ptr_array_new_with_free_func(g_free);
+    for (guint i = 0; i < elf_order->len; i++) {
+        const char *elf_ext = g_ptr_array_index(elf_order, i);
+
+        if (!riscv_isa_has_compatible_ext(cpu_extensions, elf_ext)) {
+            g_ptr_array_add(missing, g_strdup(elf_ext));
+        }
+    }
+
+    if (missing->len > 0) {
+        g_ptr_array_add(missing, NULL);
+        missing_str = g_strjoinv(", ", (char **)missing->pdata);
+        cpu_arch = riscv_isa_string(&harts->harts[0]);
+        warn_report("ELF image '%s' requires RISC-V ISA extension(s) "
+                    "not enabled by the selected CPU: %s "
+                    "(ELF arch: %s; CPU arch: %s)",
+                    filename, missing_str, elf_arch, cpu_arch);
+    }
 }
 
 /*
@@ -227,6 +669,9 @@ bool riscv_check_elf_compatible(const char *filename,
                      filename);
         exit(1);
     }
+
+    riscv_warn_elf_arch_mismatch(filename, &elf_header, elf_is64,
+                                 e_ident[EI_DATA], harts);
 
     return true;
 }
