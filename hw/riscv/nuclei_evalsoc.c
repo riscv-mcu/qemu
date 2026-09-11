@@ -82,6 +82,7 @@ static const struct MemmapEntry
     [EVALSOC_QSPI1]   = { EVALSOC_QSPI1_BASE,             EVALSOC_QSPI1_SIZE,   "QSPI1"},
     [EVALSOC_QSPI2]   = { EVALSOC_QSPI2_BASE,             EVALSOC_QSPI2_SIZE,   "QSPI2"},
     [EVALSOC_XIP]     = { EVALSOC_XIP_BASE,               EVALSOC_XIP_SIZE,     "XIP"  },
+    [EVALSOC_QSPI0_XIP] = { EVALSOC_QSPI0_XIP_BASE,       EVALSOC_QSPI0_XIP_SIZE, "QSPI0_XIP"},
     [EVALSOC_DEBUG]   = { IREGION_DEBUG_OFS,              IREGION_DEBUG_SIZE,   "DEBUG"},
     [EVALSOC_TIMER]   = { IREGION_TIMER_OFS,              IREGION_TIMER_SIZE,   "TIMER"},
     [EVALSOC_PLIC]    = { IREGION_PLIC_OFS,               IREGION_PLIC_SIZE,    "PLIC" },
@@ -1121,6 +1122,8 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
     memoryRegion[EVALSOC_DDR].size = s->ddr.size;
     memoryRegion[EVALSOC_XIP].base = s->norflash.base;
     memoryRegion[EVALSOC_XIP].size = s->norflash.size;
+    memoryRegion[EVALSOC_QSPI0_XIP].base = s->qspi0_xip.base;
+    memoryRegion[EVALSOC_QSPI0_XIP].size = s->qspi0_xip.size;
     memoryRegion[EVALSOC_TEST].base = s->test.base;
     memoryRegion[EVALSOC_TEST].size = s->test.size;
     memoryRegion[EVALSOC_MISC].base = s->misc.base;
@@ -1167,6 +1170,7 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
     memoryRegion[EVALSOC_PLIC].base = memmap[EVALSOC_PLIC].base + s->iregion.base;
     memoryRegion[EVALSOC_ECLIC].base = memmap[EVALSOC_ECLIC].base + s->iregion.base;
     memoryRegion[EVALSOC_SMP].base = memmap[EVALSOC_SMP].base + s->iregion.base;
+    memoryRegion[EVALSOC_CIDU].base = memmap[EVALSOC_CIDU].base + s->iregion.base;
 
     for (size_t i = 0; i < EVALSOC_DEV_END; ++i) {
         if (i == EVALSOC_CLINT || i == EVALSOC_ILM || i == EVALSOC_DLM || i == EVALSOC_SRAM) continue;
@@ -1180,6 +1184,7 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
             || (i == EVALSOC_MISC && !s->misc.enable)
             || (i == EVALSOC_UART0 && !s->uart0.enable)
             || (i == EVALSOC_QSPI0 && !s->qspi0.enable)
+            || (i == EVALSOC_QSPI0_XIP && (!s->qspi0.enable || !s->qspi0_xip.enable))
             || (i == EVALSOC_UDMA && !s->udma.enable)
             || (i == EVALSOC_QSPI1 && !s->qspi1.enable)
             || (i == EVALSOC_QSPI2 && !s->qspi2.enable)
@@ -1202,6 +1207,7 @@ static bool is_iregion_addr_overlap(const struct MemmapEntry *memmap, EvalSoCSta
                 || (j == EVALSOC_MISC && !s->misc.enable)
                 || (j == EVALSOC_UART0 && !s->uart0.enable)
                 || (j == EVALSOC_QSPI0 && !s->qspi0.enable)
+                || (j == EVALSOC_QSPI0_XIP && (!s->qspi0.enable || !s->qspi0_xip.enable))
                 || (j == EVALSOC_UDMA && !s->udma.enable)
                 || (j == EVALSOC_QSPI1 && !s->qspi1.enable)
                 || (j == EVALSOC_QSPI2 && !s->qspi2.enable)
@@ -1254,6 +1260,10 @@ static void evalsoc_machine_init(MachineState *machine)
     else
     {
         s->ddr.startup_addr = (s->ddr.startup_addr == -1) ? s->ddr.base : s->ddr.startup_addr;
+    }
+    /* Keep overlap validation in sync with the DDR MemoryRegion size. */
+    if (machine->ram_size != 128 * MiB) {
+        s->ddr.size = machine->ram_size;
     }
     s->ilm.startup_addr = (s->ilm.startup_addr == -1) ? s->ilm.base : s->ilm.startup_addr;
     s->sram.startup_addr = (s->sram.startup_addr == -1) ? s->sram.base : s->sram.startup_addr;
@@ -1338,12 +1348,6 @@ static void evalsoc_machine_init(MachineState *machine)
                                 &s->soc.sram);
 
     // ddr
-    //if -m 128M or no -m,s->ddr.size is first json,then EVALSOC_DDR_SIZE
-    if(machine->ram_size != 128 * MiB)
-    {
-        s->ddr.size = machine->ram_size;
-    }
-
     memory_region_init_ram(&s->soc.ddr, NULL, "riscv.evalsoc.ram.ddr",
                            s->ddr.size, &error_fatal);
     memory_region_add_subregion(system_memory, s->ddr.base,
@@ -1559,8 +1563,8 @@ static void evalsoc_machine_instance_init(Object *obj)
     s->udma.irq = EVALSOC_UDMA_IRQ_BASE;
     s->udma.enable = 1;
     s->udma.version = NUCLEI_UDMA_DEFAULT_VERSION;
-    s->qspi0_xip.base = EVALSOC_QSPI0_XIP_BASE;
-    s->qspi0_xip.size = EVALSOC_QSPI0_XIP_SIZE;
+    s->qspi0_xip.base = memmap[EVALSOC_QSPI0_XIP].base;
+    s->qspi0_xip.size = memmap[EVALSOC_QSPI0_XIP].size;
     s->qspi0_xip.enable = 1;
     s->qspi1.base = memmap[EVALSOC_QSPI1].base;
     s->qspi1.size = memmap[EVALSOC_QSPI1].size;
