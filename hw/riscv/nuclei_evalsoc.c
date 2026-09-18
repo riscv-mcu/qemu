@@ -35,6 +35,7 @@
 #include "hw/riscv/virt.h"
 #include "hw/riscv/boot.h"
 #include "hw/riscv/numa.h"
+#include "kvm/kvm_riscv.h"
 #include "hw/intc/riscv_aclint.h"
 #include "hw/intc/riscv_aplic.h"
 #include "hw/intc/riscv_imsic.h"
@@ -44,6 +45,7 @@
 #include "sysemu/arch_init.h"
 #include "sysemu/device_tree.h"
 #include "sysemu/sysemu.h"
+#include "sysemu/kvm.h"
 #include "hw/pci/pci.h"
 #include "hw/pci-host/gpex.h"
 #include "hw/display/ramfb.h"
@@ -108,6 +110,13 @@ static bool evalsoc_has_eclic(const EvalSoCState *s)
 static bool evalsoc_has_plic(const EvalSoCState *s)
 {
     return (s->aia_type == EVALSOC_AIA_TYPE_NONE) && s->iregion.plic_en;
+}
+
+/* KVM AIA only supports MSI-mode APLIC backed by the in-kernel irqchip. */
+static bool evalsoc_use_kvm_aia(const EvalSoCState *s)
+{
+    return kvm_irqchip_in_kernel() &&
+           s->aia_type == EVALSOC_AIA_TYPE_APLIC_IMSIC;
 }
 
 static bool evalsoc_cpu_big_endian(const RISCVCPU *cpu)
@@ -1238,6 +1247,7 @@ static void evalsoc_machine_init(MachineState *machine)
     const struct MemmapEntry *memmap = evalsoc_memmap;
     EvalSoCState *s = RISCV_EVALSOC_MACHINE(machine);
     target_ulong start_addr;
+    target_ulong kernel_entry = 0;
     MemoryRegion *system_memory = get_system_memory();
     uint64_t kernel_entry_point;
     int i;
@@ -1432,6 +1442,26 @@ static void evalsoc_machine_init(MachineState *machine)
     DEBUGF("timer_freq : %d\n", (int)s->timer_freq);
     DEBUGF("firmware startup addr:0x%lx\n", (long)start_addr);
 
+    /*
+     * RISC-V KVM runs the guest in S/VS mode. Machine-mode firmware cannot
+     * be executed directly, so keep KVM to the direct kernel boot path.
+     */
+    if (kvm_enabled()) {
+        if (machine->firmware && strcmp(machine->firmware, "none")) {
+            error_report("Machine mode firmware is not supported in "
+                         "combination with KVM.");
+            exit(1);
+        }
+        if (!machine->kernel_filename) {
+            error_report("KVM requires a direct kernel image (-kernel) on "
+                         "nuclei_evalsoc.");
+            exit(1);
+        }
+        if (!machine->firmware) {
+            machine->firmware = g_strdup("none");
+        }
+    }
+
     big_endian = evalsoc_cpu_big_endian(&s->soc.cpus.harts[0]);
     if ((!machine->firmware || !strcmp(machine->firmware, "none")) &&
         machine->kernel_filename && strstr(s->soc.cpu_type, "n100")) {
@@ -1445,6 +1475,7 @@ static void evalsoc_machine_init(MachineState *machine)
                 kernel_entry_point &= UINT32_MAX;
             }
             start_addr = kernel_entry_point;
+            kernel_entry = start_addr;
             for (i = 0; i < s->soc.cpus.num_harts; i++) {
                 s->soc.cpus.harts[i].env.resetvec = start_addr;
             }
@@ -1461,8 +1492,21 @@ static void evalsoc_machine_init(MachineState *machine)
             g_free(firmware_filename);
         }
     } else if (machine->kernel_filename && !kernel_loaded) {
+        target_ulong kernel_load_addr = kvm_enabled() ?
+                                        s->ddr.startup_addr : start_addr;
+
         riscv_check_elf_compatible(machine->kernel_filename, &s->soc.cpus);
-        riscv_load_kernel(machine, &s->soc.cpus, start_addr, true, NULL);
+        kernel_entry = riscv_load_kernel(machine, &s->soc.cpus,
+                                         kernel_load_addr, true, NULL);
+    }
+
+    if (kvm_enabled()) {
+        hwaddr fdt_load_addr;
+
+        fdt_load_addr = riscv_compute_fdt_addr(s->ddr.base, s->ddr.size,
+                                               machine);
+        riscv_load_fdt(fdt_load_addr, machine->fdt);
+        riscv_setup_direct_kernel(kernel_entry, fdt_load_addr);
     }
 
     /* Connect an SPI flash to SPI0 */
@@ -1799,6 +1843,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     char *plic_hart_config;
     size_t plic_hart_config_len;
     bool use_legacy_plic_path;
+    bool use_kvm_aia;
     bool msimode;
     hwaddr msi_addr;
     uint32_t guest_bits;
@@ -1846,6 +1891,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
 
     use_legacy_plic_path = (mst->aia_type == EVALSOC_AIA_TYPE_NONE) &&
                            !(mst->aplic_m.enable | mst->aplic_s.enable);
+    use_kvm_aia = evalsoc_use_kvm_aia(mst);
 
     if (use_legacy_plic_path) {
         if (mst->iregion.plic_en) {
@@ -1866,18 +1912,20 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
         msimode = ((mst->aia_type == EVALSOC_AIA_TYPE_APLIC_IMSIC) ||
                     (mst->imsic_m.enable & mst->imsic_s.enable)) ? true : false;
         if (msimode) {
-            /* M-level IMSICs */
-            msi_addr = mst->imsic_m.base;
-            for (i = 0; i < EVALSOC_IMSIC_DEFAULT_HARTS; i++) {
-                if (i < ms->smp.cpus) {
-                    riscv_imsic_create(msi_addr + i * mst->imsic_m.size,
-                                        i, true, 1, EVALSOC_IRQCHIP_NUM_MSIS);
-                } else {
-                    MemoryRegion *mr = g_new(MemoryRegion, 1);
-                    char *ram_block_name = g_strdup_printf("imsic-M-reserved-ram-hart%d", i);
-                    memory_region_init_io(mr, NULL, &riscv_imsic_dummy_ops, NULL,
-                                        ram_block_name, mst->imsic_m.size);
-                    memory_region_add_subregion(get_system_memory(), msi_addr + i * mst->imsic_m.size, mr);
+            if (!use_kvm_aia) {
+                /* M-level IMSICs are emulated by QEMU.  KVM AIA owns M-mode. */
+                msi_addr = mst->imsic_m.base;
+                for (i = 0; i < EVALSOC_IMSIC_DEFAULT_HARTS; i++) {
+                    if (i < ms->smp.cpus) {
+                        riscv_imsic_create(msi_addr + i * mst->imsic_m.size,
+                                            i, true, 1, EVALSOC_IRQCHIP_NUM_MSIS);
+                    } else {
+                        MemoryRegion *mr = g_new(MemoryRegion, 1);
+                        char *ram_block_name = g_strdup_printf("imsic-M-reserved-ram-hart%d", i);
+                        memory_region_init_io(mr, NULL, &riscv_imsic_dummy_ops, NULL,
+                                            ram_block_name, mst->imsic_m.size);
+                        memory_region_add_subregion(get_system_memory(), msi_addr + i * mst->imsic_m.size, mr);
+                    }
                 }
             }
             /* S-level IMSICs */
@@ -1897,27 +1945,48 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
                 }
             }
         }
-        
-        /* M-level APLIC */
-        s->irqchip = riscv_aplic_create(
-            mst->aplic_m.base,
-            mst->aplic_m.size,
-            0,
-            (msimode) ? 0 : ms->smp.cpus,
-            irqmax - 1,
-            VIRT_IRQCHIP_NUM_PRIO_BITS,
-            msimode, true, NULL);
 
-        if (s->irqchip) {
-            /* S-level APLIC */
-            riscv_aplic_create(
+        if (use_kvm_aia) {
+            /*
+             * The in-kernel RISC-V AIA device exposes a single root APLIC.
+             * Keep the board-visible interrupt inputs on the S-level APLIC
+             * so riscv_kvm_aplic_request() targets KVM's configured routes.
+             */
+            s->irqchip = riscv_aplic_create(
                 mst->aplic_s.base,
                 mst->aplic_s.size,
+                0,
+                0,
+                irqmax - 1,
+                VIRT_IRQCHIP_NUM_PRIO_BITS,
+                true, false, NULL);
+
+            kvm_riscv_aia_create(ms, IMSIC_MMIO_GROUP_MIN_SHIFT,
+                                 irqmax - 1, EVALSOC_IRQCHIP_NUM_MSIS,
+                                 mst->aplic_s.base, mst->imsic_s.base,
+                                 mst->aia_guests);
+        } else {
+            /* M-level APLIC */
+            s->irqchip = riscv_aplic_create(
+                mst->aplic_m.base,
+                mst->aplic_m.size,
                 0,
                 (msimode) ? 0 : ms->smp.cpus,
                 irqmax - 1,
                 VIRT_IRQCHIP_NUM_PRIO_BITS,
-                msimode, false, s->irqchip);
+                msimode, true, NULL);
+
+            if (s->irqchip) {
+                /* S-level APLIC */
+                riscv_aplic_create(
+                    mst->aplic_s.base,
+                    mst->aplic_s.size,
+                    0,
+                    (msimode) ? 0 : ms->smp.cpus,
+                    irqmax - 1,
+                    VIRT_IRQCHIP_NUM_PRIO_BITS,
+                    msimode, false, s->irqchip);
+            }
         }
     }
     g_free(plic_hart_config);
