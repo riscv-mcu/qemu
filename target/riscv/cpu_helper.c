@@ -129,6 +129,19 @@ bool cpu_get_bcfien(CPURISCVState *env)
     }
 }
 
+bool riscv_env_smode_dbltrp_enabled(CPURISCVState *env, bool virt)
+{
+#ifdef CONFIG_USER_ONLY
+    return false;
+#else
+    if (virt) {
+        return (env->henvcfg & HENVCFG_DTE) != 0;
+    } else {
+        return (env->menvcfg & MENVCFG_DTE) != 0;
+    }
+#endif
+}
+
 #ifndef CONFIG_USER_ONLY
 static int riscv_cpu_local_irq_mode_enabled(CPUState *cs, int excode, int level)
 {
@@ -552,6 +565,18 @@ static int riscv_cpu_local_irq_pending(CPURISCVState *env)
     uint64_t vsbits, irq_delegated;
     int virq;
 
+    /* Priority: RNMI > Other interrupt. */
+    if (riscv_cpu_cfg(env)->ext_smrnmi) {
+        /* If mnstatus.NMIE == 0, all interrupts are disabled. */
+        if (!get_field(env->mnstatus, MNSTATUS_NMIE)) {
+            return RISCV_EXCP_NONE;
+        }
+
+        if (env->rnmip) {
+            return ctz64(env->rnmip); /* since non-zero */
+        }
+    }
+
     /* Determine interrupt enable state of all privilege modes */
     if (env->virt_enabled) {
         mie = 1;
@@ -633,7 +658,9 @@ bool riscv_cpu_exec_interrupt(CPUState *cs, int interrupt_request)
         cpu_reset_interrupt(cs, CPU_INTERRUPT_NUCLEI_NMI);
     }
 
-    if (interrupt_request & CPU_INTERRUPT_HARD) {
+    uint32_t mask = CPU_INTERRUPT_HARD | CPU_INTERRUPT_RNMI;
+
+    if (interrupt_request & mask) {
         RISCVCPU *cpu = RISCV_CPU(cs);
         CPURISCVState *env = &cpu->env;
         int interruptno = riscv_cpu_local_irq_pending(env);
@@ -710,6 +737,10 @@ void riscv_cpu_swap_hypervisor_regs(CPURISCVState *env)
     }
 
     g_assert(riscv_has_ext(env, RVH));
+
+    if (riscv_env_smode_dbltrp_enabled(env, current_virt)) {
+        mstatus_mask |= MSTATUS_SDT;
+    }
 
     if (current_virt) {
         /* Current V=1 and we are about to change to V=0 */
@@ -803,6 +834,32 @@ void riscv_cpu_set_virt_enabled(CPURISCVState *env, bool enable)
          * To solve this, we check and inject interrupt after setting V=1.
          */
         riscv_cpu_update_mip(env, 0, 0);
+    }
+}
+
+void riscv_cpu_set_rnmi(RISCVCPU *cpu, uint32_t irq, bool level)
+{
+    CPURISCVState *env = &cpu->env;
+    CPUState *cs = CPU(cpu);
+    bool release_lock = false;
+
+    if (!bql_locked()) {
+        release_lock = true;
+        bql_lock();
+    }
+
+    if (level) {
+        env->rnmip |= 1 << irq;
+        cpu_interrupt(cs, CPU_INTERRUPT_RNMI);
+    } else {
+        env->rnmip &= ~(1 << irq);
+        if (!env->rnmip) {
+            cpu_reset_interrupt(cs, CPU_INTERRUPT_RNMI);
+        }
+    }
+
+    if (release_lock) {
+        bql_unlock();
     }
 }
 
@@ -2351,6 +2408,30 @@ static target_ulong promote_load_fault(target_ulong orig_cause)
     /* if no promotion, return original cause */
     return orig_cause;
 }
+
+static void riscv_do_nmi(CPURISCVState *env, target_ulong cause, bool virt)
+{
+    env->mnstatus = set_field(env->mnstatus, MNSTATUS_NMIE, false);
+    env->mnstatus = set_field(env->mnstatus, MNSTATUS_MNPV, virt);
+    env->mnstatus = set_field(env->mnstatus, MNSTATUS_MNPP, env->priv);
+    env->mncause = cause;
+    env->mnepc = env->pc;
+    env->pc = env->rnmi_irqvec;
+
+    if (cpu_get_fcfien(env)) {
+        env->mnstatus = set_field(env->mnstatus, MNSTATUS_MNPELP, env->elp);
+        env->elp = false;
+    }
+
+    /* Trapping to M mode, virt is disabled */
+    if (riscv_has_ext(env, RVH)) {
+        if (env->virt_enabled) {
+            riscv_cpu_swap_hypervisor_regs(env);
+        }
+        riscv_cpu_set_virt_enabled(env, 0);
+    }
+    riscv_cpu_set_mode(env, PRV_M);
+}
 #endif
 
 /*
@@ -2367,8 +2448,11 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     CPURISCVState *env = &cpu->env;
     bool write_gva = false;
     bool always_storeamo = (env->excp_uw2 & RISCV_UW2_ALWAYS_STORE_AMO);
+    bool current_virt = env->virt_enabled;
+    bool vsmode_exc;
     uint64_t s;
     int mode = 0, level = 0;
+    int trap_mode = PRV_M;
     target_ulong newpc = 0;
 
     /*
@@ -2398,11 +2482,21 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         (env->hvip & (1ULL << cause) & env->hvien) &&
         !(env->mip & (1ULL << cause));
     const char *trap_name;
+    bool smode_double_trap = false;
+    uint64_t hdeleg = is_interrupt ? env->hideleg : env->hedeleg;
     target_ulong tval = 0;
     target_ulong tinst = 0;
     target_ulong htval = 0;
     target_ulong mtval2 = 0;
     uint32_t int_vec_mode = 0;
+    int mxlen = 16 << riscv_cpu_mxl(env);
+    bool nnmi_excep = false;
+
+    if (cpu->cfg.ext_smrnmi && env->rnmip && async) {
+        riscv_do_nmi(env, cause | ((target_ulong)1U << (mxlen - 1)),
+                     current_virt);
+        return;
+    }
 
     if (!is_interrupt) {
         /* set tval to badaddr for traps with address information */
@@ -2527,9 +2621,41 @@ void riscv_cpu_do_interrupt(CPUState *cs)
                   __func__, env->mhartid, is_interrupt, cause, env->pc, tval,
                   trap_name);
 
-    if (!nuclei_nmi && env->priv <= PRV_S && ((cause < 64 &&
-        (((deleg >> cause) & 1) || s_injected || vs_injected))
-        || (eclic_flag && mode == (PRV_S)))) {
+    if (!nuclei_nmi) {
+        trap_mode = env->priv <= PRV_S && cause < 64 &&
+            (((deleg >> cause) & 1) || s_injected || vs_injected) ?
+            PRV_S : PRV_M;
+        if (eclic_flag && mode == PRV_S) {
+            trap_mode = PRV_S;
+        }
+    }
+
+    vsmode_exc = current_virt && cause < 64 &&
+        (((hdeleg >> cause) & 1) || vs_injected);
+    /*
+     * Check double trap condition only if already in S-mode and targeting
+     * S-mode
+     */
+    if (cpu->cfg.ext_ssdbltrp && env->priv == PRV_S && trap_mode == PRV_S) {
+        bool dte = (env->menvcfg & MENVCFG_DTE) != 0;
+        bool sdt = (env->mstatus & MSTATUS_SDT) != 0;
+        /* In VS or HS */
+        if (riscv_has_ext(env, RVH)) {
+            if (vsmode_exc) {
+                /* VS -> VS, use henvcfg instead of menvcfg*/
+                dte = (env->henvcfg & HENVCFG_DTE) != 0;
+            } else if (env->virt_enabled) {
+                /* VS -> HS, use mstatus_hs */
+                sdt = (env->mstatus_hs & MSTATUS_SDT) != 0;
+            }
+        }
+        smode_double_trap = dte && sdt;
+        if (smode_double_trap) {
+            trap_mode = PRV_M;
+        }
+    }
+
+    if (trap_mode == PRV_S) {
         /* handle the trap in S-mode */
         /* save elp status */
         if (cpu_get_fcfien(env)) {
@@ -2560,10 +2686,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         }
 
         if (riscv_has_ext(env, RVH)) {
-            uint64_t hdeleg = is_interrupt ? env->hideleg : env->hedeleg;
-
-            if (env->virt_enabled &&
-                (((hdeleg >> cause) & 1) || vs_injected)) {
+            if (vsmode_exc) {
                 /* Trap to VS mode */
                 /*
                  * See if we need to adjust cause. Yes if its VS mode interrupt
@@ -2597,6 +2720,9 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         s = set_field(s, MSTATUS_SPIE, get_field(s, MSTATUS_SIE));
         s = set_field(s, MSTATUS_SPP, env->priv);
         s = set_field(s, MSTATUS_SIE, 0);
+        if (riscv_env_smode_dbltrp_enabled(env, current_virt)) {
+            s = set_field(s, MSTATUS_SDT, 1);
+        }
         env->mstatus = s;
         if (!is_interrupt && !eclic_flag && riscv_intc_is_clic_mode(env)) {
             env->ssubm = set_field(env->ssubm, XSUBM_PTYP,
@@ -2628,6 +2754,14 @@ void riscv_cpu_do_interrupt(CPUState *cs)
             nuclei_eclic_context_auto_saving(env, int_vec_mode, level);
         }
     } else {
+        /*
+         * If the hart encounters an exception while executing in M-mode
+         * with the mnstatus.NMIE bit clear, the exception is an RNMI exception.
+         */
+        nnmi_excep = cpu->cfg.ext_smrnmi &&
+                     !get_field(env->mnstatus, MNSTATUS_NMIE) &&
+                     !async;
+
         /* handle the trap in M-mode */
         /* save elp status */
         if (cpu_get_fcfien(env)) {
@@ -2677,11 +2811,32 @@ void riscv_cpu_do_interrupt(CPUState *cs)
             /* Trapping to M mode, virt is disabled */
             riscv_cpu_set_virt_enabled(env, 0);
         }
+        /*
+         * If the hart encounters an exception while executing in M-mode,
+         * with the mnstatus.NMIE bit clear, the program counter is set to
+         * the RNMI exception trap handler address.
+         */
+        nnmi_excep = cpu->cfg.ext_smrnmi &&
+                     !get_field(env->mnstatus, MNSTATUS_NMIE) &&
+                     !async;
 
         s = env->mstatus;
         s = set_field(s, MSTATUS_MPIE, get_field(s, MSTATUS_MIE));
         s = set_field(s, MSTATUS_MPP, env->priv);
         s = set_field(s, MSTATUS_MIE, 0);
+        if (cpu->cfg.ext_smdbltrp) {
+            if (env->mstatus & MSTATUS_MDT) {
+                assert(env->priv == PRV_M);
+                if (!cpu->cfg.ext_smrnmi || nnmi_excep) {
+                    cpu_abort(CPU(cpu), "M-mode double trap\n");
+                } else {
+                    riscv_do_nmi(env, cause, false);
+                    return;
+                }
+            }
+
+            s = set_field(s, MSTATUS_MDT, 1);
+        }
         env->mstatus = s;
         if (!is_interrupt && !eclic_flag && riscv_intc_is_clic_mode(env)) {
             env->msubm = set_field(env->msubm, XSUBM_PTYP,
@@ -2694,14 +2849,22 @@ void riscv_cpu_do_interrupt(CPUState *cs)
             cause = set_field(cause, MCAUSE_MPP, env->priv);
         }
         env->mcause = cause | ((target_ulong)is_interrupt <<
-                               (TARGET_LONG_BITS - 1));
+                               (mxlen - 1));
         if (riscv_intc_is_clic_mode(env)) {
             riscv_nuclei_sync_mcause_from_mstatus(env);
         }
+        if (smode_double_trap) {
+            env->mtval2 = env->mcause;
+            env->mcause = RISCV_EXCP_DOUBLE_TRAP;
+        } else {
+            env->mtval2 = mtval2;
+        }
         env->mepc = env->pc;
         env->mtval = tval;
-        env->mtval2 = mtval2;
         env->mtinst = tinst;
+        if (nnmi_excep) {
+            newpc = env->rnmi_excpvec;
+        }
         env->pc = newpc;
         riscv_cpu_set_mode(env, PRV_M);
         if (riscv_intc_is_clic_mode(env) &&

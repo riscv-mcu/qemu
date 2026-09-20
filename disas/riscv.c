@@ -966,6 +966,7 @@ typedef enum {
     rv_op_ssamoswap_d = 933,
     rv_op_c_sspush = 934,
     rv_op_c_sspopchk = 935,
+    rv_op_mnret = 936,
 } rv_op;
 
 /* register names */
@@ -2216,6 +2217,7 @@ const rv_opcode_data rvi_opcode_data[] = {
       rv_op_sspush, 0 },
     { "c.sspopchk", rv_codec_cmop_ss, rv_fmt_rs1, NULL, rv_op_sspopchk,
       rv_op_sspopchk, 0 },
+    { "mnret", rv_codec_none, rv_fmt_none, NULL, 0, 0, 0 },
 };
 
 /* CSR names */
@@ -3987,6 +3989,11 @@ static void decode_inst_opcode(rv_decode *dec, rv_isa isa)
                 case 768:
                     switch ((inst >> 15) & 0b1111111111) {
                     case 64: op = rv_op_mret; break;
+                    }
+                    break;
+                case 1792:
+                    switch ((inst >> 15) & 0b1111111111) {
+                    case 64: op = rv_op_mnret; break;
                     }
                     break;
                 case 1952:

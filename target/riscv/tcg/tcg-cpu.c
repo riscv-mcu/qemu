@@ -83,6 +83,8 @@ static const char *cpu_priv_ver_to_str(int priv_ver)
         return "v1.11.0";
     case PRIV_VERSION_1_12_0:
         return "v1.12.0";
+    case PRIV_VERSION_1_13_0:
+        return "v1.13.0";
     }
 
     g_assert_not_reached();
@@ -213,7 +215,8 @@ static void cpu_bump_multi_ext_priv_ver(CPURISCVState *env,
 {
     int ext_priv_ver;
 
-    if (env->priv_ver == PRIV_VERSION_LATEST) {
+    if (riscv_cpu_option_set("priv_spec") ||
+        env->priv_ver == PRIV_VERSION_LATEST) {
         return;
     }
 
@@ -222,7 +225,7 @@ static void cpu_bump_multi_ext_priv_ver(CPURISCVState *env,
     if (env->priv_ver < ext_priv_ver) {
         /*
          * Note: the 'priv_spec' command line option, if present,
-         * will take precedence over this priv_ver bump.
+         * takes precedence over this priv_ver bump.
          */
         env->priv_ver = ext_priv_ver;
     }
@@ -960,7 +963,7 @@ static void riscv_cpu_validate_profile(RISCVCPU *cpu,
 #endif
 
     if (profile->priv_spec != RISCV_PROFILE_ATTR_UNUSED &&
-        profile->priv_spec != env->priv_ver) {
+        profile->priv_spec > env->priv_ver) {
         profile_impl = false;
 
         if (send_warn) {

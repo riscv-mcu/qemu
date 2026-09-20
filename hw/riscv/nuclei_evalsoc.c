@@ -363,7 +363,15 @@ static void evalsoc_misc_nmi_irq(void *opaque, int n, int level)
     RISCVCPU *cpu = opaque;
 
     (void)n;
-    riscv_cpu_nuclei_nmi_interrupt(cpu, level);
+    /*
+     * MISC exposes one NMI source. Smrnmi changes the CPU-side response
+     * mechanism; it does not add a second MISC output or trigger source.
+     */
+    if (cpu->cfg.ext_smrnmi) {
+        riscv_cpu_set_rnmi(cpu, 0, level);
+    } else {
+        riscv_cpu_nuclei_nmi_interrupt(cpu, level);
+    }
 }
 
 static target_ulong evalsoc_compose_mcfg_info(const EvalSoCState *s,
