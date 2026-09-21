@@ -302,7 +302,7 @@ static uint8_t sd_crc7(const void *message, size_t width)
                 shift_reg ^= 0x89;
         }
 
-    return shift_reg;
+    return shift_reg & 0x7f;
 }
 
 void sd_req_init(SDRequest *req, uint8_t cmd, uint32_t arg)
