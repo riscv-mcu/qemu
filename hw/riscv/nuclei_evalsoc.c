@@ -1841,7 +1841,6 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
 
     int i = 0;
     char *plic_hart_config;
-    size_t plic_hart_config_len;
     bool use_legacy_plic_path;
     bool use_kvm_aia;
     bool msimode;
@@ -1874,19 +1873,14 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
      */
     qdev_realize(DEVICE(&s->u_cluster), NULL, &error_abort);
 
-    /* create PLIC hart topology configuration string */
-    plic_hart_config_len = (strlen(EVALSOC_PLIC_HART_CONFIG) + 1) *
-                           ms->smp.cpus;
-    plic_hart_config = g_malloc0(plic_hart_config_len);
-    for (i = 0; i < ms->smp.cpus; i++)
-    {
-        if (i != 0) {
-            strncat(plic_hart_config, ",", plic_hart_config_len);
-        }
-        strncat(plic_hart_config, EVALSOC_PLIC_HART_CONFIG,
-                plic_hart_config_len);
-        plic_hart_config_len -= (strlen(EVALSOC_PLIC_HART_CONFIG) + 1);
-    }
+    /*
+     * Create PLIC hart topology configuration string.
+     * Keep the PLIC context topology consistent with the execution mode.
+     * In KVM, kvm_riscv_set_irq() only injects IRQ_S_EXT, so every hart
+     * must have an S-mode PLIC context.  TCG keeps the normal MS topology
+     * when the CPU implements supervisor mode.
+     */
+    plic_hart_config = riscv_plic_hart_config_string(ms->smp.cpus);
     /* MMIO */
 
     use_legacy_plic_path = (mst->aia_type == EVALSOC_AIA_TYPE_NONE) &&
