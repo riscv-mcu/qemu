@@ -149,6 +149,11 @@ static int riscv_cpu_local_irq_mode_enabled(CPUState *cs, int excode, int level)
     RISCVCPU *cpu = RISCV_CPU(cs);
     CPURISCVState *env = &cpu->env;
 
+    if (riscv_cpu_cfg(env)->ext_smrnmi &&
+        !get_field(env->mnstatus, MNSTATUS_NMIE)) {
+        return false;
+    }
+
     int mode = (excode >> 12) & 0x3;
 
     target_ulong mintstatus_mil = get_field(env->mintstatus, MINTSTATUS_MIL);
@@ -2432,6 +2437,16 @@ static void riscv_do_nmi(CPURISCVState *env, target_ulong cause, bool virt)
     }
     riscv_cpu_set_mode(env, PRV_M);
 }
+
+static void riscv_nmi_trap_cleanup(CPUState *cs)
+{
+    CPURISCVState *env = cpu_env(cs);
+
+    env->elp = false;
+    env->two_stage_lookup = false;
+    env->two_stage_indirect_lookup = false;
+    cs->exception_index = RISCV_EXCP_NONE;
+}
 #endif
 
 /*
@@ -2495,6 +2510,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     if (cpu->cfg.ext_smrnmi && env->rnmip && async) {
         riscv_do_nmi(env, cause | ((target_ulong)1U << (mxlen - 1)),
                      current_virt);
+        riscv_nmi_trap_cleanup(cs);
         return;
     }
 
@@ -2720,7 +2736,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
         s = set_field(s, MSTATUS_SPIE, get_field(s, MSTATUS_SIE));
         s = set_field(s, MSTATUS_SPP, env->priv);
         s = set_field(s, MSTATUS_SIE, 0);
-        if (riscv_env_smode_dbltrp_enabled(env, current_virt)) {
+        if (riscv_env_smode_dbltrp_enabled(env, env->virt_enabled)) {
             s = set_field(s, MSTATUS_SDT, 1);
         }
         env->mstatus = s;
@@ -2759,8 +2775,10 @@ void riscv_cpu_do_interrupt(CPUState *cs)
          * with the mnstatus.NMIE bit clear, the exception is an RNMI exception.
          */
         nnmi_excep = cpu->cfg.ext_smrnmi &&
+                     env->priv == PRV_M &&
                      !get_field(env->mnstatus, MNSTATUS_NMIE) &&
-                     !async;
+                     !is_interrupt &&
+                     !nuclei_nmi;
 
         /* handle the trap in M-mode */
         /* save elp status */
@@ -2817,20 +2835,32 @@ void riscv_cpu_do_interrupt(CPUState *cs)
          * the RNMI exception trap handler address.
          */
         nnmi_excep = cpu->cfg.ext_smrnmi &&
+                     env->priv == PRV_M &&
                      !get_field(env->mnstatus, MNSTATUS_NMIE) &&
-                     !async;
+                     !is_interrupt &&
+                     !nuclei_nmi;
 
         s = env->mstatus;
         s = set_field(s, MSTATUS_MPIE, get_field(s, MSTATUS_MIE));
         s = set_field(s, MSTATUS_MPP, env->priv);
         s = set_field(s, MSTATUS_MIE, 0);
-        if (cpu->cfg.ext_smdbltrp) {
-            if (env->mstatus & MSTATUS_MDT) {
+        /*
+         * Nuclei NMI has an independent entry/nesting mechanism and must
+         * not be converted into an Smrnmi double-trap entry.
+         */
+        if (cpu->cfg.ext_smdbltrp && !nuclei_nmi) {
+            if ((env->mstatus & MSTATUS_MDT) || nnmi_excep) {
                 assert(env->priv == PRV_M);
+                /*
+                 * A trap with MDT already set is an unexpected trap.  A
+                 * trap in M-mode with NMIE clear is also unexpected, even if
+                 * MDT is clear; this is the RNMI-handler case.
+                 */
                 if (!cpu->cfg.ext_smrnmi || nnmi_excep) {
                     cpu_abort(CPU(cpu), "M-mode double trap\n");
                 } else {
                     riscv_do_nmi(env, cause, false);
+                    riscv_nmi_trap_cleanup(cs);
                     return;
                 }
             }
