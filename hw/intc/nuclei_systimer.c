@@ -83,6 +83,16 @@ static uint64_t nuclei_systimer_get_mtime(NucleiSYSTIMERState *s)
     return nuclei_cpu_riscv_read_rtc_raw(s->timebase_freq) + s->time_delta;
 }
 
+static inline bool nuclei_systimer_is_low_word(const NucleiSYSTIMERState *s,
+                                                hwaddr offset)
+{
+    if (!s->timer_64bit) {
+        return (offset & 0x7) == 0;
+    }
+
+    return (offset & 0x7) == (s->big_endian ? 4 : 0);
+}
+
 static void nuclei_systimer_set_timer_irq(NucleiSYSTIMERState *s,
                                           uint32_t hart_idx, bool level)
 {
@@ -279,7 +289,7 @@ static uint64_t nuclei_timer_read(void *opaque, hwaddr offset, unsigned size)
             return 0;
         }
 
-        if ((offset & 0x7) == 0) {
+        if (nuclei_systimer_is_low_word(s, offset)) {
             return h_env->mtimecmp & 0xffffffffu;
         }
         return (h_env->mtimecmp >> 32) & 0xffffffffu;
@@ -296,19 +306,24 @@ static uint64_t nuclei_timer_read(void *opaque, hwaddr offset, unsigned size)
 
     switch (offset) {
     case REG_MTIME_LO:
-        return srw_blocked ? 0 : (nuclei_systimer_get_mtime(s) & 0xffffffffu);
     case REG_MTIME_HI:
-        return srw_blocked ? 0 :
+        if (srw_blocked) {
+            return 0;
+        }
+        return nuclei_systimer_is_low_word(s, offset) ?
+               (nuclei_systimer_get_mtime(s) & 0xffffffffu) :
                ((nuclei_systimer_get_mtime(s) >> 32) & 0xffffffffu);
     case REG_MTIMECMP_LO:
         /*
          * Spec 13.1 defines the local MTIMECMP shadow window as the 1st-hart
          * copy in CLINT mode, not a current-hart alias.
          */
-        return (srw_blocked || !hart0_env) ? 0 :
-               (hart0_env->mtimecmp & 0xffffffffu);
     case REG_MTIMECMP_HI:
-        return (srw_blocked || !hart0_env) ? 0 :
+        if (srw_blocked || !hart0_env) {
+            return 0;
+        }
+        return nuclei_systimer_is_low_word(s, offset) ?
+               (hart0_env->mtimecmp & 0xffffffffu) :
                ((hart0_env->mtimecmp >> 32) & 0xffffffffu);
     case REG_MTIME_SRW_CTRL:
         return env->priv == PRV_M ? s->mtime_srw_ctrl : 0;
@@ -324,9 +339,12 @@ static uint64_t nuclei_timer_read(void *opaque, hwaddr offset, unsigned size)
         return srw_blocked ? 0 : s->msip[0];
     /* 0xcff8 is the shared MTIME alias defined by the Nuclei timer window. */
     case REG_MTIME:
-        return srw_blocked ? 0 : (nuclei_systimer_get_mtime(s) & 0xffffffffu);
     case REG_MTIME + 4:
-        return srw_blocked ? 0 :
+        if (srw_blocked) {
+            return 0;
+        }
+        return nuclei_systimer_is_low_word(s, offset) ?
+               (nuclei_systimer_get_mtime(s) & 0xffffffffu) :
                ((nuclei_systimer_get_mtime(s) >> 32) & 0xffffffffu);
     default:
         qemu_log_mask(LOG_GUEST_ERROR,
@@ -379,7 +397,7 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
         }
 
         cmp = h_env->mtimecmp;
-        if ((offset & 0x7) == 0) {
+        if (nuclei_systimer_is_low_word(s, offset)) {
             cmp = (cmp & 0xffffffff00000000ULL) | value;
         } else {
             cmp = (cmp & 0xffffffffULL) | (value << 32);
@@ -411,7 +429,11 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
          * merge the incoming half with the current visible MTIME value.
          */
         mtime = nuclei_systimer_get_mtime(s);
-        mtime = (mtime & 0xffffffff00000000ULL) | value;
+        if (nuclei_systimer_is_low_word(s, offset)) {
+            mtime = (mtime & 0xffffffff00000000ULL) | value;
+        } else {
+            mtime = (mtime & 0xffffffffULL) | (value << 32);
+        }
         nuclei_systimer_set_mtime(s, mtime);
         nuclei_systimer_update_all_timers(s);
         return;
@@ -425,7 +447,11 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
         }
 
         mtime = nuclei_systimer_get_mtime(s);
-        mtime = (mtime & 0xffffffffULL) | (value << 32);
+        if (nuclei_systimer_is_low_word(s, offset)) {
+            mtime = (mtime & 0xffffffff00000000ULL) | value;
+        } else {
+            mtime = (mtime & 0xffffffffULL) | (value << 32);
+        }
         nuclei_systimer_set_mtime(s, mtime);
         nuclei_systimer_update_all_timers(s);
         return;
@@ -443,7 +469,11 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
          * copy in CLINT mode, so local writes always target hart0.
          */
         cmp = hart0_env->mtimecmp;
-        cmp = (cmp & 0xffffffff00000000ULL) | value;
+        if (nuclei_systimer_is_low_word(s, offset)) {
+            cmp = (cmp & 0xffffffff00000000ULL) | value;
+        } else {
+            cmp = (cmp & 0xffffffffULL) | (value << 32);
+        }
         set_mtimecmp(s, 0, cmp);
         return;
     }
@@ -456,7 +486,11 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
         }
 
         cmp = hart0_env->mtimecmp;
-        cmp = (cmp & 0xffffffffULL) | (value << 32);
+        if (nuclei_systimer_is_low_word(s, offset)) {
+            cmp = (cmp & 0xffffffff00000000ULL) | value;
+        } else {
+            cmp = (cmp & 0xffffffffULL) | (value << 32);
+        }
         set_mtimecmp(s, 0, cmp);
         return;
     }
@@ -515,7 +549,11 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
         }
 
         mtime = nuclei_systimer_get_mtime(s);
-        mtime = (mtime & 0xffffffff00000000ULL) | value;
+        if (nuclei_systimer_is_low_word(s, offset)) {
+            mtime = (mtime & 0xffffffff00000000ULL) | value;
+        } else {
+            mtime = (mtime & 0xffffffffULL) | (value << 32);
+        }
         nuclei_systimer_set_mtime(s, mtime);
         nuclei_systimer_update_all_timers(s);
         return;
@@ -529,7 +567,11 @@ static void nuclei_timer_write(void *opaque, hwaddr offset,
         }
 
         mtime = nuclei_systimer_get_mtime(s);
-        mtime = (mtime & 0xffffffffULL) | (value << 32);
+        if (nuclei_systimer_is_low_word(s, offset)) {
+            mtime = (mtime & 0xffffffff00000000ULL) | value;
+        } else {
+            mtime = (mtime & 0xffffffffULL) | (value << 32);
+        }
         nuclei_systimer_set_mtime(s, mtime);
         nuclei_systimer_update_all_timers(s);
         return;
@@ -737,7 +779,8 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size,
                                     uint32_t hartid_base, uint32_t num_harts,
                                     DeviceState *eclic,
                                     uint32_t timebase_freq,
-                                    bool big_endian)
+                                    bool big_endian,
+                                    bool timer_64bit)
 {
     DeviceState *dev = qdev_new(TYPE_NUCLEI_SYSTIMER);
     NucleiSYSTIMERState *s = NUCLEI_SYSTIMER(dev);
@@ -752,6 +795,7 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size,
         s->eclic = eclic;
     }
     s->big_endian = big_endian;
+    s->timer_64bit = timer_64bit;
 
     sysbus_realize_and_unref(SYS_BUS_DEVICE(dev), &error_fatal);
     sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, addr);

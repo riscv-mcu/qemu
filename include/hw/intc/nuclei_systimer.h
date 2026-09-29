@@ -78,6 +78,7 @@ typedef struct NucleiSYSTIMERState {
     uint32_t msftrst;
     uint32_t mtimectl;
     bool big_endian;
+    bool timer_64bit;
 
     uint32_t *msip;
     uint32_t *ssip;
@@ -95,6 +96,7 @@ DeviceState *nuclei_systimer_create(hwaddr addr, hwaddr size,
                                     uint32_t hartid_base, uint32_t num_harts,
                                     DeviceState *eclic,
                                     uint32_t timebase_freq,
-                                    bool big_endian);
+                                    bool big_endian,
+                                    bool timer_64bit);
 
 #endif
