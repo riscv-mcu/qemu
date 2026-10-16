@@ -2451,18 +2451,32 @@ static RISCVException write_mtvec(CPURISCVState *env, int csrno,
                                   target_ulong val)
 {
     int mode1 = val & 0b11, mode2 = val & 0b111111;
+    bool updated = false;
+
     /* bits [1:0] encode mode; 0 = direct, 1 = vectored, 2 >= reserved */
     if (mode1 < 2) {
         env->mtvec = val;
+        updated = true;
     } else {
          /* bits [5:0] encode extended modes currently used by the ECLIC */
         switch (mode2) {
         case 0b000011: /* ECLIC  mode */
             env->mtvec = val;
+            updated = true;
             break;
         default:
                 qemu_log_mask(LOG_UNIMP, "CSR_MTVEC: reserved mode not supported\n");
         }
+    }
+
+    /*
+     * The Nuclei Smrnmi model uses the ordinary M-mode exception base for
+     * RNMI exceptions.  Keep the implementation-defined QOM property as the
+     * reset-time value, but replace it after a guest configures mtvec.
+     */
+    if (updated && riscv_cpu_cfg(env)->ext_smrnmi) {
+        /* Nuclei mtvec.ADDR is mtvec[XLEN-1:6] in every interrupt mode. */
+        env->rnmi_excpvec = env->mtvec & ~((target_ulong)0x3f);
     }
 
     env->mnvec = riscv_cpu_nuclei_mnvec(env);
@@ -5718,8 +5732,20 @@ static int rmw_sscratchcswl(CPURISCVState *env, int csrno, target_ulong *ret_val
 
 static int read_mnvec(CPURISCVState *env, int csrno, target_ulong *val)
 {
-    /* MNVEC is a derived view controlled by MMISC_CTL[9] in this model. */
-    *val = riscv_cpu_nuclei_mnvec(env);
+    if (riscv_cpu_cfg(env)->ext_smrnmi) {
+        *val = env->rnmi_irqvec;
+    } else {
+        /* MNVEC is a derived view controlled by MMISC_CTL[9] in this model. */
+        *val = riscv_cpu_nuclei_mnvec(env);
+    }
+    return RISCV_EXCP_NONE;
+}
+
+static int write_mnvec(CPURISCVState *env, int csrno, target_ulong val)
+{
+    if (riscv_cpu_cfg(env)->ext_smrnmi) {
+        env->rnmi_irqvec = val;
+    }
     return RISCV_EXCP_NONE;
 }
 
@@ -7644,7 +7670,7 @@ riscv_csr_operations csr_ops[CSR_TABLE_SIZE] = {
     [CSR_NUCLEI_MINTSTATUS]     = { "mintstatus",     any, read_mintstatus, write_ignore },
     [CSR_NUCLEI_MSCRATCHCSW]    = { "mscratchcsw",    any, NULL, NULL, rmw_mscratchcsw },
     [CSR_NUCLEI_MSCRATCHCSWL]   = { "mscratchcswl",   any, NULL, NULL, rmw_mscratchcswl },
-    [CSR_NUCLEI_MNVEC]          = { "mnvec",          any, read_mnvec, write_ignore },
+    [CSR_NUCLEI_MNVEC]          = { "mnvec",          any, read_mnvec, write_mnvec },
     [CSR_NUCLEI_MSUBM]          = { "msubm",          any, read_msubm, write_msubm },
     [CSR_NUCLEI_MSTACK_CTL]     = { "mstack_ctrl",    any, read_mstack_ctl, write_mstack_ctl },
     [CSR_NUCLEI_MSTACK_BOUND]   = { "mstack_bound",   any, read_mstack_bound, write_mstack_bound },
