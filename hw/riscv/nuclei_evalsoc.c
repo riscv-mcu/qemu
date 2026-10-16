@@ -1549,9 +1549,8 @@ static void evalsoc_machine_init(MachineState *machine)
                         qdev_get_child_bus(sd_dev, "sd-bus"),
                         &error_fatal);
 
-    bool is_32_bit = riscv_is_32bit(&s->soc.cpus);
-
-    nuclei_iregion_create(memmap[EVALSOC_IINFO].base + s->iregion.base, is_32_bit);
+    nuclei_iregion_create(memmap[EVALSOC_IINFO].base + s->iregion.base,
+                          &s->soc.cpus.harts[0], big_endian);
 }
 
 static void evalsoc_machine_instance_init(Object *obj)
