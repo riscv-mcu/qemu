@@ -682,7 +682,7 @@ static RISCVException aia_hmode32(CPURISCVState *env, int csrno)
 
 static RISCVException dbltrp_hmode(CPURISCVState *env, int csrno)
 {
-    if (riscv_cpu_cfg(env)->ext_ssdbltrp) {
+    if (riscv_cpu_ssdbltrp_enabled(env)) {
         return RISCV_EXCP_NONE;
     }
 
@@ -818,9 +818,7 @@ static RISCVException debug(CPURISCVState *env, int csrno)
 
 static RISCVException rnmi(CPURISCVState *env, int csrno)
 {
-    RISCVCPU *cpu = env_archcpu(env);
-
-    if (cpu->cfg.ext_smrnmi) {
+    if (riscv_cpu_smrnmi_enabled(env)) {
         return RISCV_EXCP_NONE;
     }
 
@@ -1841,7 +1839,7 @@ static RISCVException write_mstatus(CPURISCVState *env, int csrno,
         }
     }
 
-    if (riscv_cpu_cfg(env)->ext_smdbltrp) {
+    if (riscv_cpu_smdbltrp_enabled(env)) {
         mask |= MSTATUS_MDT;
         if ((val & MSTATUS_MDT) != 0) {
             val &= ~MSTATUS_MIE;
@@ -1896,7 +1894,7 @@ static RISCVException write_mstatush(CPURISCVState *env, int csrno,
     uint64_t valh = (uint64_t)val << 32;
     uint64_t mask = riscv_has_ext(env, RVH) ? MSTATUS_MPV | MSTATUS_GVA : 0;
 
-    if (riscv_cpu_cfg(env)->ext_smdbltrp) {
+    if (riscv_cpu_smdbltrp_enabled(env)) {
         mask |= MSTATUS_MDT;
         if ((valh & MSTATUS_MDT) != 0) {
             mask |= MSTATUS_MIE;
@@ -2645,7 +2643,7 @@ static RISCVException write_menvcfg(CPURISCVState *env, int csrno,
         mask |= (cfg->ext_svpbmt ? MENVCFG_PBMTE : 0) |
                 (cfg->ext_sstc ? MENVCFG_STCE : 0) |
                 (cfg->ext_svadu ? MENVCFG_ADUE : 0) |
-                (cfg->ext_ssdbltrp ? MENVCFG_DTE : 0);
+                (riscv_cpu_ssdbltrp_enabled(env) ? MENVCFG_DTE : 0);
 
         if (env_archcpu(env)->cfg.ext_zicfilp) {
             mask |= MENVCFG_LPE;
@@ -2678,7 +2676,7 @@ static RISCVException write_menvcfgh(CPURISCVState *env, int csrno,
     uint64_t mask = (cfg->ext_svpbmt ? MENVCFG_PBMTE : 0) |
                     (cfg->ext_sstc ? MENVCFG_STCE : 0) |
                     (cfg->ext_svadu ? MENVCFG_ADUE : 0) |
-                    (cfg->ext_ssdbltrp ? MENVCFG_DTE : 0);
+                    (riscv_cpu_ssdbltrp_enabled(env) ? MENVCFG_DTE : 0);
     uint64_t valh = (uint64_t)val << 32;
 
     if ((valh & MENVCFG_DTE) == 0) {
@@ -3379,7 +3377,7 @@ static RISCVException read_sstatus_i128(CPURISCVState *env, int csrno,
     if (env->xl != MXL_RV32 || env->debugger) {
         mask |= SSTATUS64_UXL;
     }
-    if (riscv_cpu_cfg(env)->ext_ssdbltrp) {
+    if (riscv_cpu_ssdbltrp_enabled(env)) {
         mask |= SSTATUS_SDT;
     }
 
@@ -3402,7 +3400,7 @@ static RISCVException read_sstatus(CPURISCVState *env, int csrno,
     if (env_archcpu(env)->cfg.ext_zicfilp) {
         mask |= SSTATUS_SPELP;
     }
-    if (riscv_cpu_cfg(env)->ext_ssdbltrp) {
+    if (riscv_cpu_ssdbltrp_enabled(env)) {
         mask |= SSTATUS_SDT;
     }
     /* TODO: Use SXL not MXL. */
@@ -3424,7 +3422,7 @@ static RISCVException write_sstatus(CPURISCVState *env, int csrno,
     if (env_archcpu(env)->cfg.ext_zicfilp) {
         mask |= SSTATUS_SPELP;
     }
-    if (riscv_cpu_cfg(env)->ext_ssdbltrp) {
+    if (riscv_cpu_ssdbltrp_enabled(env)) {
         mask |= SSTATUS_SDT;
     }
     target_ulong newval = (env->mstatus & ~mask) | (val & mask);
@@ -4621,7 +4619,7 @@ static RISCVException write_vsstatus(CPURISCVState *env, int csrno,
     if ((val & VSSTATUS64_UXL) == 0) {
         mask &= ~VSSTATUS64_UXL;
     }
-    if ((env->henvcfg & HENVCFG_DTE)) {
+    if (riscv_cpu_ssdbltrp_enabled(env) && (env->henvcfg & HENVCFG_DTE)) {
         if ((val & SSTATUS_SDT) != 0) {
             val &= ~SSTATUS_SIE;
         }
@@ -5732,7 +5730,7 @@ static int rmw_sscratchcswl(CPURISCVState *env, int csrno, target_ulong *ret_val
 
 static int read_mnvec(CPURISCVState *env, int csrno, target_ulong *val)
 {
-    if (riscv_cpu_cfg(env)->ext_smrnmi) {
+    if (riscv_cpu_smrnmi_enabled(env)) {
         *val = env->rnmi_irqvec;
     } else {
         /* MNVEC is a derived view controlled by MMISC_CTL[9] in this model. */
@@ -5743,7 +5741,7 @@ static int read_mnvec(CPURISCVState *env, int csrno, target_ulong *val)
 
 static int write_mnvec(CPURISCVState *env, int csrno, target_ulong val)
 {
-    if (riscv_cpu_cfg(env)->ext_smrnmi) {
+    if (riscv_cpu_smrnmi_enabled(env)) {
         env->rnmi_irqvec = val;
     }
     return RISCV_EXCP_NONE;
@@ -5794,6 +5792,13 @@ static int read_mmisc_ctl(CPURISCVState *env, int csrno, target_ulong *val)
 static int write_mmisc_ctl(CPURISCVState *env, int csrno, target_ulong val)
 {
     env->mmisc_ctl = val;
+
+    if (!(env->mmisc_ctl & MMISC_CTL_RNMI_DBTR_EN)) {
+        cpu_reset_interrupt(env_cpu(env), CPU_INTERRUPT_RNMI);
+    } else if (riscv_cpu_smrnmi_enabled(env) && env->rnmip) {
+        cpu_interrupt(env_cpu(env), CPU_INTERRUPT_RNMI);
+    }
+
     /* Keep the derived NMI entry view coherent for CSR reads and reset code. */
     env->mnvec = riscv_cpu_nuclei_mnvec(env);
     return RISCV_EXCP_NONE;

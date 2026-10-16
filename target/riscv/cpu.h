@@ -876,6 +876,24 @@ static inline const RISCVCPUConfig *riscv_cpu_cfg(CPURISCVState *env)
 }
 
 #if !defined(CONFIG_USER_ONLY)
+static inline bool riscv_cpu_smrnmi_enabled(CPURISCVState *env)
+{
+    return riscv_cpu_cfg(env)->ext_smrnmi &&
+           (env->mmisc_ctl & MMISC_CTL_RNMI_DBTR_EN) != 0;
+}
+
+static inline bool riscv_cpu_smdbltrp_enabled(CPURISCVState *env)
+{
+    return riscv_cpu_cfg(env)->ext_smdbltrp &&
+           (env->mmisc_ctl & MMISC_CTL_RNMI_DBTR_EN) != 0;
+}
+
+static inline bool riscv_cpu_ssdbltrp_enabled(CPURISCVState *env)
+{
+    return riscv_cpu_cfg(env)->ext_ssdbltrp &&
+           (env->mmisc_ctl & MMISC_CTL_RNMI_DBTR_EN) != 0;
+}
+
 static inline int cpu_address_mode(CPURISCVState *env)
 {
     int mode = env->priv;

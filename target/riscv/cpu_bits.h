@@ -1113,6 +1113,7 @@ typedef enum RISCVException {
 
 /* mmisc_ctl */
 #define MMISC_CTL_NMI_CAUSE_FFF          0x00000200
+#define MMISC_CTL_RNMI_DBTR_EN           0x02000000
 
 /* msubm */
 #define XSUBM_PFGPRIDX                     0x3e000000 /* pfgpridx[4:0], previous floating caller-saved bank index */

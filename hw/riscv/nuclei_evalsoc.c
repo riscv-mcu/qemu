@@ -367,7 +367,7 @@ static void evalsoc_misc_nmi_irq(void *opaque, int n, int level)
      * MISC exposes one NMI source. Smrnmi changes the CPU-side response
      * mechanism; it does not add a second MISC output or trigger source.
      */
-    if (cpu->cfg.ext_smrnmi) {
+    if (riscv_cpu_smrnmi_enabled(&cpu->env)) {
         riscv_cpu_set_rnmi(cpu, 0, level);
     } else {
         riscv_cpu_nuclei_nmi_interrupt(cpu, level);

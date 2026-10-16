@@ -1314,7 +1314,7 @@ static bool riscv_cpu_has_work(CPUState *cs)
         riscv_cpu_sirq_pending(env) != RISCV_EXCP_NONE ||
         riscv_cpu_vsirq_pending(env) != RISCV_EXCP_NONE ||
         eclic_irq_panding ||
-        env->rnmip ||
+        (riscv_cpu_smrnmi_enabled(env) && env->rnmip) ||
         env->nuclei_nmi_pending;
 #else
     return true;
@@ -1370,9 +1370,6 @@ static void riscv_cpu_reset_hold(Object *obj)
             env->mstatus_hs = set_field(env->mstatus_hs,
                                         MSTATUS64_UXL, env->misa_mxl);
         }
-        if (riscv_cpu_cfg(env)->ext_smdbltrp) {
-            env->mstatus = set_field(env->mstatus, MSTATUS_MDT, 1);
-        }
     }
     env->mstatus = set_field(env->mstatus, MSTATUS_MBE, big_endian);
     env->mstatus = set_field(env->mstatus, MSTATUS_SBE, big_endian);
@@ -1382,6 +1379,12 @@ static void riscv_cpu_reset_hold(Object *obj)
     env->pc = env->resetvec;
     env->mdcause = 0;
     env->mmisc_ctl = 0;
+    env->mstatus &= ~(MSTATUS_MDT | MSTATUS_SDT);
+    if (riscv_cpu_smdbltrp_enabled(env)) {
+        env->mstatus |= MSTATUS_MDT;
+    }
+    env->vsstatus &= ~MSTATUS_SDT;
+    env->mstatus_hs &= ~MSTATUS_SDT;
     env->msubm = 0;
     env->mnvec = riscv_cpu_nuclei_mnvec(env);
     env->nuclei_nmi_level = false;

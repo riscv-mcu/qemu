@@ -134,6 +134,10 @@ bool riscv_env_smode_dbltrp_enabled(CPURISCVState *env, bool virt)
 #ifdef CONFIG_USER_ONLY
     return false;
 #else
+    if (!riscv_cpu_ssdbltrp_enabled(env)) {
+        return false;
+    }
+
     if (virt) {
         return (env->henvcfg & HENVCFG_DTE) != 0;
     } else {
@@ -149,7 +153,7 @@ static int riscv_cpu_local_irq_mode_enabled(CPUState *cs, int excode, int level)
     RISCVCPU *cpu = RISCV_CPU(cs);
     CPURISCVState *env = &cpu->env;
 
-    if (riscv_cpu_cfg(env)->ext_smrnmi &&
+    if (riscv_cpu_smrnmi_enabled(env) &&
         !get_field(env->mnstatus, MNSTATUS_NMIE)) {
         return false;
     }
@@ -571,7 +575,7 @@ static int riscv_cpu_local_irq_pending(CPURISCVState *env)
     int virq;
 
     /* Priority: RNMI > Other interrupt. */
-    if (riscv_cpu_cfg(env)->ext_smrnmi) {
+    if (riscv_cpu_smrnmi_enabled(env)) {
         /* If mnstatus.NMIE == 0, all interrupts are disabled. */
         if (!get_field(env->mnstatus, MNSTATUS_NMIE)) {
             return RISCV_EXCP_NONE;
@@ -2507,7 +2511,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     int mxlen = 16 << riscv_cpu_mxl(env);
     bool nnmi_excep = false;
 
-    if (cpu->cfg.ext_smrnmi && env->rnmip && async) {
+    if (riscv_cpu_smrnmi_enabled(env) && env->rnmip && async) {
         riscv_do_nmi(env, cause | ((target_ulong)1U << (mxlen - 1)),
                      current_virt);
         riscv_nmi_trap_cleanup(cs);
@@ -2652,7 +2656,8 @@ void riscv_cpu_do_interrupt(CPUState *cs)
      * Check double trap condition only if already in S-mode and targeting
      * S-mode
      */
-    if (cpu->cfg.ext_ssdbltrp && env->priv == PRV_S && trap_mode == PRV_S) {
+    if (riscv_cpu_ssdbltrp_enabled(env) &&
+        env->priv == PRV_S && trap_mode == PRV_S) {
         bool dte = (env->menvcfg & MENVCFG_DTE) != 0;
         bool sdt = (env->mstatus & MSTATUS_SDT) != 0;
         /* In VS or HS */
@@ -2774,7 +2779,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
          * If the hart encounters an exception while executing in M-mode
          * with the mnstatus.NMIE bit clear, the exception is an RNMI exception.
          */
-        nnmi_excep = cpu->cfg.ext_smrnmi &&
+        nnmi_excep = riscv_cpu_smrnmi_enabled(env) &&
                      env->priv == PRV_M &&
                      !get_field(env->mnstatus, MNSTATUS_NMIE) &&
                      !is_interrupt &&
@@ -2834,7 +2839,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
          * with the mnstatus.NMIE bit clear, the program counter is set to
          * the RNMI exception trap handler address.
          */
-        nnmi_excep = cpu->cfg.ext_smrnmi &&
+        nnmi_excep = riscv_cpu_smrnmi_enabled(env) &&
                      env->priv == PRV_M &&
                      !get_field(env->mnstatus, MNSTATUS_NMIE) &&
                      !is_interrupt &&
@@ -2848,7 +2853,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
          * Nuclei NMI has an independent entry/nesting mechanism and must
          * not be converted into an Smrnmi double-trap entry.
          */
-        if (cpu->cfg.ext_smdbltrp && !nuclei_nmi) {
+        if (riscv_cpu_smdbltrp_enabled(env) && !nuclei_nmi) {
             if ((env->mstatus & MSTATUS_MDT) || nnmi_excep) {
                 assert(env->priv == PRV_M);
                 /*
@@ -2856,7 +2861,7 @@ void riscv_cpu_do_interrupt(CPUState *cs)
                  * trap in M-mode with NMIE clear is also unexpected, even if
                  * MDT is clear; this is the RNMI-handler case.
                  */
-                if (!cpu->cfg.ext_smrnmi || nnmi_excep) {
+                if (!riscv_cpu_smrnmi_enabled(env) || nnmi_excep) {
                     cpu_abort(CPU(cpu), "M-mode double trap\n");
                 } else {
                     riscv_do_nmi(env, cause, false);

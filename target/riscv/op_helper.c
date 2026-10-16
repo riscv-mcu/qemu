@@ -353,7 +353,7 @@ target_ulong helper_sret(CPURISCVState *env)
         mstatus = set_field(mstatus, MSTATUS_SPP, PRV_U);
     }
 
-    if (riscv_cpu_cfg(env)->ext_ssdbltrp) {
+    if (riscv_cpu_ssdbltrp_enabled(env)) {
         if (riscv_has_ext(env, RVH)) {
             target_ulong prev_vu = get_field(env->hstatus, HSTATUS_SPV) &&
                                    prev_priv == PRV_U;
@@ -364,7 +364,7 @@ target_ulong helper_sret(CPURISCVState *env)
         }
         mstatus = set_field(mstatus, MSTATUS_SDT, 0);
     }
-    if (riscv_cpu_cfg(env)->ext_smdbltrp && env->priv >= PRV_M) {
+    if (riscv_cpu_smdbltrp_enabled(env) && env->priv >= PRV_M) {
         mstatus = set_field(mstatus, MSTATUS_MDT, 0);
     }
     if (env->priv_ver >= PRIV_VERSION_1_12_0) {
@@ -485,10 +485,10 @@ target_ulong helper_mret(CPURISCVState *env)
     mstatus = set_field(mstatus, MSTATUS_MPP,
                         riscv_has_ext(env, RVU) ? PRV_U : PRV_M);
     mstatus = set_field(mstatus, MSTATUS_MPV, 0);
-    if (riscv_cpu_cfg(env)->ext_ssdbltrp) {
+    if (riscv_cpu_ssdbltrp_enabled(env)) {
         mstatus = ssdbltrp_mxret(env, mstatus, prev_priv, prev_virt);
     }
-    if (riscv_cpu_cfg(env)->ext_smdbltrp) {
+    if (riscv_cpu_smdbltrp_enabled(env)) {
         mstatus = set_field(mstatus, MSTATUS_MDT, 0);
     }
     if ((env->priv_ver >= PRIV_VERSION_1_12_0) && (prev_priv != PRV_M)) {
@@ -531,6 +531,10 @@ target_ulong helper_mret(CPURISCVState *env)
 
 target_ulong helper_mnret(CPURISCVState *env)
 {
+    if (!riscv_cpu_smrnmi_enabled(env)) {
+        riscv_raise_exception(env, RISCV_EXCP_ILLEGAL_INST, GETPC());
+    }
+
     target_ulong retpc = env->mnepc;
     target_ulong prev_priv = get_field(env->mnstatus, MNSTATUS_MNPP);
     target_ulong prev_virt;
@@ -548,11 +552,11 @@ target_ulong helper_mnret(CPURISCVState *env)
     if (prev_priv < PRV_M) {
         env->mstatus = set_field(env->mstatus, MSTATUS_MPRV, false);
     }
-    if (riscv_cpu_cfg(env)->ext_ssdbltrp) {
+    if (riscv_cpu_ssdbltrp_enabled(env)) {
         env->mstatus = ssdbltrp_mxret(env, env->mstatus, prev_priv, prev_virt);
     }
 
-    if (riscv_cpu_cfg(env)->ext_smdbltrp) {
+    if (riscv_cpu_smdbltrp_enabled(env)) {
         if (prev_priv < PRV_M) {
             env->mstatus = set_field(env->mstatus, MSTATUS_MDT, 0);
         }
