@@ -504,11 +504,17 @@ static inline int nuclei_eclic_irq_mode(const NucleiECLICState *eclic,
     return PRV_M;
 }
 
+static inline bool nuclei_eclic_access_from_mmode(void)
+{
+    return current_cpu && RISCV_CPU(current_cpu)->env.priv == PRV_M;
+}
+
 static inline bool nuclei_eclic_s_view_access_allowed(const NucleiECLICState *eclic,
                                                       int hartid, int irq)
 {
-    /* The S-window only exposes interrupts currently owned by S-mode. */
-    return nuclei_eclic_irq_mode(eclic, hartid, irq) == PRV_S;
+    /* M-mode may use either window; S-mode only sees S-owned interrupts. */
+    return nuclei_eclic_access_from_mmode() ||
+           nuclei_eclic_irq_mode(eclic, hartid, irq) == PRV_S;
 }
 
 static uint64_t nuclei_eclic_read(void *opaque, hwaddr offset, unsigned size)
@@ -747,8 +753,13 @@ static void nuclei_eclic_write(void *opaque, hwaddr offset, uint64_t value,
                                           (value >> 8) & 0xFF);
             }
             if (size == 4) {
-                nuclei_eclic_update_intattr_s_view(eclic, irq, hartid,
-                                                   (value >> 16) & 0xFF);
+                if (nuclei_eclic_access_from_mmode()) {
+                    nuclei_eclic_update_intattr(eclic, irq, hartid,
+                                                (value >> 16) & 0xFF);
+                } else {
+                    nuclei_eclic_update_intattr_s_view(eclic, irq, hartid,
+                                                       (value >> 16) & 0xFF);
+                }
                 nuclei_eclic_update_intctl(eclic, irq, hartid,
                                            (value >> 24) & 0xFF);
             }
@@ -761,8 +772,12 @@ static void nuclei_eclic_write(void *opaque, hwaddr offset, uint64_t value,
         break;
     case NUCLEI_ECLIC_REG_CLICINTATTR_BASE_S:
         if (s_allowed) {
-            nuclei_eclic_update_intattr_s_view(eclic, irq, hartid,
-                                               value & 0xFF);
+            if (nuclei_eclic_access_from_mmode()) {
+                nuclei_eclic_update_intattr(eclic, irq, hartid, value & 0xFF);
+            } else {
+                nuclei_eclic_update_intattr_s_view(eclic, irq, hartid,
+                                                   value & 0xFF);
+            }
             if (size == 2) {
                 nuclei_eclic_update_intctl(eclic, irq, hartid,
                                            (value >> 8) & 0xFF);
