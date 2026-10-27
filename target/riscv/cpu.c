@@ -641,6 +641,9 @@ static void rv64imacu_nuclei_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(RISCV_CPU(obj), VM_1_10_SV39);
 #endif
@@ -658,6 +661,9 @@ static void rv64imafcu_nuclei_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(cpu, VM_1_10_MBARE);
 #endif
@@ -675,6 +681,9 @@ static void rv64imafdcu_nuclei_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(cpu, VM_1_10_MBARE);
 #endif
@@ -692,6 +701,9 @@ static void rv64imacu_nuclei_u_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(RISCV_CPU(obj), VM_1_10_SV57);
 #endif
@@ -709,6 +721,9 @@ static void rv64imafcu_nuclei_u_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(RISCV_CPU(obj), VM_1_10_SV57);
 #endif
@@ -726,6 +741,9 @@ static void rv64imafdcu_nuclei_u_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(RISCV_CPU(obj), VM_1_10_SV57);
 #endif
@@ -872,6 +890,9 @@ static void rv32icu_nuclei_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(cpu, VM_1_10_MBARE);
 #endif
@@ -889,6 +910,9 @@ static void rv32ecu_nuclei_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(cpu, VM_1_10_MBARE);
 #endif
@@ -906,6 +930,9 @@ static void rv32iacu_nuclei_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(cpu, VM_1_10_MBARE);
 #endif
@@ -923,6 +950,9 @@ static void rv32eacu_nuclei_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(cpu, VM_1_10_MBARE);
 #endif
@@ -940,6 +970,9 @@ static void rv32imcu_nuclei_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(cpu, VM_1_10_MBARE);
 #endif
@@ -957,6 +990,9 @@ static void rv32emcu_nuclei_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(cpu, VM_1_10_MBARE);
 #endif
@@ -975,6 +1011,9 @@ static void rv32icu_zmmul_nuclei_cpu_init(Object *obj)
     cpu->cfg.ext_zmmul = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(cpu, VM_1_10_MBARE);
 #endif
@@ -993,6 +1032,9 @@ static void rv32ecu_zmmul_nuclei_cpu_init(Object *obj)
     cpu->cfg.ext_zmmul = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(cpu, VM_1_10_MBARE);
 #endif
@@ -1010,6 +1052,9 @@ static void rv32imacu_nuclei_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(cpu, VM_1_10_MBARE);
 #endif
@@ -1027,6 +1072,9 @@ static void rv32emacu_nuclei_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(cpu, VM_1_10_MBARE);
 #endif
@@ -1044,6 +1092,9 @@ static void rv32imafcu_nuclei_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(cpu, VM_1_10_MBARE);
 #endif
@@ -1061,6 +1112,9 @@ static void rv32imafdcu_nuclei_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(cpu, VM_1_10_MBARE);
 #endif
@@ -1078,6 +1132,9 @@ static void rv32imacu_nuclei_u_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(RISCV_CPU(obj), VM_1_10_SV32);
 #endif
@@ -1095,6 +1152,9 @@ static void rv32imafcu_nuclei_u_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(RISCV_CPU(obj), VM_1_10_SV32);
 #endif
@@ -1112,6 +1172,9 @@ static void rv32imafdcu_nuclei_u_cpu_init(Object *obj)
     cpu->cfg.smpu = true;
     cpu->cfg.ext_zifencei = true;
     cpu->cfg.ext_zicsr = true;
+    cpu->cfg.ext_smrnmi = true;
+    cpu->cfg.ext_smdbltrp = true;
+    cpu->cfg.ext_ssdbltrp = true;
 #ifndef CONFIG_USER_ONLY
     set_satp_mode_max_supported(RISCV_CPU(obj), VM_1_10_SV32);
 #endif
