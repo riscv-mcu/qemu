@@ -559,7 +559,8 @@ bool qemu_plugin_dispatch_nice(unsigned int vcpu_index,
     bool handled = false;
 
     qemu_rec_mutex_lock(&plugin.lock);
-    if (insn_handler->cb(vcpu_index, info, insn_handler->userdata)) {
+    if (insn_handler && insn_handler->cb &&
+        insn_handler->cb(vcpu_index, info, insn_handler->userdata)) {
         handled = true;
     }
     qemu_rec_mutex_unlock(&plugin.lock);
