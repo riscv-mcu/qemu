@@ -443,6 +443,14 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
         return;
     }
 
+    if (cpu->cfg.ext_ssdbltrp && !riscv_has_ext(env, RVS)) {
+        if (cpu_cfg_ext_is_user_set(CPU_CFG_OFFSET(ext_ssdbltrp))) {
+            error_setg(errp, "ssdbltrp extension requires S");
+            return;
+        }
+        cpu->cfg.ext_ssdbltrp = false;
+    }
+
     if (riscv_has_ext(env, RVH) && !riscv_has_ext(env, RVI)) {
         error_setg(errp,
                    "H depends on an I base integer ISA with 32 x registers");
