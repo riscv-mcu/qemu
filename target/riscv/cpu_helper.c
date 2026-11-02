@@ -2512,6 +2512,12 @@ void riscv_cpu_do_interrupt(CPUState *cs)
     bool nnmi_excep = false;
 
     if (riscv_cpu_smrnmi_enabled(env) && env->rnmip && async) {
+        /*
+         * The pending bitmap selects which RNMI is serviced, while the
+         * architectural cause follows the Nuclei NMI_CAUSE_FFF setting.
+         * RNMI always enters through MNVEC regardless of that setting.
+         */
+        cause = riscv_cpu_nuclei_nmi_cause(env);
         riscv_do_nmi(env, cause | ((target_ulong)1U << (mxlen - 1)),
                      current_virt);
         riscv_nmi_trap_cleanup(cs);

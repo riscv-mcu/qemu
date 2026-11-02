@@ -1449,7 +1449,6 @@ static void riscv_cpu_reset_hold(Object *obj)
     env->vsstatus &= ~MSTATUS_SDT;
     env->mstatus_hs &= ~MSTATUS_SDT;
     env->msubm = 0;
-    env->mnvec = riscv_cpu_nuclei_mnvec(env);
     env->nuclei_nmi_level = false;
     env->nuclei_nmi_pending = false;
     env->bins = 0;

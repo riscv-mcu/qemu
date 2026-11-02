@@ -2477,8 +2477,6 @@ static RISCVException write_mtvec(CPURISCVState *env, int csrno,
         env->rnmi_excpvec = env->mtvec & ~((target_ulong)0x3f);
     }
 
-    env->mnvec = riscv_cpu_nuclei_mnvec(env);
-
     return RISCV_EXCP_NONE;
 }
 
@@ -5799,8 +5797,6 @@ static int write_mmisc_ctl(CPURISCVState *env, int csrno, target_ulong val)
         cpu_interrupt(env_cpu(env), CPU_INTERRUPT_RNMI);
     }
 
-    /* Keep the derived NMI entry view coherent for CSR reads and reset code. */
-    env->mnvec = riscv_cpu_nuclei_mnvec(env);
     return RISCV_EXCP_NONE;
 }
 

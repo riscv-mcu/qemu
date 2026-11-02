@@ -597,7 +597,6 @@ struct CPUArchState {
     target_ulong sscratchcswl;
 
     /* NMI  CSR*/
-    target_ulong mnvec;
     target_ulong msubm;
     target_ulong mdcause;
     target_ulong mcache_ctl;
@@ -772,18 +771,17 @@ int riscv_cpu_max_xlen(RISCVCPUClass *mcc);
 bool riscv_cpu_option_set(const char *optname);
 
 /*
- * Nuclei ISA chapter 10 ties both the NMI entry point and EXCCODE to
- * mmisc_ctl[9]: resetvec/0x1 when clear, mtvec/0xfff when set.
+ * When RNMI/double trap is disabled, Nuclei ISA chapter 10 ties the legacy
+ * NMI entry point to mmisc_ctl[9]: resetvec when clear and mtvec when set.
+ * With RNMI/double trap enabled, the entry is always provided by MNVEC.
  */
+#ifndef CONFIG_USER_ONLY
 static inline target_ulong riscv_cpu_nuclei_mnvec(CPURISCVState *env)
 {
-#ifdef CONFIG_USER_ONLY
-    return env->mnvec;
-#else
     return (env->mmisc_ctl & MMISC_CTL_NMI_CAUSE_FFF) ?
            env->mtvec : env->resetvec;
-#endif
 }
+#endif
 
 static inline target_ulong riscv_cpu_nuclei_nmi_cause(CPURISCVState *env)
 {
