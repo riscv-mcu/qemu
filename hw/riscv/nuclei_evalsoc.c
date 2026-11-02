@@ -1860,7 +1860,6 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     qemu_irq qspi2_irq = NULL;
     qemu_irq xec0_irq = NULL;
     bool big_endian;
-    bool timer_64bit;
 
     qdev_prop_set_uint32(DEVICE(&s->cpus), "num-harts", ms->smp.cpus);
     qdev_prop_set_uint32(DEVICE(&s->cpus), "hartid-base", 0);
@@ -1870,7 +1869,6 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
     sysbus_realize(SYS_BUS_DEVICE(&s->cpus), &error_abort);
     evalsoc_resolve_auto_big_endian(&s->cpus, ms);
     big_endian = evalsoc_cpu_big_endian(&s->cpus.harts[0]);
-    timer_64bit = !strstr(s->cpu_type, "n100");
 
     irqmax = (uint32_t)mst->irqmax;
 
@@ -2040,8 +2038,7 @@ static void riscv_evalsoc_soc_realize(DeviceState *dev, Error **errp)
 
     nuclei_systimer_create(memmap[EVALSOC_TIMER].base + mst->iregion.base,
                            memmap[EVALSOC_TIMER].size, 0, ms->smp.cpus,
-                           s->eclic, mst->timer_freq, big_endian,
-                           timer_64bit);
+                           s->eclic, mst->timer_freq, big_endian);
 
     qdev_prop_set_uint32(DEVICE(&s->misc), "version", mst->misc.version);
     qdev_prop_set_uint32(DEVICE(&s->misc), "tick-hz", (uint32_t)mst->cpu_freq);
