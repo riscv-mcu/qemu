@@ -67,13 +67,16 @@
 static bool gen_load_pstinc(DisasContext *ctx, arg_lb *a, MemOp memop, int shift)
 {
     REQUIRE_XXLCZPSTINC(ctx);
-    TCGv src1 = get_gpr(ctx, a->rs1, EXT_ZERO);
+    if (a->rd == a->rs1) {
+        return false;
+    }
+    TCGv src1 = get_gpr(ctx, a->rs1, EXT_NONE);
     TCGv dest = dest_gpr(ctx, a->rd);
     TCGv addr = get_address(ctx, a->rs1, 0);
 
     memop |= ctx->mo_endianness;
     tcg_gen_qemu_ld_tl(dest, addr, ctx->mem_idx, memop);
-    tcg_gen_addi_tl(src1, src1, a->imm << shift);
+    tcg_gen_addi_tl(src1, src1, a->imm * (1 << shift));
     gen_set_gpr(ctx, a->rs1, src1);
     gen_set_gpr(ctx, a->rd, dest);
     return true;
@@ -106,11 +109,13 @@ static bool trans_xl_lw(DisasContext *ctx, arg_xl_lw *a)
 //RV64 ONLY
 static bool trans_xl_lwu(DisasContext *ctx, arg_xl_lwu *a)
 {
+    REQUIRE_64BIT(ctx);
     return gen_load_pstinc(ctx, a, MO_TEUL, 2);
 }
 //RV64 ONLY
 static bool trans_xl_ld(DisasContext *ctx, arg_xl_ld *a)
 {
+    REQUIRE_64BIT(ctx);
     return gen_load_pstinc(ctx, a, MO_TESQ, 3);
 }
 
@@ -123,7 +128,7 @@ static bool gen_store_pstinc(DisasContext *ctx, arg_sb *a, MemOp memop, int shif
 
     memop |= ctx->mo_endianness;
     tcg_gen_qemu_st_tl(data, addr, ctx->mem_idx, memop);
-    tcg_gen_addi_tl(src1, src1, a->imm << shift);
+    tcg_gen_addi_tl(src1, src1, a->imm * (1 << shift));
     gen_set_gpr(ctx, a->rs1, src1);
     return true;
 }
@@ -145,13 +150,14 @@ static bool trans_xl_sw(DisasContext *ctx, arg_xl_sw *a)
 
 static bool trans_xl_sd(DisasContext *ctx, arg_xl_sd *a)
 {
+    REQUIRE_64BIT(ctx);
     return gen_store_pstinc(ctx, a, MO_TESQ, 3);
 }
 
 static bool gen_load_gp(DisasContext *ctx, arg_xl_lgp *a, int shift, MemOp memop)
 {
     REQUIRE_XXLCZGP(ctx);
-    TCGv t0 = get_address(ctx, 3, a->imm << shift);
+    TCGv t0 = get_address(ctx, 3, a->imm * (1 << shift));
     TCGv t1 = tcg_temp_new();
 
     memop |= ctx->mo_endianness;
@@ -187,19 +193,21 @@ static bool trans_xl_lgp_w(DisasContext *ctx, arg_xl_lgp_w *a)
 //rv64 ONLY
 static bool trans_xl_lgp_wu(DisasContext *ctx, arg_xl_lgp_wu *a)
 {
+    REQUIRE_64BIT(ctx);
     return gen_load_gp(ctx, a, 2, MO_UL);
 }
 
 //rv64 ONLY
 static bool trans_xl_lgp_d(DisasContext *ctx, arg_xl_lgp_d *a)
 {
+    REQUIRE_64BIT(ctx);
     return gen_load_gp(ctx, a, 3, MO_SQ);
 }
 
 static bool gen_store_gp(DisasContext *ctx, arg_xl_sgp *a, int shift, MemOp memop)
 {
     REQUIRE_XXLCZGP(ctx);
-    TCGv t0 = get_address(ctx, 3, a->imm << shift);
+    TCGv t0 = get_address(ctx, 3, a->imm * (1 << shift));
     TCGv data = get_gpr(ctx, a->rs2, EXT_NONE);
 
     memop |= ctx->mo_endianness;
@@ -224,13 +232,14 @@ static bool trans_xl_sgp_w(DisasContext *ctx, arg_xl_sgp_w *a)
 //RV64 ONLY
 static bool trans_xl_sgp_d(DisasContext *ctx, arg_xl_sgp_d *a)
 {
+    REQUIRE_64BIT(ctx);
     return gen_store_gp(ctx, a, 3, MO_SQ);
 }
 
 static bool trans_xl_muli(DisasContext *ctx, arg_xl_muli *a)
 {
     REQUIRE_XXLCZMAC(ctx);
-    TCGv src1 = get_gpr(ctx, a->rs1, EXT_SIGN);
+    TCGv src1 = get_gpr(ctx, a->rs1, EXT_NONE);
     TCGv dest = dest_gpr(ctx, a->rd);
     
     tcg_gen_muli_tl(dest, src1, a->imm);
@@ -241,7 +250,7 @@ static bool trans_xl_muli(DisasContext *ctx, arg_xl_muli *a)
 static bool gen_bimm(DisasContext *ctx, arg_xl_brib *a, TCGCond cond)
 {
     TCGLabel *l = gen_new_label();
-    TCGv src1 = get_gpr(ctx, a->rs1, EXT_ZERO);
+    TCGv src1 = get_gpr(ctx, a->rs1, EXT_NONE);
     TCGv src2 = tcg_constant_tl(a->imm);
     target_ulong orig_pc_save = ctx->pc_save;
 
@@ -252,7 +261,7 @@ static bool gen_bimm(DisasContext *ctx, arg_xl_brib *a, TCGCond cond)
     gen_set_label(l); /* branch taken */
 
     if (!has_ext(ctx, RVC) && !ctx->cfg_ptr->ext_zca &&
-        (a->ofst & 0x1)) {
+        (a->ofst & 0x3)) {
         /* misaligned */
         TCGv target_pc = tcg_temp_new();
         gen_pc_plus_diff(target_pc, ctx, a->ofst);
@@ -279,34 +288,33 @@ static bool trans_xl_bnei(DisasContext *ctx, arg_xl_bnei *a)
 static bool trans_xl_addibne(DisasContext *ctx, arg_xl_addibne *a)
 {
     REQUIRE_XXLCZBRI(ctx);
+    TCGv old_rd = get_gpr(ctx, a->rd, EXT_NONE);
     TCGv dest = dest_gpr(ctx, a->rd);
-    TCGv rs1 = get_gpr(ctx, a->rs1, EXT_ZERO);
+    TCGv rs1 = get_gpr(ctx, a->rs1, EXT_NONE);
+    TCGv insn_pc = tcg_temp_new();
+    uint32_t increment = 1U << a->scale;
+    uint32_t encoded_distance = a->imm & 0x1ff;
+    /* The field stores the 9-bit two's complement of uimm[9:1]. */
+    uint32_t distance = ((0x200 - encoded_distance) & 0x1ff) << 1;
 
-    uint32_t scale = a->scale;
-
-    switch (scale)
-    {
-        case 0: scale = 1; break;
-        case 1: scale = 2; break;
-        case 2: scale = 4; break;
-        case 3: scale = 8; break;
-        default:
-        return true;
-    }
-    gen_helper_xl_addibne(cpu_pc, dest, rs1, tcg_constant_i32(scale), tcg_constant_i32((((int) ~((a->imm) << 1) + 1)&0x3FF)), tcg_constant_i32(ctx->base.pc_next));
-    tcg_gen_addi_tl(dest, dest, scale);
+    gen_pc_plus_diff(insn_pc, ctx, 0);
+    gen_helper_xl_addibne(cpu_pc, old_rd, rs1,
+                          tcg_constant_i32(increment),
+                          tcg_constant_i32(distance), insn_pc);
+    tcg_gen_addi_tl(dest, old_rd, increment);
     gen_set_gpr(ctx, a->rd, dest);
 
-    tcg_gen_lookup_and_goto_ptr();
+    lookup_and_goto_ptr(ctx);
+    ctx->base.is_jmp = DISAS_NORETURN;
     return true;
-    
 }
 
 static bool gen_slet(DisasContext *ctx, arg_r *a, TCGCond cond)
 {
     REQUIRE_XXLCZSLET(ctx);
-    TCGv src1 = get_gpr(ctx, a->rs1, EXT_ZERO);
-    TCGv src2 = get_gpr(ctx, a->rs2, EXT_ZERO);
+    DisasExtend ext = cond == TCG_COND_LE ? EXT_SIGN : EXT_ZERO;
+    TCGv src1 = get_gpr(ctx, a->rs1, ext);
+    TCGv src2 = get_gpr(ctx, a->rs2, ext);
     TCGv dest = dest_gpr(ctx, a->rd);
 
     tcg_gen_setcond_tl(cond, dest, src1, src2);
@@ -460,9 +468,13 @@ static bool trans_xl_addrchk(DisasContext *ctx, arg_xl_addrchk *a)
     REQUIRE_XXLCZBMRK(ctx);
     TCGv source1 = get_gpr(ctx, a->rs1, EXT_NONE);
     TCGv source2 = get_gpr(ctx, a->rs2, EXT_NONE);
+    TCGv insn_pc = tcg_temp_new();
 
-    gen_helper_xl_addrchk(cpu_pc, source1, source2, tcg_constant_i32(a->imm << 1), tcg_constant_i32(ctx->base.pc_next));
-    tcg_gen_lookup_and_goto_ptr();
+    gen_pc_plus_diff(insn_pc, ctx, 0);
+    gen_helper_xl_addrchk(cpu_pc, source1, source2,
+                          tcg_constant_i32(a->imm * 2), insn_pc);
+    lookup_and_goto_ptr(ctx);
+    ctx->base.is_jmp = DISAS_NORETURN;
 
     return true;
 }
@@ -470,15 +482,16 @@ static bool trans_xl_addrchk(DisasContext *ctx, arg_xl_addrchk *a)
 static bool trans_xl_bezm(DisasContext *ctx, arg_xl_bezm *a)
 {
     REQUIRE_XXLCZBMRK(ctx);
-    TCGv result = dest_gpr(ctx, 31);
     TCGv source1 = get_gpr(ctx, a->rs1, EXT_NONE);
     TCGv source2 = get_gpr(ctx, a->rs2, EXT_NONE);
+    TCGv insn_pc = tcg_temp_new();
 
-    tcg_gen_sub_tl(result, source1, source2);
-    gen_set_gpr(ctx, 31, result);
-    gen_helper_xl_bezm(cpu_pc, source1, source2, tcg_constant_i32(a->imm << 1), tcg_constant_i32(ctx->base.pc_next));
+    gen_pc_plus_diff(insn_pc, ctx, 0);
+    gen_helper_xl_bezm(cpu_pc, tcg_env, source1, source2,
+                       tcg_constant_i32(a->imm * 2), insn_pc);
 
-    tcg_gen_lookup_and_goto_ptr();
+    lookup_and_goto_ptr(ctx);
+    ctx->base.is_jmp = DISAS_NORETURN;
 
     return true;
 }
@@ -495,127 +508,91 @@ static bool trans_xl_ffnz(DisasContext *ctx, arg_xl_ffnz *a)
     return gen_unary(ctx, a, EXT_NONE, gen_helper_xl_ffnz);
 }
 
-static bool trans_xl_flh(DisasContext *ctx, arg_xl_flh *a)
+static bool gen_fload_pstinc(DisasContext *ctx, arg_i *a, MemOp memop)
 {
-    TCGv_i64 dest;
-    TCGv t0;
+    TCGv_i64 dest = cpu_fpr[a->rd];
+    TCGv base = get_gpr(ctx, a->rs1, EXT_NONE);
+    TCGv addr;
+    unsigned int shift = memop & MO_SIZE;
 
-    REQUIRE_FPU;
-    REQUIRE_ZFHMIN_OR_ZFBFMIN(ctx);
     REQUIRE_XXLCZPSTINC(ctx);
 
     decode_save_opc(ctx, 0);
-    t0 = get_gpr(ctx, a->rs1, EXT_NONE);
+    addr = get_address(ctx, a->rs1, 0);
 
-    dest = cpu_fpr[a->rd];
-    tcg_gen_qemu_ld_i64(dest, t0, ctx->mem_idx,
-                        MO_UW | ctx->mo_endianness);
-    gen_nanbox_h(dest, dest);
+    memop |= ctx->mo_endianness;
+    tcg_gen_qemu_ld_i64(dest, addr, ctx->mem_idx, memop);
+    if (shift == MO_16) {
+        gen_nanbox_h(dest, dest);
+    } else if (shift == MO_32) {
+        gen_nanbox_s(dest, dest);
+    }
 
-    tcg_gen_addi_tl(t0, t0, a->imm << 1);
-    gen_set_gpr(ctx, a->rs1, t0);
+    tcg_gen_addi_tl(base, base, a->imm * (1 << shift));
+    gen_set_gpr(ctx, a->rs1, base);
 
     mark_fs_dirty(ctx);
     return true;
+}
+
+static bool gen_fstore_pstinc(DisasContext *ctx, arg_s *a, MemOp memop)
+{
+    TCGv base = get_gpr(ctx, a->rs1, EXT_NONE);
+    TCGv addr;
+    unsigned int shift = memop & MO_SIZE;
+
+    REQUIRE_XXLCZPSTINC(ctx);
+
+    decode_save_opc(ctx, 0);
+    addr = get_address(ctx, a->rs1, 0);
+
+    memop |= ctx->mo_endianness;
+    tcg_gen_qemu_st_i64(cpu_fpr[a->rs2], addr, ctx->mem_idx, memop);
+
+    tcg_gen_addi_tl(base, base, a->imm * (1 << shift));
+    gen_set_gpr(ctx, a->rs1, base);
+
+    return true;
+}
+
+static bool trans_xl_flh(DisasContext *ctx, arg_xl_flh *a)
+{
+    REQUIRE_FPU;
+    REQUIRE_ZFHMIN_OR_ZFBFMIN(ctx);
+    return gen_fload_pstinc(ctx, a, MO_UW);
 }
 
 static bool trans_xl_flw(DisasContext *ctx, arg_xl_flw *a)
 {
-    TCGv_i64 dest;
-    TCGv addr;
-
     REQUIRE_FPU;
     REQUIRE_EXT(ctx, RVF);
-    REQUIRE_XXLCZPSTINC(ctx);
-
-    decode_save_opc(ctx, 0);
-    addr = get_address(ctx, a->rs1, 0);
-    dest = cpu_fpr[a->rd];
-    tcg_gen_qemu_ld_i64(dest, addr, ctx->mem_idx,
-                        MO_UL | ctx->mo_endianness);
-    gen_nanbox_s(dest, dest);
-
-    tcg_gen_addi_tl(addr, addr, a->imm << 2);
-    gen_set_gpr(ctx, a->rs1, addr);
-
-    mark_fs_dirty(ctx);
-    return true;
+    return gen_fload_pstinc(ctx, a, MO_UL);
 }
 
 static bool trans_xl_fld(DisasContext *ctx, arg_xl_fld *a)
 {
-    TCGv addr;
-
     REQUIRE_FPU;
     REQUIRE_EXT(ctx, RVD);
-    REQUIRE_XXLCZPSTINC(ctx);
-
-    decode_save_opc(ctx, 0);
-    addr = get_address(ctx, a->rs1, 0);
-    tcg_gen_qemu_ld_i64(cpu_fpr[a->rd], addr, ctx->mem_idx,
-                        MO_UQ | ctx->mo_endianness);
-
-    tcg_gen_addi_tl(addr, addr, a->imm << 3);
-    gen_set_gpr(ctx, a->rs1, addr);
-
-    mark_fs_dirty(ctx);
-    return true;
+    return gen_fload_pstinc(ctx, a, MO_UQ);
 }
 
 static bool trans_xl_fsh(DisasContext *ctx, arg_xl_fsh *a)
 {
-    TCGv t0;
-
     REQUIRE_FPU;
     REQUIRE_ZFHMIN_OR_ZFBFMIN(ctx);
-    REQUIRE_XXLCZPSTINC(ctx);
-
-    decode_save_opc(ctx, 0);
-    t0 = get_gpr(ctx, a->rs1, EXT_NONE);
-
-    tcg_gen_qemu_st_i64(cpu_fpr[a->rs2], t0, ctx->mem_idx,
-                        MO_UW | ctx->mo_endianness);
-
-    tcg_gen_addi_tl(t0, t0, a->imm << 1);
-    gen_set_gpr(ctx, a->rs1, t0);
-
-    return true;
+    return gen_fstore_pstinc(ctx, a, MO_UW);
 }
 
 static bool trans_xl_fsw(DisasContext *ctx, arg_xl_fsw *a)
 {
-    TCGv addr;
-
     REQUIRE_FPU;
     REQUIRE_EXT(ctx, RVF);
-    REQUIRE_XXLCZPSTINC(ctx);
-
-    decode_save_opc(ctx, 0);
-    addr = get_address(ctx, a->rs1, 0);
-    tcg_gen_qemu_st_i64(cpu_fpr[a->rs2], addr, ctx->mem_idx,
-                        MO_UL | ctx->mo_endianness);
-
-    tcg_gen_addi_tl(addr, addr, a->imm << 2);
-    gen_set_gpr(ctx, a->rs1, addr);
-
-    return true;
+    return gen_fstore_pstinc(ctx, a, MO_UL);
 }
 
 static bool trans_xl_fsd(DisasContext *ctx, arg_xl_fsd *a)
 {
-    TCGv addr;
-
     REQUIRE_FPU;
     REQUIRE_EXT(ctx, RVD);
-    REQUIRE_XXLCZPSTINC(ctx);
-
-    decode_save_opc(ctx, 0);
-    addr = get_address(ctx, a->rs1, a->imm);
-    tcg_gen_qemu_st_i64(cpu_fpr[a->rs2], addr, ctx->mem_idx,
-                        MO_UQ | ctx->mo_endianness);
-
-    tcg_gen_addi_tl(addr, addr, a->imm << 3);
-    gen_set_gpr(ctx, a->rs1, addr);
-
-    return true;
+    return gen_fstore_pstinc(ctx, a, MO_UQ);
 }
