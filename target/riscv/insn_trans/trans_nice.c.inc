@@ -114,5 +114,26 @@ static bool trans_vns32(DisasContext *s, arg_vns32 *a)
     return false;
 }
 
-GEN_MM_TRANS(vn_cmpx_mul)
-GEN_MM_TRANS(vn_cmpx_mul_m)
+#define GEN_VN_CMPX_MUL_TRANS(NAME, VM_VALUE)                    \
+static bool trans_##NAME(DisasContext *s, arg_r *a)              \
+{                                                                \
+    if (require_rvv(s) && vext_check_isa_ill(s)) {               \
+        uint32_t data = 0;                                       \
+                                                                 \
+        data = FIELD_DP32(data, VDATA, VM, VM_VALUE);             \
+        data = FIELD_DP32(data, VDATA, LMUL, s->lmul);           \
+        data = FIELD_DP32(data, VDATA, VTA, s->vta);             \
+        tcg_gen_gvec_4_ptr(vreg_ofs(s, a->rd), vreg_ofs(s, 0),   \
+                           vreg_ofs(s, a->rs1),                   \
+                           vreg_ofs(s, a->rs2), tcg_env,          \
+                           s->cfg_ptr->vlenb,                     \
+                           s->cfg_ptr->vlenb, data,               \
+                           gen_helper_##NAME);                    \
+        finalize_rvv_inst(s);                                    \
+        return true;                                             \
+    }                                                            \
+    return false;                                                \
+}
+
+GEN_VN_CMPX_MUL_TRANS(vn_cmpx_mul, 1)
+GEN_VN_CMPX_MUL_TRANS(vn_cmpx_mul_m, 0)

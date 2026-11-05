@@ -5673,8 +5673,8 @@ void HELPER(vn_cmpx_mul)(void *vd, void *v0, void *vs1,
                   uint32_t desc)
 {
     uint32_t vl = env->vl;
-    uint32_t total_elems = riscv_cpu_cfg(env)->vlenb << 3;
-    uint32_t vta_all_1s = vext_vta_all_1s(desc);
+    uint32_t total_elems = vext_get_total_elems(env, desc, 1);
+    uint32_t vta = vext_vta(desc);
     uint32_t i;
     uint8_t tmp[2] = {0};
     uint8_t *a = vs1, *b = vs2;
@@ -5686,15 +5686,8 @@ void HELPER(vn_cmpx_mul)(void *vd, void *v0, void *vs1,
         ((uint8_t *)vd)[i+1] = tmp[1];
     }
     env->vstart = 0;
-    /* mask destination register are always tail-
-     * agnostic
-     */
-    /* set tail elements to 1s */
-    if (vta_all_1s) {
-        for (; i < total_elems; i++) {
-            vext_set_elem_mask(vd, i, 1);
-        }
-    }
+    nuclei_vext_set_tail_elems_1s(vd, vta, vl, total_elems,
+                                  simd_maxsz(desc));
 }
 
 /* Nuclei custom vnice complex mask mul */
@@ -5703,8 +5696,8 @@ void HELPER(vn_cmpx_mul_m)(void *vd, void *v0, void *vs1,
                   uint32_t desc)
 {
     uint32_t vl = env->vl;
-    uint32_t total_elems = riscv_cpu_cfg(env)->vlenb << 3;
-    uint32_t vta_all_1s = vext_vta_all_1s(desc);
+    uint32_t total_elems = vext_get_total_elems(env, desc, 1);
+    uint32_t vta = vext_vta(desc);
     uint32_t i;
     uint8_t tmp[2] = {0};
     uint8_t *a = vs1, *b = vs2;
@@ -5721,11 +5714,8 @@ void HELPER(vn_cmpx_mul_m)(void *vd, void *v0, void *vs1,
      * agnostic
      */
     /* set tail elements to 1s */
-    if (vta_all_1s) {
-        for (; i < total_elems; i++) {
-            vext_set_elem_mask(vd, i, 1);
-        }
-    }
+    nuclei_vext_set_tail_elems_1s(vd, vta, vl, total_elems,
+                                  simd_maxsz(desc));
 }
 
 /* Nuclei Matrix Multiply-Add Instructions */
