@@ -55,6 +55,15 @@ void vext_set_elems_1s(void *base, uint32_t is_agnostic, uint32_t cnt,
     memset(base + cnt, -1, tot - cnt);
 }
 
+void nuclei_vext_set_tail_elems_1s(void *base, uint32_t is_agnostic,
+                                   uint32_t cnt, uint32_t tot,
+                                   uint32_t vlenb)
+{
+    uint32_t tail_end = MIN(tot, ROUND_UP(cnt, vlenb));
+
+    vext_set_elems_1s(base, is_agnostic, cnt, tail_end);
+}
+
 void do_vext_vv(void *vd, void *v0, void *vs1, void *vs2,
                 CPURISCVState *env, uint32_t desc,
                 opivv2_fn *fn, uint32_t esz)
@@ -78,7 +87,8 @@ void do_vext_vv(void *vd, void *v0, void *vs1, void *vs2,
     }
     env->vstart = 0;
     /* set tail elements to 1s */
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);
+    nuclei_vext_set_tail_elems_1s(vd, vta, vl * esz,
+                                  total_elems * esz, simd_maxsz(desc));
 }
 
 void do_vext_vx(void *vd, void *v0, target_long s1, void *vs2,
@@ -104,5 +114,6 @@ void do_vext_vx(void *vd, void *v0, target_long s1, void *vs2,
     }
     env->vstart = 0;
     /* set tail elements to 1s */
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);
+    nuclei_vext_set_tail_elems_1s(vd, vta, vl * esz,
+                                  total_elems * esz, simd_maxsz(desc));
 }

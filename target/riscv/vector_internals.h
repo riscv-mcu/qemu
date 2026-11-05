@@ -104,6 +104,9 @@ static inline uint32_t vext_get_total_elems(CPURISCVState *env, uint32_t desc,
 /* set agnostic elements to 1s */
 void vext_set_elems_1s(void *base, uint32_t is_agnostic, uint32_t cnt,
                        uint32_t tot);
+void nuclei_vext_set_tail_elems_1s(void *base, uint32_t is_agnostic,
+                                   uint32_t cnt, uint32_t tot,
+                                   uint32_t vlenb);
 
 /* expand macro args before macro */
 #define RVVCALL(macro, ...)  macro(__VA_ARGS__)
@@ -164,8 +167,9 @@ void HELPER(NAME)(void *vd, void *v0, void *vs2,       \
     }                                                  \
     env->vstart = 0;                                   \
     /* set tail elements to 1s */                      \
-    vext_set_elems_1s(vd, vta, vl * ESZ,               \
-                      total_elems * ESZ);              \
+    nuclei_vext_set_tail_elems_1s(                     \
+        vd, vta, vl * ESZ, total_elems * ESZ,          \
+        simd_maxsz(desc));                             \
 }
 
 #define GEN_VEXT_V_F_BF(NAME, ESZ)                     \
@@ -193,8 +197,9 @@ void HELPER(NAME)(void *vd, void *v0, void *vs2,       \
     }                                                  \
     env->vstart = 0;                                   \
     /* set tail elements to 1s */                      \
-    vext_set_elems_1s(vd, vta, vl * ESZ,               \
-                      total_elems * ESZ);              \
+    nuclei_vext_set_tail_elems_1s(                     \
+        vd, vta, vl * ESZ, total_elems * ESZ,          \
+        simd_maxsz(desc));                             \
 }
 
 /* operation of two vector elements */

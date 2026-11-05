@@ -206,8 +206,9 @@ static void vext_set_tail_elems_1s(target_ulong vl, void *vd,
     }
 
     for (k = 0; k < nf; ++k) {
-        vext_set_elems_1s(vd, vta, (k * max_elems + vl) * esz,
-                          (k * max_elems + max_elems) * esz);
+        nuclei_vext_set_tail_elems_1s(vd + k * max_elems * esz, vta,
+                                      vl * esz, max_elems * esz,
+                                      simd_maxsz(desc));
     }
 }
 
@@ -921,7 +922,9 @@ void HELPER(NAME)(void *vd, void *v0, void *vs1, void *vs2,   \
     }                                                         \
     env->vstart = 0;                                          \
     /* set tail elements to 1s */                             \
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);  \
+    nuclei_vext_set_tail_elems_1s(                            \
+        vd, vta, vl * esz, total_elems * esz,                 \
+        simd_maxsz(desc));                                    \
 }
 
 GEN_VEXT_VADC_VVM(vadc_vvm_b, uint8_t,  H1, DO_VADC)
@@ -954,7 +957,8 @@ void HELPER(NAME)(void *vd, void *v0, target_ulong s1, void *vs2,        \
     }                                                                    \
     env->vstart = 0;                                                     \
     /* set tail elements to 1s */                                        \
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);             \
+    nuclei_vext_set_tail_elems_1s(                                       \
+        vd, vta, vl * esz, total_elems * esz, simd_maxsz(desc));         \
 }
 
 GEN_VEXT_VADC_VXM(vadc_vxm_b, uint8_t,  H1, DO_VADC)
@@ -1133,7 +1137,8 @@ void HELPER(NAME)(void *vd, void *v0, void *vs1,                          \
     }                                                                     \
     env->vstart = 0;                                                      \
     /* set tail elements to 1s */                                         \
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);              \
+    nuclei_vext_set_tail_elems_1s(                                        \
+        vd, vta, vl * esz, total_elems * esz, simd_maxsz(desc));          \
 }
 
 GEN_VEXT_SHIFT_VV(vsll_vv_b, uint8_t,  uint8_t, H1, H1, DO_SLL, 0x7)
@@ -1182,7 +1187,9 @@ void HELPER(NAME)(void *vd, void *v0, target_ulong s1,      \
     }                                                       \
     env->vstart = 0;                                        \
     /* set tail elements to 1s */                           \
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);\
+    nuclei_vext_set_tail_elems_1s(                          \
+        vd, vta, vl * esz, total_elems * esz,               \
+        simd_maxsz(desc));                                  \
 }
 
 GEN_VEXT_SHIFT_VX(vsll_vx_b, uint8_t, int8_t, H1, H1, DO_SLL, 0x7)
@@ -1856,7 +1863,8 @@ void HELPER(NAME)(void *vd, void *vs1, CPURISCVState *env,           \
     }                                                                \
     env->vstart = 0;                                                 \
     /* set tail elements to 1s */                                    \
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);         \
+    nuclei_vext_set_tail_elems_1s(                                   \
+        vd, vta, vl * esz, total_elems * esz, simd_maxsz(desc));     \
 }
 
 GEN_VEXT_VMV_VV(vmv_v_v_b, int8_t,  H1)
@@ -1881,7 +1889,8 @@ void HELPER(NAME)(void *vd, uint64_t s1, CPURISCVState *env,         \
     }                                                                \
     env->vstart = 0;                                                 \
     /* set tail elements to 1s */                                    \
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);         \
+    nuclei_vext_set_tail_elems_1s(                                   \
+        vd, vta, vl * esz, total_elems * esz, simd_maxsz(desc));     \
 }
 
 GEN_VEXT_VMV_VX(vmv_v_x_b, int8_t,  H1)
@@ -1907,7 +1916,8 @@ void HELPER(NAME)(void *vd, void *v0, void *vs1, void *vs2,          \
     }                                                                \
     env->vstart = 0;                                                 \
     /* set tail elements to 1s */                                    \
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);         \
+    nuclei_vext_set_tail_elems_1s(                                   \
+        vd, vta, vl * esz, total_elems * esz, simd_maxsz(desc));     \
 }
 
 GEN_VEXT_VMERGE_VV(vmerge_vvm_b, int8_t,  H1)
@@ -1935,7 +1945,8 @@ void HELPER(NAME)(void *vd, void *v0, target_ulong s1,               \
     }                                                                \
     env->vstart = 0;                                                 \
     /* set tail elements to 1s */                                    \
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);         \
+    nuclei_vext_set_tail_elems_1s(                                   \
+        vd, vta, vl * esz, total_elems * esz, simd_maxsz(desc));     \
 }
 
 GEN_VEXT_VMERGE_VX(vmerge_vxm_b, int8_t,  H1)
@@ -2016,7 +2027,8 @@ vext_vv_rm_2(void *vd, void *v0, void *vs1, void *vs2,
         break;
     }
     /* set tail elements to 1s */
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);
+    nuclei_vext_set_tail_elems_1s(vd, vta, vl * esz,
+                                  total_elems * esz, simd_maxsz(desc));
 }
 
 /* generate helpers for fixed point instructions with OPIVV format */
@@ -2142,7 +2154,8 @@ vext_vx_rm_2(void *vd, void *v0, target_long s1, void *vs2,
         break;
     }
     /* set tail elements to 1s */
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);
+    nuclei_vext_set_tail_elems_1s(vd, vta, vl * esz,
+                                  total_elems * esz, simd_maxsz(desc));
 }
 
 /* generate helpers for fixed point instructions with OPIVX format */
@@ -2908,8 +2921,9 @@ void HELPER(NAME)(void *vd, void *v0, void *vs1,          \
     }                                                     \
     env->vstart = 0;                                      \
     /* set tail elements to 1s */                         \
-    vext_set_elems_1s(vd, vta, vl * ESZ,                  \
-                      total_elems * ESZ);                 \
+    nuclei_vext_set_tail_elems_1s(                        \
+        vd, vta, vl * ESZ, total_elems * ESZ,             \
+        simd_maxsz(desc));                                \
 }
 
 RVVCALL(OPFVV2_F_BF, vfadd_vv_h, OP_UUU_H, H2, H2, H2, float16_add, bfloat16_add)
@@ -2965,8 +2979,9 @@ void HELPER(NAME)(void *vd, void *v0, uint64_t s1,        \
     }                                                     \
     env->vstart = 0;                                      \
     /* set tail elements to 1s */                         \
-    vext_set_elems_1s(vd, vta, vl * ESZ,                  \
-                      total_elems * ESZ);                 \
+    nuclei_vext_set_tail_elems_1s(                        \
+        vd, vta, vl * ESZ, total_elems * ESZ,             \
+        simd_maxsz(desc));                                \
 }
 
 RVVCALL(OPFVF2_F_BF, vfadd_vf_h, OP_UUU_H, H2, H2, float16_add, bfloat16_add)
@@ -3697,8 +3712,9 @@ void HELPER(NAME)(void *vd, void *v0, void *vs2,       \
         do_##NAME(vd, vs2, i, env);                    \
     }                                                  \
     env->vstart = 0;                                   \
-    vext_set_elems_1s(vd, vta, vl * ESZ,               \
-                      total_elems * ESZ);              \
+    nuclei_vext_set_tail_elems_1s(                     \
+        vd, vta, vl * ESZ, total_elems * ESZ,          \
+        simd_maxsz(desc));                             \
 }
 
 RVVCALL(OPFVV1_F_BF, vfsqrt_v_h, OP_UU_H, H2, H2, float16_sqrt, bfloat16_sqrt)
@@ -4646,7 +4662,9 @@ void HELPER(NAME)(void *vd, void *v0, uint64_t s1, void *vs2, \
     }                                                         \
     env->vstart = 0;                                          \
     /* set tail elements to 1s */                             \
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);  \
+    nuclei_vext_set_tail_elems_1s(                            \
+        vd, vta, vl * esz, total_elems * esz,                 \
+        simd_maxsz(desc));                                    \
 }
 
 GEN_VFMERGE_VF(vfmerge_vfm_h, int16_t, H2)
@@ -4825,7 +4843,8 @@ void HELPER(NAME)(void *vd, void *v0, void *vs1,          \
     *((TD *)vd + HD(0)) = s1;                             \
     env->vstart = 0;                                      \
     /* set tail elements to 1s */                         \
-    vext_set_elems_1s(vd, vta, esz, vlenb);               \
+    nuclei_vext_set_tail_elems_1s(                        \
+        vd, vta, esz, vlenb, vlenb);                      \
 }
 
 /* vd[0] = sum(vs1[0], vs2[*]) */
@@ -4911,7 +4930,8 @@ void HELPER(NAME)(void *vd, void *v0, void *vs1,           \
     *((TD *)vd + HD(0)) = s1;                              \
     env->vstart = 0;                                       \
     /* set tail elements to 1s */                          \
-    vext_set_elems_1s(vd, vta, esz, vlenb);                \
+    nuclei_vext_set_tail_elems_1s(                         \
+        vd, vta, esz, vlenb, vlenb);                       \
 }
 
 #define GEN_VEXT_FRED_BF(NAME, TD, TS2, HD, HS2, OP1, OP2) \
@@ -4941,7 +4961,8 @@ void HELPER(NAME)(void *vd, void *v0, void *vs1,           \
     *((TD *)vd + HD(0)) = s1;                              \
     env->vstart = 0;                                       \
     /* set tail elements to 1s */                          \
-    vext_set_elems_1s(vd, vta, esz, vlenb);                \
+    nuclei_vext_set_tail_elems_1s(                         \
+        vd, vta, esz, vlenb, vlenb);                       \
 }
 
 /* Unordered sum */
@@ -5183,7 +5204,8 @@ void HELPER(NAME)(void *vd, void *v0, void *vs2, CPURISCVState *env,      \
     }                                                                     \
     env->vstart = 0;                                                      \
     /* set tail elements to 1s */                                         \
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);              \
+    nuclei_vext_set_tail_elems_1s(                                        \
+        vd, vta, vl * esz, total_elems * esz, simd_maxsz(desc));          \
 }
 
 GEN_VEXT_VIOTA_M(viota_m_b, uint8_t,  H1)
@@ -5215,7 +5237,8 @@ void HELPER(NAME)(void *vd, void *v0, CPURISCVState *env, uint32_t desc)  \
     }                                                                     \
     env->vstart = 0;                                                      \
     /* set tail elements to 1s */                                         \
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);              \
+    nuclei_vext_set_tail_elems_1s(                                        \
+        vd, vta, vl * esz, total_elems * esz, simd_maxsz(desc));          \
 }
 
 GEN_VEXT_VID_V(vid_v_b, uint8_t,  H1)
@@ -5253,7 +5276,8 @@ void HELPER(NAME)(void *vd, void *v0, target_ulong s1, void *vs2,         \
     }                                                                     \
     env->vstart = 0;                                                      \
     /* set tail elements to 1s */                                         \
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);              \
+    nuclei_vext_set_tail_elems_1s(                                        \
+        vd, vta, vl * esz, total_elems * esz, simd_maxsz(desc));          \
 }
 
 /* vslideup.vx vd, vs2, rs1, vm # vd[i+rs1] = vs2[i] */
@@ -5296,7 +5320,8 @@ void HELPER(NAME)(void *vd, void *v0, target_ulong s1, void *vs2,         \
                                                                           \
     env->vstart = 0;                                                      \
     /* set tail elements to 1s */                                         \
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);              \
+    nuclei_vext_set_tail_elems_1s(                                        \
+        vd, vta, vl * esz, total_elems * esz, simd_maxsz(desc));          \
 }
 
 /* vslidedown.vx vd, vs2, rs1, vm # vd[i] = vs2[i+rs1] */
@@ -5335,7 +5360,8 @@ static void vslide1up_##BITWIDTH(void *vd, void *v0, uint64_t s1,           \
     }                                                                       \
     env->vstart = 0;                                                        \
     /* set tail elements to 1s */                                           \
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);                \
+    nuclei_vext_set_tail_elems_1s(                                          \
+        vd, vta, vl * esz, total_elems * esz, simd_maxsz(desc));            \
 }
 
 GEN_VEXT_VSLIE1UP(8,  H1)
@@ -5386,7 +5412,8 @@ static void vslide1down_##BITWIDTH(void *vd, void *v0, uint64_t s1,           \
     }                                                                         \
     env->vstart = 0;                                                          \
     /* set tail elements to 1s */                                             \
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);                  \
+    nuclei_vext_set_tail_elems_1s(                                            \
+        vd, vta, vl * esz, total_elems * esz, simd_maxsz(desc));              \
 }
 
 GEN_VEXT_VSLIDE1DOWN(8,  H1)
@@ -5464,7 +5491,8 @@ void HELPER(NAME)(void *vd, void *v0, void *vs1, void *vs2,               \
     }                                                                     \
     env->vstart = 0;                                                      \
     /* set tail elements to 1s */                                         \
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);              \
+    nuclei_vext_set_tail_elems_1s(                                        \
+        vd, vta, vl * esz, total_elems * esz, simd_maxsz(desc));          \
 }
 
 /* vd[i] = (vs1[i] >= VLMAX) ? 0 : vs2[vs1[i]]; */
@@ -5508,7 +5536,8 @@ void HELPER(NAME)(void *vd, void *v0, target_ulong s1, void *vs2,         \
     }                                                                     \
     env->vstart = 0;                                                      \
     /* set tail elements to 1s */                                         \
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);              \
+    nuclei_vext_set_tail_elems_1s(                                        \
+        vd, vta, vl * esz, total_elems * esz, simd_maxsz(desc));          \
 }
 
 /* vd[i] = (x[rs1] >= VLMAX) ? 0 : vs2[rs1] */
@@ -5526,6 +5555,7 @@ void HELPER(NAME)(void *vd, void *v0, void *vs1, void *vs2,               \
     uint32_t esz = sizeof(ETYPE);                                         \
     uint32_t total_elems = vext_get_total_elems(env, desc, esz);          \
     uint32_t vta = vext_vta(desc);                                        \
+    uint32_t tail_end;                                                     \
     uint32_t num = 0, i;                                                  \
                                                                           \
     for (i = env->vstart; i < vl; i++) {                                  \
@@ -5537,7 +5567,9 @@ void HELPER(NAME)(void *vd, void *v0, void *vs1, void *vs2,               \
     }                                                                     \
     env->vstart = 0;                                                      \
     /* set tail elements to 1s */                                         \
-    vext_set_elems_1s(vd, vta, num * esz, total_elems * esz);             \
+    tail_end = MIN(total_elems * esz,                                     \
+                   ROUND_UP(vl * esz, simd_maxsz(desc)));                 \
+    vext_set_elems_1s(vd, vta, num * esz, tail_end);                      \
 }
 
 /* Compress into vd elements of vs2 where vs1 is enabled */
@@ -5600,7 +5632,9 @@ void HELPER(NAME)(void *vd, void *v0, void *vs2,                 \
     }                                                            \
     env->vstart = 0;                                             \
     /* set tail elements to 1s */                                \
-    vext_set_elems_1s(vd, vta, vl * esz, total_elems * esz);     \
+    nuclei_vext_set_tail_elems_1s(                               \
+        vd, vta, vl * esz, total_elems * esz,                    \
+        simd_maxsz(desc));                                       \
 }
 
 GEN_VEXT_INT_EXT(vzext_vf2_h, uint16_t, uint8_t,  H2, H1)
@@ -5721,24 +5755,21 @@ void HELPER(NAME)(void *vd, void *v0, void *vs1,                \
 {                                                               \
     uint32_t vm = vext_vm(desc);                                \
     uint32_t vl = env->vl;                                      \
-    uint32_t total_elems = riscv_cpu_cfg(env)->vlenb << 3;      \
-    uint32_t vta_all_1s = vext_vta_all_1s(desc);                \
+    uint32_t total_elems =                                      \
+        vext_get_total_elems(env, desc, sizeof(int32_t));       \
+    uint32_t vta = vext_vta(desc);                              \
     uint32_t i;                                                 \
                                                                 \
     VSTART_CHECK_EARLY_EXIT(env);                               \
                                                                 \
     for (i = env->vstart; i < vl / 16; i++) {                   \
-        do_##NAME(vd, v0, vs1, vs2, vm);                        \
-        vs2 += 16;                                              \
-        vd += 64;                                               \
+        do_##NAME(vd + i * 64, v0, vs1, vs2 + i * 16, vm);      \
     }                                                           \
     env->vstart = 0;                                            \
     /* set tail elements to 1s */                               \
-    if (vta_all_1s) {                                           \
-        for (; i < total_elems; i++) {                          \
-            vext_set_elem_mask(vd, i, 1);                       \
-        }                                                       \
-    }                                                           \
+    nuclei_vext_set_tail_elems_1s(                              \
+        vd, vta, vl * sizeof(int32_t),                          \
+        total_elems * sizeof(int32_t), simd_maxsz(desc));       \
 }
 
 OP_MATRIX_VV(xl_vqmaccu_vv, uint8_t, uint8_t)
