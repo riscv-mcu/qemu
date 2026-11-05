@@ -173,6 +173,27 @@ GEN_VEXT_ST_ELEM(ste_h, int16_t, H2, stw)
 GEN_VEXT_ST_ELEM(ste_w, int32_t, H4, stl)
 GEN_VEXT_ST_ELEM(ste_d, int64_t, H8, stq)
 
+static void lde_vnice_w(CPURISCVState *env, abi_ptr addr,
+                        uint32_t idx, void *vd, uintptr_t retaddr)
+{
+    uint32_t val;
+
+    (void)addr;
+    (void)retaddr;
+    memcpy(&val, &env->vnice_mem[idx * sizeof(val)], sizeof(val));
+    *((uint32_t *)vd + H4(idx)) = val;
+}
+
+static void ste_vnice_w(CPURISCVState *env, abi_ptr addr,
+                        uint32_t idx, void *vd, uintptr_t retaddr)
+{
+    uint32_t val = *((uint32_t *)vd + H4(idx));
+
+    (void)addr;
+    (void)retaddr;
+    memcpy(&env->vnice_mem[idx * sizeof(val)], &val, sizeof(val));
+}
+
 static void vext_set_tail_elems_1s(target_ulong vl, void *vd,
                                    uint32_t desc, uint32_t nf,
                                    uint32_t esz, uint32_t max_elems)
@@ -5600,7 +5621,7 @@ GEN_VEXT_INT_EXT(vsext_vf8_d, int64_t, int8_t,  H8, H1)
 void HELPER(vnl32)(void *vd, void *v0, target_ulong base,
                   CPURISCVState *env, uint32_t desc)
 {
-    vext_ldst_us(vd, base, env, desc, lde_w,
+    vext_ldst_us(vd, 0, env, desc, lde_vnice_w,
                  ctzl(sizeof(int32_t)), env->vl, GETPC());
 }
 
@@ -5608,7 +5629,7 @@ void HELPER(vnl32)(void *vd, void *v0, target_ulong base,
 void HELPER(vns32)(void *vd, void *v0, target_ulong base,
                   CPURISCVState *env, uint32_t desc)
 {
-    vext_ldst_us(vd, base, env, desc, ste_w,
+    vext_ldst_us(vd, 0, env, desc, ste_vnice_w,
                  ctzl(sizeof(int32_t)), env->vl, GETPC());
 }
 

@@ -156,6 +156,7 @@ typedef enum {
 #endif
 
 #define RV_VLEN_MAX 1024
+#define VNICE_PRIVATE_MEM_SIZE 1024
 #define RV_MAX_MHPMEVENTS 32
 #define RV_MAX_MHPMCOUNTERS 32
 
@@ -293,6 +294,7 @@ struct CPUArchState {
 
     /* vector coprocessor state. */
     uint64_t vreg[32 * RV_VLEN_MAX / 64] QEMU_ALIGNED(16);
+    uint8_t vnice_mem[VNICE_PRIVATE_MEM_SIZE];
     target_ulong vxrm;
     target_ulong vxsat;
     target_ulong vl;
