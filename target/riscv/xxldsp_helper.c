@@ -5850,9 +5850,10 @@ static inline void do_dksms32_u(CPURISCVState *env, void *vd, void *va,
 {
     int32_t *d = vd, *c = vc, *a = va, *b = vb;
     int64_t mres, round, op;
-    mres = (int64_t)a[i] * b[i];
-    round = extract64(mres, 15, 33) + 1;
-    op = (int64_t)c[i] + extract64(round, 1, 32);
+    mres = (int64_t)sextract32(a[i], 0, 24) *
+           sextract32(b[i], 0, 24);
+    round = (mres + (1ll << 15)) >> 16;
+    op = (int64_t)c[i] + round;
     if(op > INT32_MAX){
         op = INT32_MAX;
         env->ucode = 1;
